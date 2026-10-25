@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../config';
-import type { Message, Room, SendMessageRequest, SendMessageResponse } from '../types/chat';
-import { mockMessages, mockRooms } from './mockData';
+import type { HistoryResponse, Message, Room, SendMessageRequest, SendMessageResponse } from '../types/chat';
+import { mockRooms } from './mockData';
 
 export const chatApi = createApi({
   reducerPath: 'chatApi',
@@ -16,13 +16,30 @@ export const chatApi = createApi({
       providesTags: ['Room'],
     }),
 
-    // TODO: chưa có backend. Đổi thành `query: (roomId) => `/api/v1/rooms/${roomId}/messages``.
     getMessages: build.query<Message[], string>({
-      queryFn: async (roomId) => ({ data: mockMessages[roomId] ?? [] }),
+      query: (roomId) => `/api/v1/chat/${encodeURIComponent(roomId)}/messages?limit=50`,
+      // Gateway trả tin mới nhất trước, FlatList cần cũ nhất trước
+      transformResponse: (res: HistoryResponse): Message[] =>
+        res.messages
+          .map((m) => ({
+            id: m.message_id,
+            roomId: m.room_id,
+            senderId: m.sender_id,
+            content: m.content,
+            timestamp: m.timestamp,
+            status: 'sent' as const,
+          }))
+          .reverse(),
+      // Khi polling, giữ lại tin đang gửi / gửi lỗi mà server chưa có
+      merge: (currentCache, newItems) => {
+        const pending = currentCache.filter(
+          (m) => m.status !== 'sent' && !newItems.some((n) => n.id === m.id),
+        );
+        currentCache.splice(0, currentCache.length, ...newItems, ...pending);
+      },
       providesTags: (_result, _error, roomId) => [{ type: 'Message', id: roomId }],
     }),
 
-    // Endpoint thật, đã có ở gateway.
     sendMessage: build.mutation<
       SendMessageResponse,
       { roomId: string; senderId: string; content: string; localId: string }
