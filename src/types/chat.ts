@@ -34,3 +34,17 @@ export interface SendMessageResponse {
   status_message: string;
   timestamp: number;
 }
+
+// Khớp với GET /api/v1/chat/{room_id}/messages của gateway
+export interface HistoryItem {
+  message_id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  timestamp: number;
+}
+
+export interface HistoryResponse {
+  messages: HistoryItem[];
+  has_more: boolean;
+}
