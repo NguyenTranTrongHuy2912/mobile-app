@@ -26,9 +26,12 @@ export default function ChatRoomScreen({ route }: Props) {
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');
 
-  const { data: messages = [], isLoading } = useGetMessagesQuery(roomId);
+  const { data: messages = [], isLoading } = useGetMessagesQuery(roomId, {
+    pollingInterval: 3000,
+  });
   const [sendMessage] = useSendMessageMutation();
   const listRef = useRef<FlatList<Message>>(null);
+
 
   const send = useCallback(
     (content: string, localId?: string) => {

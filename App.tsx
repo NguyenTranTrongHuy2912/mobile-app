@@ -5,15 +5,18 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { store } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
+import SessionBootstrap from './src/features/session/SessionBootstrap';
 
 export default function App() {
   return (
     <Provider store={store}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <RootNavigator />
-          <StatusBar style="auto" />
-        </NavigationContainer>
+        <SessionBootstrap>
+          <NavigationContainer>
+            <RootNavigator />
+            <StatusBar style="auto" />
+          </NavigationContainer>
+        </SessionBootstrap>
       </SafeAreaProvider>
     </Provider>
   );
