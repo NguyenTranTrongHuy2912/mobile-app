@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 import { useGetMessagesQuery, useSendMessageMutation } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
+import { newId } from '../utils/newId';
 import type { Message } from '../types/chat';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -41,7 +42,7 @@ export default function ChatRoomScreen({ route }: Props) {
         roomId,
         senderId: userId,
         content: text,
-        localId: localId ?? `local_${Date.now()}`,
+        localId: localId ?? newId(),
       });
     },
     [roomId, sendMessage, userId],
@@ -65,7 +66,7 @@ export default function ChatRoomScreen({ route }: Props) {
           </Text>
         </View>
         {mine && item.status === 'failed' && (
-          <Pressable onPress={() => send(item.content)} hitSlop={8}>
+          <Pressable onPress={() => send(item.content, item.id)} hitSlop={8}>
             <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
           </Pressable>
         )}

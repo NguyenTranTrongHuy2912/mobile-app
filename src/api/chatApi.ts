@@ -44,11 +44,12 @@ export const chatApi = createApi({
       SendMessageResponse,
       { roomId: string; senderId: string; content: string; localId: string }
     >({
-      query: ({ roomId, senderId, content }) => {
+      query: ({ roomId, senderId, content, localId }) => {
         const body: SendMessageRequest = {
           room_id: roomId,
           sender_id: senderId,
           content,
+          message_id: localId,
         };
         return { url: '/api/v1/chat/send', method: 'POST', body };
       },
@@ -57,14 +58,19 @@ export const chatApi = createApi({
       async onQueryStarted({ roomId, senderId, content, localId }, { dispatch, queryFulfilled }) {
         dispatch(
           chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
-            draft.push({
-              id: localId,
-              roomId,
-              senderId,
-              content,
-              timestamp: Date.now(),
-              status: 'sending',
-            });
+            const existing = draft.find((m) => m.id === localId);
+            if (existing) {
+              existing.status = 'sending';
+            } else {
+              draft.push({
+                id: localId,
+                roomId,
+                senderId,
+                content,
+                timestamp: Date.now(),
+                status: 'sending',
+              });
+            }
           }),
         );
 
