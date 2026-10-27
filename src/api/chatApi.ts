@@ -17,7 +17,7 @@ export const chatApi = createApi({
     }),
 
     getMessages: build.query<Message[], string>({
-      query: (roomId) => `/api/v1/chat/${encodeURIComponent(roomId)}/messages?limit=50`,
+      query: (roomId) => `/api/v1/chat/history/${encodeURIComponent(roomId)}?limit=50`,
       // Gateway trả tin mới nhất trước, FlatList cần cũ nhất trước
       transformResponse: (res: HistoryResponse): Message[] =>
         res.messages

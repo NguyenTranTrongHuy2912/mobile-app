@@ -36,7 +36,7 @@ export interface SendMessageResponse {
   timestamp: number;
 }
 
-// Khớp với GET /api/v1/chat/{room_id}/messages của gateway
+// Khớp với GET /api/v1/chat/history/{room_id}/messages của gateway
 export interface HistoryItem {
   message_id: string;
   room_id: string;
