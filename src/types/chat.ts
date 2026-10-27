@@ -26,6 +26,7 @@ export interface SendMessageRequest {
   room_id: string;
   sender_id: string;
   content: string;
+  message_id?: string;
 }
 
 export interface SendMessageResponse {
