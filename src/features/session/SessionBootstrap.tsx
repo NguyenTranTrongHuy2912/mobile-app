@@ -1,28 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppDispatch } from '../../store/hooks';
-import { setUser } from './sessionSlice';
+import type { AuthUser } from '../../api/authApi';
+import { SESSION_KEY, setUser } from './sessionSlice';
 
-const KEY = 'chat_user_id';
-
-// Mỗi thiết bị tự có một userId, lưu lại để lần sau mở app vẫn là người đó.
+// Mở app: nếu máy đã lưu phiên đăng nhập thì khôi phục, không thì để người dùng
+// đi qua Welcome/Login. Chờ đọc xong mới render để không nháy màn hình đăng nhập.
 export default function SessionBootstrap({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     (async () => {
-      let id: string | null = null;
       try {
-        id = await AsyncStorage.getItem(KEY);
+        const raw = await AsyncStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const user = JSON.parse(raw) as AuthUser;
+          if (user?.userId) dispatch(setUser(user));
+        }
       } catch {}
-      if (!id) {
-        id = `user_${Math.random().toString(36).slice(2, 7)}`;
-        try {
-          await AsyncStorage.setItem(KEY, id);
-        } catch {}
-      }
-      dispatch(setUser({ userId: id, displayName: id }));
       setReady(true);
     })();
   }, [dispatch]);
