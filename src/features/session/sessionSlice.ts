@@ -13,6 +13,7 @@ interface SessionState extends AuthUser {
 const initialState: SessionState = {
   userId: '',
   displayName: '',
+  token: '',
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -40,11 +41,11 @@ export const login = createAsyncThunk<
 
 export const register = createAsyncThunk<
   AuthUser,
-  { name: string; account: string; password: string },
+  { name: string; account: string; password: string; otpCode: string },
   { rejectValue: string }
->('session/register', async ({ name, account, password }, { rejectWithValue }) => {
+>('session/register', async ({ name, account, password, otpCode }, { rejectWithValue }) => {
   try {
-    const user = await authApi.register(name, account, password);
+    const user = await authApi.register(name, account, password, otpCode);
     await saveSession(user);
     return user;
   } catch (e) {
@@ -66,6 +67,7 @@ const sessionSlice = createSlice({
     setUser(state, action: PayloadAction<AuthUser>) {
       state.userId = action.payload.userId;
       state.displayName = action.payload.displayName;
+      state.token = action.payload.token;
       state.isAuthenticated = true;
     },
     clearError(state) {
@@ -81,6 +83,7 @@ const sessionSlice = createSlice({
       state.loading = false;
       state.userId = action.payload.userId;
       state.displayName = action.payload.displayName;
+      state.token = action.payload.token;
       state.isAuthenticated = true;
     };
     const rejected = (state: SessionState, action: { payload?: string }) => {
