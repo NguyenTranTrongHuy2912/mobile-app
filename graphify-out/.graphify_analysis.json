@@ -1,0 +1,325 @@
+{
+  "communities": {
+    "0": [
+      "package",
+      "package_dependencies",
+      "package_dependencies_axios",
+      "package_dependencies_dayjs",
+      "package_dependencies_expo",
+      "package_dependencies_expo_image_picker",
+      "package_dependencies_expo_status_bar",
+      "package_dependencies_expo_vector_icons",
+      "package_dependencies_lucide_react_native",
+      "package_dependencies_react",
+      "package_dependencies_react_dom",
+      "package_dependencies_react_native",
+      "package_dependencies_react_native_gifted_chat",
+      "package_dependencies_react_native_screens",
+      "package_dependencies_react_native_svg",
+      "package_dependencies_react_native_web",
+      "package_dependencies_react_navigation_native",
+      "package_devdependencies",
+      "package_devdependencies_types_react",
+      "package_devdependencies_typescript",
+      "package_main",
+      "package_name",
+      "package_private",
+      "package_version",
+      "ref_axios",
+      "ref_dayjs",
+      "ref_expo",
+      "ref_expo_image_picker",
+      "ref_expo_status_bar",
+      "ref_lucide_react_native",
+      "ref_react_dom",
+      "ref_react_native_gifted_chat",
+      "ref_react_native_screens",
+      "ref_react_native_svg",
+      "ref_react_native_web",
+      "ref_react_navigation_native",
+      "ref_types_react",
+      "ref_typescript"
+    ],
+    "1": [
+      "package_dependencies_react_native_safe_area_context",
+      "ref_expo_vector_icons",
+      "ref_react",
+      "ref_react_native",
+      "ref_react_native_safe_area_context",
+      "src_components_applogo",
+      "src_components_applogo_applogo",
+      "src_components_applogo_styles",
+      "src_components_authbutton",
+      "src_components_authbutton_authbutton",
+      "src_components_authbutton_props",
+      "src_components_authbutton_styles",
+      "src_components_authinput",
+      "src_components_authinput_authinput",
+      "src_components_authinput_props",
+      "src_components_authinput_styles",
+      "src_features_session_sessionslice_clearerror",
+      "src_navigation_types",
+      "src_navigation_types_rootstackparamlist",
+      "src_screens_loginscreen",
+      "src_screens_loginscreen_props",
+      "src_screens_loginscreen_styles",
+      "src_screens_registerscreen",
+      "src_screens_registerscreen_props",
+      "src_screens_registerscreen_styles",
+      "src_screens_welcomescreen",
+      "src_screens_welcomescreen_props",
+      "src_screens_welcomescreen_styles",
+      "src_screens_welcomescreen_welcomescreen",
+      "src_theme",
+      "src_theme_colors"
+    ],
+    "2": [
+      "src_api_chatapi",
+      "src_api_chatapi_rationale_13",
+      "src_api_chatapi_usegetroomsquery",
+      "src_api_mockdata",
+      "src_api_mockdata_me",
+      "src_api_mockdata_mockmessages",
+      "src_api_mockdata_mockrooms",
+      "src_config",
+      "src_config_api_url",
+      "src_screens_roomlistscreen",
+      "src_screens_roomlistscreen_props",
+      "src_screens_roomlistscreen_roomlistscreen",
+      "src_screens_roomlistscreen_styles",
+      "src_types_chat",
+      "src_types_chat_historyitem",
+      "src_types_chat_historyresponse",
+      "src_types_chat_message",
+      "src_types_chat_messagestatus",
+      "src_types_chat_room",
+      "src_types_chat_roomtype",
+      "src_types_chat_sendmessagerequest",
+      "src_types_chat_sendmessageresponse"
+    ],
+    "3": [
+      "package_dependencies_react_navigation_native_stack",
+      "ref_react_navigation_native_stack",
+      "src_api_chatapi_usegetmessagesquery",
+      "src_api_chatapi_usesendmessagemutation",
+      "src_features_chat_chatslice_cleardraft",
+      "src_features_chat_chatslice_setdraft",
+      "src_features_session_sessionslice_logout",
+      "src_navigation_rootnavigator",
+      "src_navigation_rootnavigator_rootnavigator",
+      "src_navigation_rootnavigator_stack",
+      "src_screens_chatroomscreen",
+      "src_screens_chatroomscreen_chatroomscreen",
+      "src_screens_chatroomscreen_props",
+      "src_screens_chatroomscreen_styles",
+      "src_screens_loginscreen_loginscreen",
+      "src_screens_registerscreen_registerscreen",
+      "src_store_hooks_useappdispatch",
+      "src_store_hooks_useappselector",
+      "src_utils_newid",
+      "src_utils_newid_newid"
+    ],
+    "4": [
+      "app_adaptiveicon_backgroundcolor",
+      "app_adaptiveicon_backgroundimage",
+      "app_adaptiveicon_foregroundimage",
+      "app_adaptiveicon_monochromeimage",
+      "app_android_adaptiveicon",
+      "app_android_predictivebackgestureenabled",
+      "app_expo",
+      "app_expo_android",
+      "app_expo_icon",
+      "app_expo_ios",
+      "app_expo_name",
+      "app_expo_orientation",
+      "app_expo_slug",
+      "app_expo_userinterfacestyle",
+      "app_expo_version",
+      "app_expo_web",
+      "app_ios_supportstablet",
+      "app_json_app",
+      "app_web_favicon"
+    ],
+    "5": [
+      "app_app",
+      "app_tsx_app",
+      "index",
+      "package_dependencies_react_redux",
+      "package_dependencies_reduxjs_toolkit",
+      "ref_react_redux",
+      "ref_reduxjs_toolkit",
+      "src_api_chatapi_chatapi",
+      "src_features_chat_chatslice",
+      "src_features_chat_chatslice_chatslice",
+      "src_features_chat_chatslice_chatstate",
+      "src_features_chat_chatslice_initialstate",
+      "src_features_session_sessionbootstrap_sessionbootstrap",
+      "src_store_hooks",
+      "src_store_index",
+      "src_store_index_appdispatch",
+      "src_store_index_rootstate",
+      "src_store_index_store"
+    ],
+    "6": [
+      "package_dependencies_react_native_async_storage_async_storage",
+      "ref_react_native_async_storage_async_storage",
+      "src_api_authapi",
+      "src_api_authapi_authapi",
+      "src_api_authapi_authuser",
+      "src_api_authapi_touserid",
+      "src_api_authapi_wait",
+      "src_features_session_sessionbootstrap",
+      "src_features_session_sessionslice",
+      "src_features_session_sessionslice_initialstate",
+      "src_features_session_sessionslice_login",
+      "src_features_session_sessionslice_register",
+      "src_features_session_sessionslice_savesession",
+      "src_features_session_sessionslice_session_key",
+      "src_features_session_sessionslice_sessionslice",
+      "src_features_session_sessionslice_sessionstate",
+      "src_features_session_sessionslice_setuser"
+    ],
+    "7": [
+      "package_scripts",
+      "package_scripts_android",
+      "package_scripts_ios",
+      "package_scripts_start",
+      "package_scripts_web"
+    ],
+    "8": [
+      "ref_expo_tsconfig_base",
+      "tsconfig",
+      "tsconfig_compileroptions",
+      "tsconfig_compileroptions_strict",
+      "tsconfig_extends"
+    ],
+    "9": [
+      "src_api_chatapi_usegetroomsquery_usegetmessagesquery_usesendmessagemutation"
+    ]
+  },
+  "cohesion": {
+    "0": 0.07254623044096728,
+    "1": 0.15698924731182795,
+    "2": 0.14285714285714285,
+    "3": 0.17894736842105263,
+    "4": 0.10526315789473684,
+    "5": 0.1568627450980392,
+    "6": 0.18382352941176472,
+    "7": 0.4,
+    "8": 0.4,
+    "9": 1.0
+  },
+  "gods": [
+    {
+      "id": "ref_react",
+      "label": "react",
+      "degree": 13
+    },
+    {
+      "id": "ref_react_native",
+      "label": "react-native",
+      "degree": 12
+    },
+    {
+      "id": "src_store_hooks_useappdispatch",
+      "label": "useAppDispatch",
+      "degree": 11
+    },
+    {
+      "id": "app_expo",
+      "label": "expo",
+      "degree": 10
+    },
+    {
+      "id": "src_store_hooks_useappselector",
+      "label": "useAppSelector",
+      "degree": 9
+    },
+    {
+      "id": "ref_react_navigation_native_stack",
+      "label": "@react-navigation/native-stack",
+      "degree": 8
+    },
+    {
+      "id": "src_screens_loginscreen_loginscreen",
+      "label": "LoginScreen()",
+      "degree": 8
+    },
+    {
+      "id": "src_theme_colors",
+      "label": "colors",
+      "degree": 8
+    },
+    {
+      "id": "src_components_authbutton_authbutton",
+      "label": "AuthButton()",
+      "degree": 7
+    },
+    {
+      "id": "src_navigation_types_rootstackparamlist",
+      "label": "RootStackParamList",
+      "degree": 7
+    }
+  ],
+  "surprises": [
+    {
+      "source": "App()",
+      "target": "RootNavigator()",
+      "source_files": [
+        "App.tsx",
+        "src/navigation/RootNavigator.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "App()",
+      "target": "SessionBootstrap()",
+      "source_files": [
+        "App.tsx",
+        "src/features/session/SessionBootstrap.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories"
+    },
+    {
+      "source": "LoginScreen()",
+      "target": "AppLogo()",
+      "source_files": [
+        "src/screens/LoginScreen.tsx",
+        "src/components/AppLogo.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "LoginScreen()",
+      "target": "AuthButton()",
+      "source_files": [
+        "src/screens/LoginScreen.tsx",
+        "src/components/AuthButton.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "RegisterScreen()",
+      "target": "AuthButton()",
+      "source_files": [
+        "src/screens/RegisterScreen.tsx",
+        "src/components/AuthButton.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}
