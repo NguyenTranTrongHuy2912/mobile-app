@@ -24,10 +24,10 @@
     "semantic_hash": ""
   },
   "src/api/authApi.ts": {
-    "mtime": 1793204238.9361022,
-    "seen": 1793365800.3744347,
-    "ast_hash": "840888ae5cd10cd8e25f947df0213d42",
-    "semantic_hash": "840888ae5cd10cd8e25f947df0213d42"
+    "mtime": 1793367830.6975708,
+    "seen": 1793368192.392325,
+    "ast_hash": "e9ebdbdac3d3b023cfb87284c1f6a982",
+    "semantic_hash": ""
   },
   "src/api/chatApi.ts": {
     "mtime": 1793127559.2297547,
@@ -78,10 +78,10 @@
     "semantic_hash": "22071d51a3764a4de3ac5e92651f4fa3"
   },
   "src/features/session/sessionSlice.ts": {
-    "mtime": 1793204294.8683617,
-    "seen": 1793365800.374445,
-    "ast_hash": "b6b0741feb55b4ada2b7817885b02367",
-    "semantic_hash": "b6b0741feb55b4ada2b7817885b02367"
+    "mtime": 1793367825.9783428,
+    "seen": 1793368192.3923426,
+    "ast_hash": "9eb827c1b7b79d1772a4a2901890e0aa",
+    "semantic_hash": ""
   },
   "src/navigation/RootNavigator.tsx": {
     "mtime": 1793204360.117408,
@@ -108,10 +108,10 @@
     "semantic_hash": "e2b1ce5579d40c3d0b0146ac048e9f0e"
   },
   "src/screens/RegisterScreen.tsx": {
-    "mtime": 1793204130.2289906,
-    "seen": 1793365800.3744502,
-    "ast_hash": "603374b9a7359fceaa7f55e02394854c",
-    "semantic_hash": "603374b9a7359fceaa7f55e02394854c"
+    "mtime": 1793368177.7190597,
+    "seen": 1793368192.3923514,
+    "ast_hash": "ecec47b6ede45afa5908f721c295fe09",
+    "semantic_hash": ""
   },
   "src/screens/RoomListScreen.tsx": {
     "mtime": 1792679602.312914,
