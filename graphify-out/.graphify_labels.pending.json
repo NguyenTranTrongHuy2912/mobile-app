@@ -1,0 +1,12 @@
+{
+  "0": "package.json",
+  "1": "LoginScreen.tsx",
+  "2": "chatApi.ts",
+  "3": "RootNavigator.tsx",
+  "4": "expo",
+  "5": "App.tsx",
+  "6": "sessionSlice.ts",
+  "7": "scripts",
+  "8": "tsconfig.json",
+  "9": "{ useGetRoomsQuery, useGetMessagesQuery, useSendMessageMutation }"
+}
