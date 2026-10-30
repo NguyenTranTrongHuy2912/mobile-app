@@ -28,18 +28,16 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Xóa lỗi cũ của màn hình khác khi vừa mở màn hình này
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
 
   const onSubmit = () => {
     if (!account.trim() || !password) {
-      setLocalError('Vui lòng nhập email/số điện thoại và mật khẩu.');
+      setLocalError('Vui lòng nhập email và mật khẩu.');
       return;
     }
     setLocalError(null);
-    // Đăng nhập thành công thì isAuthenticated = true, RootNavigator tự chuyển sang RoomList
     dispatch(login({ account, password }));
   };
 
@@ -62,7 +60,7 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.title}>Đăng nhập vào ChatApp</Text>
 
           <AuthInput
-            placeholder="Email hoặc số điện thoại"
+            placeholder="Email"
             value={account}
             onChangeText={setAccount}
             keyboardType="email-address"
