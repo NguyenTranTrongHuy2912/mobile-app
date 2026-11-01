@@ -8,5 +8,6 @@
   "6": "sessionSlice.ts",
   "7": "scripts",
   "8": "tsconfig.json",
-  "9": "{ useGetRoomsQuery, useGetMessagesQuery, useSendMessageMutation }"
+  "9": "{\n  useGetRoomsQuery,\n  useSearchUsersQuery,\n  useCreateRoomMutation,\n  useMarkRoomReadMutation,\n  useGetMessagesQuery,\n  useSendMessageMutation,\n}",
+  "10": "NewChatScreen.tsx"
 }
