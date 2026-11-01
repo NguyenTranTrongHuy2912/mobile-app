@@ -1,19 +1,82 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../config';
-import type { HistoryResponse, Message, Room, SendMessageRequest, SendMessageResponse } from '../types/chat';
-import { mockRooms } from './mockData';
+import type { RootState } from '../store';
+import type {
+  CreateRoomRequest,
+  HistoryResponse,
+  Message,
+  Room,
+  RoomDto,
+  RoomsResponse,
+  RoomType,
+  SearchUsersResponse,
+  SendMessageRequest,
+  SendMessageResponse,
+  UserSummary,
+} from '../types/chat';
+
+const toRoom = (d: RoomDto): Room => ({
+  id: d.room_id,
+  type: d.type === 'GROUP' ? 'group' : 'direct',
+  name: d.name,
+  memberIds: d.member_ids,
+  members: d.members.map((m) => ({ userId: m.user_id, displayName: m.display_name })),
+  lastMessage: d.last_message?.content,
+  lastMessageSenderId: d.last_message?.sender_id,
+  lastMessageAt: d.last_message?.timestamp,
+  unreadCount: d.unread_count,
+});
 
 export const chatApi = createApi({
   reducerPath: 'chatApi',
-  baseQuery: fetchBaseQuery({ baseUrl: API_URL }),
+  baseQuery: fetchBaseQuery({
+    baseUrl: API_URL,
+    // Mọi endpoint của gateway (trừ /auth/*) đều cần JWT
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).session.token;
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      return headers;
+    },
+  }),
   tagTypes: ['Room', 'Message'],
-  // Dữ liệu giả nằm trong cache nên giữ lâu để không bị reset khi rời màn hình
+  // Giữ lâu để tin đang gửi / gửi lỗi (chỉ nằm trong cache) không mất khi rời phòng
   keepUnusedDataFor: 3600,
   endpoints: (build) => ({
-    // TODO: chưa có backend. Đổi thành `query: () => '/api/v1/rooms'` khi gateway có endpoint.
     getRooms: build.query<Room[], void>({
-      queryFn: async () => ({ data: mockRooms }),
+      query: () => '/api/v1/rooms',
+      transformResponse: (res: RoomsResponse): Room[] => res.rooms.map(toRoom),
       providesTags: ['Room'],
+    }),
+
+    searchUsers: build.query<UserSummary[], string>({
+      query: (q) => ({ url: '/api/v1/users/search', params: { q, limit: 20 } }),
+      transformResponse: (res: SearchUsersResponse): UserSummary[] =>
+        res.users.map((u) => ({ userId: u.user_id, displayName: u.display_name, email: u.email })),
+      keepUnusedDataFor: 30,
+    }),
+
+    // direct: memberIds có đúng 1 người; group: cần name và ít nhất 2 người
+    createRoom: build.mutation<Room, { type: RoomType; name?: string; memberIds: string[] }>({
+      query: ({ type, name, memberIds }) => {
+        const body: CreateRoomRequest = {
+          type: type === 'group' ? 'GROUP' : 'DIRECT',
+          name: name ?? '',
+          member_ids: memberIds,
+        };
+        return { url: '/api/v1/rooms', method: 'POST', body };
+      },
+      transformResponse: (res: RoomDto): Room => toRoom(res),
+      invalidatesTags: ['Room'],
+    }),
+
+    // Đánh dấu đã đọc đến tin mới nhất trong phòng
+    markRoomRead: build.mutation<{ ok: boolean }, string>({
+      query: (roomId) => ({
+        url: `/api/v1/rooms/${encodeURIComponent(roomId)}/read`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: ['Room'],
     }),
 
     getMessages: build.query<Message[], string>({
@@ -44,15 +107,17 @@ export const chatApi = createApi({
       SendMessageResponse,
       { roomId: string; senderId: string; content: string; localId: string }
     >({
-      query: ({ roomId, senderId, content, localId }) => {
+      query: ({ roomId, content, localId }) => {
+        // senderId chỉ dùng để hiện tin tạm trong cache; gateway lấy người gửi từ token
         const body: SendMessageRequest = {
           room_id: roomId,
-          sender_id: senderId,
           content,
           message_id: localId,
         };
         return { url: '/api/v1/chat/send', method: 'POST', body };
       },
+      // Gửi xong thì làm mới danh sách phòng để cập nhật tin cuối
+      invalidatesTags: ['Room'],
 
       // Optimistic update: hiện tin nhắn ngay, sau đó cập nhật trạng thái theo kết quả server.
       async onQueryStarted({ roomId, senderId, content, localId }, { dispatch, queryFulfilled }) {
@@ -106,4 +171,11 @@ export const chatApi = createApi({
   }),
 });
 
-export const { useGetRoomsQuery, useGetMessagesQuery, useSendMessageMutation } = chatApi;
+export const {
+  useGetRoomsQuery,
+  useSearchUsersQuery,
+  useCreateRoomMutation,
+  useMarkRoomReadMutation,
+  useGetMessagesQuery,
+  useSendMessageMutation,
+} = chatApi;
