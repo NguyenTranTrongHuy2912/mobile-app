@@ -6,4 +6,6 @@ export type RootStackParamList = {
   // Đã đăng nhập
   RoomList: undefined;
   ChatRoom: { roomId: string; title: string };
+  NewChat: undefined;
+  NewGroup: undefined;
 };
