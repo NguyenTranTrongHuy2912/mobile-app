@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,12 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import dayjs from 'dayjs';
-import { useGetMessagesQuery, useSendMessageMutation } from '../api/chatApi';
+import {
+  useGetMessagesQuery,
+  useGetRoomsQuery,
+  useMarkRoomReadMutation,
+  useSendMessageMutation,
+} from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { newId } from '../utils/newId';
@@ -31,8 +36,29 @@ export default function ChatRoomScreen({ route }: Props) {
     pollingInterval: 3000,
   });
   const [sendMessage] = useSendMessageMutation();
+  const [markRoomRead] = useMarkRoomReadMutation();
   const listRef = useRef<FlatList<Message>>(null);
 
+  // Tra tên người gửi từ danh sách thành viên của phòng (đã có trong cache danh sách phòng)
+  const { room } = useGetRoomsQuery(undefined, {
+    selectFromResult: ({ data }) => ({ room: data?.find((r) => r.id === roomId) }),
+  });
+  const names = useMemo(
+    () => new Map((room?.members ?? []).map((m) => [m.userId, m.displayName] as const)),
+    [room],
+  );
+
+  // Đánh dấu đã đọc khi mở phòng và mỗi khi có tin mới từ người khác
+  const lastIncomingId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].senderId !== userId) return messages[i].id;
+    }
+    return null;
+  }, [messages, userId]);
+
+  useEffect(() => {
+    if (lastIncomingId) markRoomRead(roomId);
+  }, [roomId, lastIncomingId, markRoomRead]);
 
   const send = useCallback(
     (content: string, localId?: string) => {
@@ -58,7 +84,9 @@ export default function ChatRoomScreen({ route }: Props) {
     return (
       <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
         <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
-          {!mine && <Text style={styles.sender}>{item.senderId}</Text>}
+          {!mine && (
+            <Text style={styles.sender}>{names.get(item.senderId) ?? 'Người dùng'}</Text>
+          )}
           <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
           <Text style={[styles.meta, mine ? styles.metaMine : styles.metaOther]}>
             {dayjs(item.timestamp).format('HH:mm')}
