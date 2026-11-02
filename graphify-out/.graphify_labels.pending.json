@@ -2,12 +2,11 @@
   "0": "package.json",
   "1": "LoginScreen.tsx",
   "2": "chatApi.ts",
-  "3": "RootNavigator.tsx",
+  "3": "ChatRoomScreen.tsx",
   "4": "expo",
   "5": "App.tsx",
   "6": "sessionSlice.ts",
   "7": "scripts",
   "8": "tsconfig.json",
-  "9": "{\n  useGetRoomsQuery,\n  useSearchUsersQuery,\n  useCreateRoomMutation,\n  useMarkRoomReadMutation,\n  useGetMessagesQuery,\n  useSendMessageMutation,\n}",
-  "10": "NewChatScreen.tsx"
+  "9": "{\n  useGetRoomsQuery,\n  useSearchUsersQuery,\n  useCreateRoomMutation,\n  useMarkRoomReadMutation,\n  useGetMessagesQuery,\n  useSendMessageMutation,\n}"
 }
