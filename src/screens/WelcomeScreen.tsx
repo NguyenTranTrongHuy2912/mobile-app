@@ -34,7 +34,10 @@ export default function WelcomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 24 },
+  container: {
+    flex: 1, backgroundColor: colors.background,
+    paddingHorizontal: 24, width: '100%', maxWidth: 480, alignSelf: 'center'
+  },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   title: {
     fontSize: 26,

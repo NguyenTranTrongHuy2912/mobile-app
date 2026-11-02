@@ -191,7 +191,10 @@ export default function RegisterScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24 },
+  content: {
+    flexGrow: 1, paddingHorizontal: 24, paddingTop: 8,
+    width: '100%', maxWidth: 480, alignSelf: 'center'
+  },
   back: { width: 40, height: 40, justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 16 },
   subtitle: { fontSize: 15, color: colors.subtext, marginTop: 4, marginBottom: 24 },

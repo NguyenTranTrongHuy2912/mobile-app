@@ -98,7 +98,10 @@ export default function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 8 },
+  content: {
+    flexGrow: 1, paddingHorizontal: 24, paddingTop: 8,
+    width: '100%', maxWidth: 480, alignSelf: 'center'
+  },
   back: { width: 40, height: 40, justifyContent: 'center' },
   logo: { alignItems: 'center', marginTop: 16, marginBottom: 20 },
   title: {
