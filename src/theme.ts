@@ -1,9 +1,10 @@
-// Màu cho các màn hình đăng nhập, lấy theo xanh Messenger.
 export const colors = {
-  primary: '#0084FF',
-  text: '#050505',
-  subtext: '#65676B',
-  border: '#CED0D4',
+  primary: '#2F6BFF',
+  primarySoft: '#E6EEFF',
+  text: '#0B1B3F',
+  subtext: '#5B6B8C',
+  border: '#D5DEEF',
   background: '#FFFFFF',
+  screen: '#F4F8FF',
   error: '#E41E3F',
 };
