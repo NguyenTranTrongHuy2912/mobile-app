@@ -1,25 +1,42 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Input, XStack } from 'tamagui';
+import type { InputProps } from 'tamagui';
 import { colors } from '../theme';
 
-type Props = TextInputProps & { isPassword?: boolean };
+type Props = InputProps & { isPassword?: boolean };
 
-export default function AuthInput({ isPassword, style, ...rest }: Props) {
+export default function AuthInput({ isPassword, ...rest }: Props) {
   const [hidden, setHidden] = useState(!!isPassword);
 
   return (
-    <View style={styles.wrapper}>
-      <TextInput
+    <XStack
+      alignItems="center"
+      height={52}
+      borderWidth={1}
+      borderColor={colors.border}
+      borderRadius={10}
+      backgroundColor={colors.background}
+      paddingHorizontal={16}
+      marginBottom={12}
+    >
+      <Input
+        flex={1}
+        height={50}
+        borderWidth={0}
+        backgroundColor="transparent"
+        paddingHorizontal={0}
+        fontSize={16}
+        color={colors.text}
+        placeholderTextColor={colors.subtext}
         autoCapitalize="none"
         autoCorrect={false}
         {...rest}
-        style={[styles.input, style]}
-        placeholderTextColor={colors.subtext}
         secureTextEntry={hidden}
       />
       {isPassword ? (
-        <Pressable onPress={() => setHidden((h) => !h)} style={styles.eye} hitSlop={8}>
+        <Pressable onPress={() => setHidden((h) => !h)} hitSlop={8}>
           <Ionicons
             name={hidden ? 'eye-off-outline' : 'eye-outline'}
             size={22}
@@ -27,22 +44,6 @@ export default function AuthInput({ isPassword, style, ...rest }: Props) {
           />
         </Pressable>
       ) : null}
-    </View>
+    </XStack>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: { justifyContent: 'center', marginBottom: 12 },
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingRight: 48,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.background,
-  },
-  eye: { position: 'absolute', right: 14 },
-});

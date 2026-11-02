@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import React, { useState } from 'react';
+import { Button, Spinner } from 'tamagui';
 import { colors } from '../theme';
 
 interface Props {
@@ -18,36 +18,25 @@ export default function AuthButton({
   disabled = false,
 }: Props) {
   const outline = variant === 'outline';
+  const [pressed, setPressed] = useState(false);
 
-  return (
-    <Pressable
+   return (
+    <Button
       onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.base,
-        outline ? styles.outline : styles.primary,
-        (pressed || disabled) && styles.dim,
-      ]}
+      height={52}
+      borderRadius={26}
+      backgroundColor={outline ? colors.background : colors.primary}
+      borderWidth={outline ? 1 : 0}
+      borderColor={colors.primary}
+      color={outline ? colors.primary : '#fff'}
+      fontSize={17}
+      fontWeight="600"
+      opacity={disabled || pressed ? 0.6 : 1}
     >
-      {loading ? (
-        <ActivityIndicator color={outline ? colors.primary : '#fff'} />
-      ) : (
-        <Text style={[styles.text, outline && styles.textOutline]}>{title}</Text>
-      )}
-    </Pressable>
+      {loading ? <Spinner color={outline ? colors.primary : '#fff'} /> : title}
+    </Button>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primary: { backgroundColor: colors.primary },
-  outline: { borderWidth: 1, borderColor: colors.primary },
-  dim: { opacity: 0.6 },
-  text: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  textOutline: { color: colors.primary },
-});
