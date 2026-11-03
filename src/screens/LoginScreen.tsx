@@ -77,7 +77,7 @@ export default function LoginScreen() {
             <AuthButton title="Đăng nhập" onPress={onSubmit} loading={loading} />
           </View>
 
-          <Pressable style={styles.forgot}>
+          <Pressable style={styles.forgot} onPress={() => router.push('/forgot-password')}>
             <Text style={styles.link}>Quên mật khẩu?</Text>
           </Pressable>
 

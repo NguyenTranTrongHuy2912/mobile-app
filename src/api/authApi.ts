@@ -54,6 +54,30 @@ export const authApi = {
     }
   },
 
+  async forgotPassword(account: string): Promise<OtpInfo> {
+    try {
+      const { data } = await http.post('/auth/forgot-password', { account: account.trim() });
+      return {
+        expiresInSeconds: data.expires_in_seconds,
+        resendAfterSeconds: data.resend_after_seconds,
+      };
+    } catch (e) {
+      throw toError(e, 'Không gửi được mã xác thực');
+    }
+  },
+
+  async resetPassword(account: string, otpCode: string, newPassword: string): Promise<void> {
+    try {
+      await http.post('/auth/reset-password', {
+        account: account.trim(),
+        otp_code: otpCode.trim(),
+        new_password: newPassword,
+      });
+    } catch (e) {
+      throw toError(e, 'Không đổi được mật khẩu');
+    }
+  },
+
   async register(
     name: string,
     account: string,

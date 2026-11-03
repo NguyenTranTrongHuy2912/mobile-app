@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile-app",
-    "slug": "mobile-app",
+    "name": "ChatApp",
+    "slug": "chat-app",
     "scheme": "chatapp",
     "version": "1.0.0",
     "orientation": "default",
@@ -12,6 +12,8 @@
     },
     "android": {
       "adaptiveIcon": {
+        "package": "iuh.fit.chatapp",
+        "versionCode": 1,
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
