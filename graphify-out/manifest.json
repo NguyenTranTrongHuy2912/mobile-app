@@ -1,8 +1,8 @@
 {
   "app.json": {
-    "mtime": 1793703584.9647179,
-    "seen": 1793704794.9869072,
-    "ast_hash": "9f141d0d876269db179090587f2b1786",
+    "mtime": 1793706854.4591677,
+    "seen": 1793706883.0722072,
+    "ast_hash": "3a94c11cd135945ddd3bca1d2e8c4efc",
     "semantic_hash": ""
   },
   "package.json": {
@@ -12,9 +12,9 @@
     "semantic_hash": ""
   },
   "src/api/authApi.ts": {
-    "mtime": 1793539297.9451113,
-    "seen": 1793594717.8985534,
-    "ast_hash": "e9ebdbdac3d3b023cfb87284c1f6a982",
+    "mtime": 1793705775.5441408,
+    "seen": 1793706883.0722454,
+    "ast_hash": "4236663b07b4ad13fb04778288cae3e1",
     "semantic_hash": ""
   },
   "src/api/chatApi.ts": {
@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "src/screens/LoginScreen.tsx": {
-    "mtime": 1793703735.4708838,
-    "seen": 1793704794.9869547,
-    "ast_hash": "626404a70ea813b81eedc034ca8dfc90",
+    "mtime": 1793706281.1376135,
+    "seen": 1793706883.0722663,
+    "ast_hash": "c5e3afb957ef9768ceaf5320c11c1a1c",
     "semantic_hash": ""
   },
   "src/screens/RegisterScreen.tsx": {
@@ -225,6 +225,18 @@
     "mtime": 1793704322.9565158,
     "seen": 1793704794.9869297,
     "ast_hash": "496b8e402a1db90f1082e156c7f4c0b5",
+    "semantic_hash": ""
+  },
+  "app/(auth)/forgot-password.tsx": {
+    "mtime": 1793705741.785697,
+    "seen": 1793706883.072231,
+    "ast_hash": "409f631d9cca21f2ad8b1a588c21e911",
+    "semantic_hash": ""
+  },
+  "src/screens/ForgotPasswordScreen.tsx": {
+    "mtime": 1793705727.325799,
+    "seen": 1793706883.0722642,
+    "ast_hash": "7cdd2fe8978aee669509d6c74840186e",
     "semantic_hash": ""
   },
   "package-lock.json": {

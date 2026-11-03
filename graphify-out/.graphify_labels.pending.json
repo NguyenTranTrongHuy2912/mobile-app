@@ -9,5 +9,6 @@
   "7": "scripts",
   "8": "tsconfig.json",
   "9": "{\n  useGetRoomsQuery,\n  useSearchUsersQuery,\n  useCreateRoomMutation,\n  useMarkRoomReadMutation,\n  useGetMessagesQuery,\n  useSendMessageMutation,\n}",
-  "10": "expo-router"
+  "10": "(auth)/_layout.tsx",
+  "11": "RoomListScreen.tsx"
 }
