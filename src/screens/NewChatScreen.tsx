@@ -8,18 +8,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import { useCreateRoomMutation, useSearchUsersQuery } from '../api/chatApi';
 import { errorMessage } from '../utils/errorMessage';
 import type { UserSummary } from '../types/chat';
-import type { RootStackParamList } from '../navigation/types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'NewChat'>;
 
 const MIN_QUERY = 2; // khớp giới hạn của backend
 const DEBOUNCE_MS = 400;
 
-export default function NewChatScreen({ navigation }: Props) {
+export default function NewChatScreen() {
+  const router = useRouter();
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +39,7 @@ export default function NewChatScreen({ navigation }: Props) {
     try {
       const room = await createRoom({ type: 'direct', memberIds: [user.userId] }).unwrap();
       // replace để nút Back quay về danh sách phòng, không quay lại màn hình tìm kiếm
-      navigation.replace('ChatRoom', { roomId: room.id, title: room.name });
+      router.replace({ pathname: '/chat/[roomId]', params: { roomId: room.id, title: room.name } });
     } catch (e) {
       setError(errorMessage(e, 'Không mở được cuộc trò chuyện. Hãy thử lại.'));
     }

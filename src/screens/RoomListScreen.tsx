@@ -7,14 +7,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import dayjs from 'dayjs';
+import { useRouter } from 'expo-router';
 import { useGetRoomsQuery } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
 import type { Room } from '../types/chat';
-import type { RootStackParamList } from '../navigation/types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'RoomList'>;
 
 // Tạm thời làm mới định kỳ để thấy tin mới / số chưa đọc, cho đến khi có realtime
 const POLL_MS = 5000;
@@ -38,7 +35,8 @@ function previewOf(room: Room, myId: string): string {
   return room.lastMessage;
 }
 
-export default function RoomListScreen({ navigation }: Props) {
+export default function RoomListScreen() {
+  const router = useRouter();
   const myId = useAppSelector((s) => s.session.userId);
   const { data: rooms, isLoading, refetch } = useGetRoomsQuery(undefined, {
     pollingInterval: POLL_MS,
@@ -79,7 +77,7 @@ export default function RoomListScreen({ navigation }: Props) {
     return (
       <Pressable
         style={styles.row}
-        onPress={() => navigation.navigate('ChatRoom', { roomId: item.id, title: item.name })}
+        onPress={() => router.push({ pathname: '/chat/[roomId]', params: { roomId: item.id, title: item.name } })}
       >
         <View style={[styles.avatar, item.type === 'group' && styles.avatarGroup]}>
           <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -118,12 +116,12 @@ export default function RoomListScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.actions}>
-        <Pressable style={styles.actionButton} onPress={() => navigation.navigate('NewChat')}>
+        <Pressable style={styles.actionButton} onPress={() => router.push('/new-chat')}>
           <Text style={styles.actionText}>+ Chat mới</Text>
         </Pressable>
         <Pressable
           style={[styles.actionButton, styles.actionGroup]}
-          onPress={() => navigation.navigate('NewGroup')}
+          onPress={() => router.push('/new-group')}
         >
           <Text style={styles.actionText}>+ Tạo nhóm</Text>
         </Pressable>

@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useLocalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
 import {
   useGetMessagesQuery,
@@ -22,12 +22,9 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { newId } from '../utils/newId';
 import type { Message } from '../types/chat';
-import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ChatRoom'>;
-
-export default function ChatRoomScreen({ route }: Props) {
-  const { roomId } = route.params;
+export default function ChatRoomScreen() {
+  const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const dispatch = useAppDispatch();
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');

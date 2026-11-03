@@ -10,18 +10,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import AppLogo from '../components/AppLogo';
 import AuthButton from '../components/AuthButton';
 import AuthInput from '../components/AuthInput';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearError, login } from '../features/session/sessionSlice';
 import { colors } from '../theme';
-import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
-
-export default function LoginScreen({ navigation }: Props) {
+export default function LoginScreen() {
+  const router = useRouter();
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/welcome'));
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.session);
   const [account, setAccount] = useState('');
@@ -50,7 +49,7 @@ export default function LoginScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable onPress={() => navigation.goBack()} style={styles.back} hitSlop={8}>
+          <Pressable onPress={() => goBack()} style={styles.back} hitSlop={8}>
             <Ionicons name="arrow-back" size={26} color={colors.text} />
           </Pressable>
 
@@ -86,7 +85,7 @@ export default function LoginScreen({ navigation }: Props) {
             <AuthButton
               title="Tạo tài khoản mới"
               variant="outline"
-              onPress={() => navigation.navigate('Register')}
+              onPress={() => router.replace('/register')}
             />
           </View>
         </ScrollView>

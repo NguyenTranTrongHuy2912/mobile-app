@@ -1,15 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import AppLogo from '../components/AppLogo';
 import AuthButton from '../components/AuthButton';
 import { colors } from '../theme';
-import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
-
-export default function WelcomeScreen({ navigation }: Props) {
+export default function WelcomeScreen() {
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.hero}>
@@ -21,12 +19,12 @@ export default function WelcomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.actions}>
-        <AuthButton title="Đăng nhập" onPress={() => navigation.navigate('Login')} />
+        <AuthButton title="Đăng nhập" onPress={() => router.push('/login')} />
         <View style={styles.gap} />
         <AuthButton
           title="Tạo tài khoản mới"
           variant="outline"
-          onPress={() => navigation.navigate('Register')}
+          onPress={() => router.push('/register')}
         />
       </View>
     </SafeAreaView>

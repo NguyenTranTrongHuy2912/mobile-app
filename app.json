@@ -2,6 +2,7 @@
   "expo": {
     "name": "mobile-app",
     "slug": "mobile-app",
+    "scheme": "chatapp",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -19,9 +20,11 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
+      "expo-router",
       "expo-status-bar"
     ]
   }

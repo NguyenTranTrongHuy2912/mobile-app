@@ -9,20 +9,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import AuthButton from '../components/AuthButton';
 import AuthInput from '../components/AuthInput';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearError, register } from '../features/session/sessionSlice';
 import { authApi } from '../api/authApi';
 import { colors } from '../theme';
-import type { RootStackParamList } from '../navigation/types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
-export default function RegisterScreen({ navigation }: Props) {
+export default function RegisterScreen() {
+  const router = useRouter();
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/welcome'));
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.session);
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -97,7 +96,7 @@ export default function RegisterScreen({ navigation }: Props) {
       dispatch(clearError());
       setStep('form');
     } else {
-      navigation.goBack();
+      goBack();
     }
   };
 
@@ -179,7 +178,7 @@ export default function RegisterScreen({ navigation }: Props) {
             </>
           )}
 
-          <Pressable style={styles.already} onPress={() => navigation.navigate('Login')}>
+          <Pressable style={styles.already} onPress={() => router.replace('/login')}>
             <Text style={styles.link}>Bạn đã có tài khoản rồi?</Text>
           </Pressable>
         </ScrollView>

@@ -8,13 +8,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import { useCreateRoomMutation, useSearchUsersQuery } from '../api/chatApi';
 import { errorMessage } from '../utils/errorMessage';
 import type { UserSummary } from '../types/chat';
-import type { RootStackParamList } from '../navigation/types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'NewGroup'>;
 
 // Khớp quy tắc của backend (ChatServiceImpl): không tính người tạo
 const MIN_OTHERS = 2;
@@ -23,7 +20,8 @@ const MAX_NAME = 50;
 const MIN_QUERY = 2;
 const DEBOUNCE_MS = 400;
 
-export default function NewGroupScreen({ navigation }: Props) {
+export default function NewGroupScreen() {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
@@ -59,7 +57,7 @@ export default function NewGroupScreen({ navigation }: Props) {
         name: name.trim(),
         memberIds: selected.map((u) => u.userId),
       }).unwrap();
-      navigation.replace('ChatRoom', { roomId: room.id, title: room.name });
+      router.replace({ pathname: '/chat/[roomId]', params: { roomId: room.id, title: room.name } });
     } catch (e) {
       setError(errorMessage(e, 'Không tạo được nhóm. Hãy thử lại.'));
     }
