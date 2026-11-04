@@ -16,7 +16,14 @@ import type { UserSummary } from '../types/chat';
 const MIN_QUERY = 2; // khớp giới hạn của backend
 const DEBOUNCE_MS = 400;
 
-export default function NewChatScreen() {
+interface Props {
+  // 'replace': màn riêng (new-chat) - Back quay về danh sách phòng
+  // 'push': dùng trong tab - Back quay về lại tab
+  navigate?: 'replace' | 'push';
+  autoFocus?: boolean;
+}
+
+export default function NewChatScreen({ navigate = 'replace', autoFocus = true }: Props) {
   const router = useRouter();
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
@@ -38,8 +45,12 @@ export default function NewChatScreen() {
     setError(null);
     try {
       const room = await createRoom({ type: 'direct', memberIds: [user.userId] }).unwrap();
-      // replace để nút Back quay về danh sách phòng, không quay lại màn hình tìm kiếm
-      router.replace({ pathname: '/chat/[roomId]', params: { roomId: room.id, title: room.name } });
+      const href = {
+        pathname: '/chat/[roomId]' as const,
+        params: { roomId: room.id, title: room.name },
+      };
+      if (navigate === 'push') router.push(href);
+      else router.replace(href); // Back quay về danh sách phòng, không quay lại màn tìm kiếm
     } catch (e) {
       setError(errorMessage(e, 'Không mở được cuộc trò chuyện. Hãy thử lại.'));
     }
@@ -75,7 +86,7 @@ export default function NewChatScreen() {
         onChangeText={setText}
         autoCapitalize="none"
         autoCorrect={false}
-        autoFocus
+        autoFocus={autoFocus}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {isFetching ? <ActivityIndicator style={styles.loading} /> : null}

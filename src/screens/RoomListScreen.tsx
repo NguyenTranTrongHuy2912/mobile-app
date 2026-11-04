@@ -115,17 +115,6 @@ export default function RoomListScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.actions}>
-        <Pressable style={styles.actionButton} onPress={() => router.push('/new-chat')}>
-          <Text style={styles.actionText}>+ Chat mới</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.actionButton, styles.actionGroup]}
-          onPress={() => router.push('/new-group')}
-        >
-          <Text style={styles.actionText}>+ Tạo nhóm</Text>
-        </Pressable>
-      </View>
       <FlatList
         data={rooms}
         keyExtractor={(r) => r.id}
@@ -136,7 +125,7 @@ export default function RoomListScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            Chưa có cuộc trò chuyện nào. Hãy bắt đầu bằng "Chat mới" hoặc "Tạo nhóm".
+            Chưa có cuộc trò chuyện nào. Bấm biểu tượng ở góc phải để chat mới hoặc tạo nhóm.
           </Text>
         }
       />
@@ -150,22 +139,6 @@ const styles = StyleSheet.create({
   errorText: { color: '#666', marginBottom: 12 },
   retryButton: { backgroundColor: '#007AFF', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
-  actions: {
-    flexDirection: 'row',
-    padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  actionGroup: { backgroundColor: '#34C759', marginRight: 0 },
-  actionText: { color: '#fff', fontWeight: '600' },
   list: { flexGrow: 1, backgroundColor: '#fff' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40, paddingHorizontal: 24 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
