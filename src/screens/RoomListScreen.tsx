@@ -14,7 +14,7 @@ import { useAppSelector } from '../store/hooks';
 import type { Room } from '../types/chat';
 
 // Tạm thời làm mới định kỳ để thấy tin mới / số chưa đọc, cho đến khi có realtime
-const POLL_MS = 5000;
+const POLL_MS = 20000; // Realtime qua WebSocket cập nhật tức thì, polling chỉ là fallback
 
 const formatTime = (ts: number) => {
   const d = dayjs(ts);

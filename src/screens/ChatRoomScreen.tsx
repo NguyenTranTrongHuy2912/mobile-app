@@ -17,6 +17,7 @@ import dayjs from 'dayjs';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
+  useLoadEarlierMessagesMutation,
   useMarkRoomReadMutation,
   useSendMessageMutation,
 } from '../api/chatApi';
@@ -43,12 +44,43 @@ export default function ChatRoomScreen() {
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');
 
-  const { data: messages = [], isLoading } = useGetMessagesQuery(roomId, {
-    pollingInterval: 3000,
+  const { data, isLoading } = useGetMessagesQuery(roomId, {
+    pollingInterval: 15000, // Realtime qua WebSocket cập nhật tức thì, polling chỉ là fallback
   });
+  const messages = data?.messages ?? [];
+  const hasMore = data?.hasMore ?? false;
+
   const [sendMessage] = useSendMessageMutation();
   const [markRoomRead] = useMarkRoomReadMutation();
+  const [loadEarlier, { isLoading: isLoadingEarlier }] = useLoadEarlierMessagesMutation();
+
   const listRef = useRef<FlatList<Message>>(null);
+  const prevMessagesRef = useRef<Message[]>([]);
+  const isInitialLoadRef = useRef(true);
+
+  // Cuộn thông minh: chỉ tự cuộn xuống cuối khi vào phòng lần đầu hoặc có tin mới ở cuối
+  useEffect(() => {
+    if (messages.length > 0) {
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+      } else {
+        const prev = prevMessagesRef.current;
+        const lastOld = prev[prev.length - 1];
+        const lastNew = messages[messages.length - 1];
+        if (!lastOld || lastNew?.id !== lastOld?.id) {
+          listRef.current?.scrollToEnd({ animated: true });
+        }
+      }
+      prevMessagesRef.current = messages;
+    }
+  }, [messages]);
+
+  const handleLoadEarlier = useCallback(async () => {
+    if (isLoadingEarlier || !hasMore || messages.length === 0) return;
+    const oldestTimestamp = messages[0].timestamp;
+    await loadEarlier({ roomId, beforeTimestamp: oldestTimestamp });
+  }, [isLoadingEarlier, hasMore, messages, loadEarlier, roomId]);
   const { sendImages, retryImage } = useSendImage(roomId);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -122,6 +154,32 @@ export default function ChatRoomScreen() {
     sendImages([toPicked(res.assets[0])]);
   };
 
+  const renderHeader = () => {
+    if (!hasMore) return null;
+    return (
+      <View style={styles.loadEarlierContainer}>
+        {isLoadingEarlier ? (
+          <View style={styles.loadEarlierLoading}>
+            <ActivityIndicator size="small" color="#0084FF" />
+            <Text style={styles.loadEarlierText}>Đang tải tin nhắn cũ hơn...</Text>
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.loadEarlierBtn,
+              pressed && styles.loadEarlierBtnPressed,
+            ]}
+            onPress={handleLoadEarlier}
+            hitSlop={8}
+          >
+            <Ionicons name="time-outline" size={16} color="#0084FF" style={{ marginRight: 6 }} />
+            <Text style={styles.loadEarlierBtnText}>Tải tin nhắn cũ hơn</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  };
+
   const renderItem = ({ item }: { item: Message }) => {
     const mine = item.senderId === userId;
     const isImage = item.type === 'image';
@@ -186,8 +244,12 @@ export default function ChatRoomScreen() {
         keyExtractor={(m) => m.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        ListEmptyComponent={<Text style={styles.empty}>Chưa có tin nhắn. Hãy gửi tin đầu tiên.</Text>}
+        ListHeaderComponent={renderHeader}
+        refreshing={isLoadingEarlier}
+        onRefresh={hasMore ? handleLoadEarlier : undefined}
+        ListEmptyComponent={
+          <Text style={styles.empty}>Chưa có tin nhắn. Hãy gửi tin đầu tiên.</Text>
+        }
       />
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <View style={styles.inputBar}>
@@ -236,6 +298,36 @@ const styles = StyleSheet.create({
   meta: { fontSize: 11, marginTop: 2 },
   metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
   metaOther: { color: '#999' },
+  loadEarlierContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  loadEarlierLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  loadEarlierText: {
+    fontSize: 13,
+    color: '#65676B',
+    marginLeft: 6,
+  },
+  loadEarlierBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4E6EB',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+  },
+  loadEarlierBtnPressed: {
+    backgroundColor: '#D8DADF',
+  },
+  loadEarlierBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0084FF',
+  },
   failed: { color: '#FF3B30', fontSize: 12, marginTop: 2 },
   notice: { textAlign: 'center', color: '#FF3B30', fontSize: 13, paddingVertical: 6, backgroundColor: '#fff' },
   iconButton: { paddingHorizontal: 4, paddingBottom: 8 },

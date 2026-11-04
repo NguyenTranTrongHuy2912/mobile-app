@@ -9,11 +9,15 @@ import { tamaguiConfig } from '../tamagui.config';
 import SessionBootstrap from '../src/features/session/SessionBootstrap';
 import { chatApi } from '../src/api/chatApi';
 import { useAppDispatch, useAppSelector } from '../src/store/hooks';
+import { useRealtime } from '../src/features/realtime/useRealtime';
 
 // Tách riêng vì useAppSelector phải nằm bên trong <Provider>
 function Routes() {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((s) => s.session.isAuthenticated);
+
+  // Kích hoạt kết nối realtime WebSocket toàn ứng dụng
+  useRealtime();
 
   // Khi đăng xuất, xóa cache API để người đăng nhập sau không thấy dữ liệu của người trước.
   useEffect(() => {

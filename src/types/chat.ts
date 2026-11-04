@@ -109,6 +109,11 @@ export interface HistoryResponse {
   has_more: boolean;
 }
 
+export interface MessagesState {
+  messages: Message[];
+  hasMore: boolean;
+}
+
 // POST /api/v1/uploads/sign — chữ ký để upload thẳng lên Cloudinary
 export interface UploadSignature {
   upload_url: string;

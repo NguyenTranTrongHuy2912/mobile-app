@@ -3,8 +3,10 @@ import { API_URL } from '../config';
 import type { RootState } from '../store';
 import type {
   CreateRoomRequest,
+  HistoryItem,
   HistoryResponse,
   Message,
+  MessagesState,
   MessageType,
   Room,
   RoomDto,
@@ -16,6 +18,20 @@ import type {
   UploadSignature,
   UserSummary,
 } from '../types/chat';
+
+
+const toMessage = (m: HistoryItem): Message => ({
+  id: m.message_id,
+  roomId: m.room_id,
+  senderId: m.sender_id,
+  type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
+  content: m.content,
+  timestamp: m.timestamp,
+  status: 'sent' as const,
+  imageUrl: m.media_url || undefined,
+  imageWidth: m.media_width || undefined,
+  imageHeight: m.media_height || undefined,
+});
 
 const toRoom = (d: RoomDto): Room => ({
   id: d.room_id,
@@ -81,11 +97,11 @@ export const chatApi = createApi({
       invalidatesTags: ['Room'],
     }),
 
-    getMessages: build.query<Message[], string>({
+    getMessages: build.query<MessagesState, string>({
       query: (roomId) => `/api/v1/chat/history/${encodeURIComponent(roomId)}?limit=50`,
       // Gateway trả tin mới nhất trước, FlatList cần cũ nhất trước
-      transformResponse: (res: HistoryResponse): Message[] =>
-        res.messages
+      transformResponse: (res: HistoryResponse): MessagesState => ({
+        messages: res.messages
           .map((m) => ({
             id: m.message_id,
             roomId: m.room_id,
@@ -99,14 +115,75 @@ export const chatApi = createApi({
             imageHeight: m.media_height || undefined,
           }))
           .reverse(),
-      // Khi polling, giữ lại tin đang gửi / gửi lỗi mà server chưa có
-      merge: (currentCache, newItems) => {
-        const pending = currentCache.filter(
-          (m) => m.status !== 'sent' && !newItems.some((n) => n.id === m.id),
+        hasMore: res.has_more,
+      }),
+      // Khi polling, giữ lại tin cũ đã tải thêm và tin đang gửi / gửi lỗi
+      merge: (currentCache, incoming) => {
+        const incomingIds = new Set(incoming.messages.map((m) => m.id));
+        const oldestIncomingTs =
+          incoming.messages.length > 0 ? incoming.messages[0].timestamp : Infinity;
+
+        // Giữ lại các tin cũ hơn đợt polling (đã load qua loadEarlierMessages)
+        const olderMessages = currentCache.messages.filter(
+          (m) => m.timestamp < oldestIncomingTs && !incomingIds.has(m.id),
         );
-        currentCache.splice(0, currentCache.length, ...newItems, ...pending);
+
+        // Giữ lại các tin đang gửi / gửi lỗi chưa có trên server
+        const pendingMessages = currentCache.messages.filter(
+          (m) => m.status !== 'sent' && !incomingIds.has(m.id),
+        );
+
+        const merged = [...olderMessages, ...incoming.messages];
+        for (const p of pendingMessages) {
+          if (!merged.some((m) => m.id === p.id)) {
+            merged.push(p);
+          }
+        }
+        currentCache.messages = merged;
+        if (incoming.hasMore !== undefined && olderMessages.length === 0) {
+          currentCache.hasMore = incoming.hasMore;
+        }
       },
       providesTags: (_result, _error, roomId) => [{ type: 'Message', id: roomId }],
+    }),
+
+    // Tải thêm tin nhắn cũ hơn trước beforeTimestamp
+    loadEarlierMessages: build.mutation<
+      HistoryResponse,
+      { roomId: string; beforeTimestamp: number }
+    >({
+      query: ({ roomId, beforeTimestamp }) =>
+        `/api/v1/chat/history/${encodeURIComponent(roomId)}?limit=50&before_timestamp=${beforeTimestamp}`,
+      async onQueryStarted({ roomId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const earlierMessages: Message[] = data.messages
+            .map((m) => ({
+              id: m.message_id,
+              roomId: m.room_id,
+              senderId: m.sender_id,
+              type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
+              content: m.content,
+              timestamp: m.timestamp,
+              status: 'sent' as const,
+              imageUrl: m.media_url || undefined,
+              imageWidth: m.media_width || undefined,
+              imageHeight: m.media_height || undefined,
+            }))
+            .reverse();
+
+          dispatch(
+            chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+              const existingIds = new Set(draft.messages.map((m) => m.id));
+              const uniqueEarlier = earlierMessages.filter((m) => !existingIds.has(m.id));
+              draft.messages.unshift(...uniqueEarlier);
+              draft.hasMore = data.has_more;
+            }),
+          );
+        } catch (e) {
+          console.warn('Lỗi khi tải tin nhắn cũ:', e);
+        }
+      },
     }),
 
     // Xin chữ ký để upload ảnh thẳng lên Cloudinary
@@ -152,11 +229,11 @@ export const chatApi = createApi({
       ) {
         dispatch(
           chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
-            const existing = draft.find((m) => m.id === localId);
+            const existing = draft.messages.find((m) => m.id === localId);
             if (existing) {
               existing.status = 'sending';
             } else {
-              draft.push({
+              draft.messages.push({
                 id: localId,
                 roomId,
                 senderId,
@@ -175,7 +252,7 @@ export const chatApi = createApi({
         const setStatus = (update: (m: Message) => void) =>
           dispatch(
             chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
-              const msg = draft.find((m) => m.id === localId);
+              const msg = draft.messages.find((m) => m.id === localId);
               if (msg) update(msg);
             }),
           );
@@ -210,6 +287,7 @@ export const {
   useCreateRoomMutation,
   useMarkRoomReadMutation,
   useGetMessagesQuery,
+  useLoadEarlierMessagesMutation,
   useSendMessageMutation,
   useGetUploadSignatureMutation,
 } = chatApi;

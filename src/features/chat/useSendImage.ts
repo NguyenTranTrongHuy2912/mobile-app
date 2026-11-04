@@ -28,7 +28,7 @@ export function useSendImage(roomId: string) {
     (id: string, update: (m: Message) => void) => {
       dispatch(
         chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
-          const msg = draft.find((m) => m.id === id);
+          const msg = draft.messages.find((m) => m.id === id);
           if (msg) update(msg);
         }),
       );
@@ -97,7 +97,7 @@ export function useSendImage(roomId: string) {
       dispatch(
         chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
           for (const { img, localId } of items) {
-            draft.push({
+            draft.messages.push({
               id: localId,
               roomId,
               senderId: userId,
