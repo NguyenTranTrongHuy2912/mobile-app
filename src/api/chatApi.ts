@@ -5,6 +5,7 @@ import type {
   CreateRoomRequest,
   HistoryResponse,
   Message,
+  MessageType,
   Room,
   RoomDto,
   RoomsResponse,
@@ -12,6 +13,7 @@ import type {
   SearchUsersResponse,
   SendMessageRequest,
   SendMessageResponse,
+  UploadSignature,
   UserSummary,
 } from '../types/chat';
 
@@ -88,9 +90,13 @@ export const chatApi = createApi({
             id: m.message_id,
             roomId: m.room_id,
             senderId: m.sender_id,
+            type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
             content: m.content,
             timestamp: m.timestamp,
             status: 'sent' as const,
+            imageUrl: m.media_url || undefined,
+            imageWidth: m.media_width || undefined,
+            imageHeight: m.media_height || undefined,
           }))
           .reverse(),
       // Khi polling, giữ lại tin đang gửi / gửi lỗi mà server chưa có
@@ -103,24 +109,47 @@ export const chatApi = createApi({
       providesTags: (_result, _error, roomId) => [{ type: 'Message', id: roomId }],
     }),
 
+    // Xin chữ ký để upload ảnh thẳng lên Cloudinary
+    getUploadSignature: build.mutation<UploadSignature, void>({
+      query: () => ({ url: '/api/v1/uploads/sign', method: 'POST' }),
+    }),
+
     sendMessage: build.mutation<
       SendMessageResponse,
-      { roomId: string; senderId: string; content: string; localId: string }
+      {
+        roomId: string;
+        senderId: string;
+        content: string;
+        localId: string;
+        type?: MessageType;
+        imageUrl?: string;
+        imageWidth?: number;
+        imageHeight?: number;
+      }
     >({
-      query: ({ roomId, content, localId }) => {
+      query: ({ roomId, content, localId, type, imageUrl, imageWidth, imageHeight }) => {
         // senderId chỉ dùng để hiện tin tạm trong cache; gateway lấy người gửi từ token
         const body: SendMessageRequest = {
           room_id: roomId,
           content,
           message_id: localId,
         };
+        if (type === 'image') {
+          body.type = 'IMAGE';
+          body.media_url = imageUrl;
+          body.media_width = imageWidth ?? 0;
+          body.media_height = imageHeight ?? 0;
+        }
         return { url: '/api/v1/chat/send', method: 'POST', body };
       },
       // Gửi xong thì làm mới danh sách phòng để cập nhật tin cuối
       invalidatesTags: ['Room'],
 
       // Optimistic update: hiện tin nhắn ngay, sau đó cập nhật trạng thái theo kết quả server.
-      async onQueryStarted({ roomId, senderId, content, localId }, { dispatch, queryFulfilled }) {
+      async onQueryStarted(
+        { roomId, senderId, content, localId, type, imageUrl, imageWidth, imageHeight },
+        { dispatch, queryFulfilled },
+      ) {
         dispatch(
           chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
             const existing = draft.find((m) => m.id === localId);
@@ -131,9 +160,13 @@ export const chatApi = createApi({
                 id: localId,
                 roomId,
                 senderId,
+                type: type ?? 'text',
                 content,
                 timestamp: Date.now(),
                 status: 'sending',
+                imageUrl,
+                imageWidth,
+                imageHeight,
               });
             }
           }),
@@ -178,4 +211,5 @@ export const {
   useMarkRoomReadMutation,
   useGetMessagesQuery,
   useSendMessageMutation,
+  useGetUploadSignatureMutation,
 } = chatApi;

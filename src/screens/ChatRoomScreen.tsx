@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,6 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
 import {
@@ -21,7 +23,19 @@ import {
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { newId } from '../utils/newId';
+import { useSendImage, type PickedImage } from '../features/chat/useSendImage';
+import ChatImage from '../components/ChatImage';
+import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
+
+const MAX_IMAGES_PER_PICK = 5;
+
+const toPicked = (a: ImagePicker.ImagePickerAsset): PickedImage => ({
+  uri: a.uri,
+  width: a.width,
+  height: a.height,
+  mimeType: a.mimeType,
+});
 
 export default function ChatRoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -35,6 +49,16 @@ export default function ChatRoomScreen() {
   const [sendMessage] = useSendMessageMutation();
   const [markRoomRead] = useMarkRoomReadMutation();
   const listRef = useRef<FlatList<Message>>(null);
+  const { sendImages, retryImage } = useSendImage(roomId);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Thông báo ngắn (ví dụ chưa cấp quyền camera) tự ẩn sau vài giây
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   // Tra tên người gửi từ danh sách thành viên của phòng (đã có trong cache danh sách phòng)
   const { room } = useGetRoomsQuery(undefined, {
@@ -76,22 +100,65 @@ export default function ChatRoomScreen() {
     dispatch(clearDraft(roomId));
   };
 
+  const pickFromLibrary = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_IMAGES_PER_PICK,
+    });
+    if (res.canceled || res.assets.length === 0) return;
+    sendImages(res.assets.slice(0, MAX_IMAGES_PER_PICK).map(toPicked));
+  };
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      setNotice('Cần cho phép dùng camera trong cài đặt để chụp ảnh.');
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (res.canceled || res.assets.length === 0) return;
+    sendImages([toPicked(res.assets[0])]);
+  };
+
   const renderItem = ({ item }: { item: Message }) => {
     const mine = item.senderId === userId;
+    const isImage = item.type === 'image';
     return (
       <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
-        <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
+        <View
+          style={[
+            styles.bubble,
+            mine ? styles.bubbleMine : styles.bubbleOther,
+            isImage && styles.bubbleImage,
+          ]}
+        >
           {!mine && (
-            <Text style={styles.sender}>{names.get(item.senderId) ?? 'Người dùng'}</Text>
+            <Text style={[styles.sender, isImage && styles.imagePad]}>
+              {names.get(item.senderId) ?? 'Người dùng'}
+            </Text>
           )}
-          <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
-          <Text style={[styles.meta, mine ? styles.metaMine : styles.metaOther]}>
+          {isImage ? (
+            <ChatImage
+              message={item}
+              onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
+            />
+          ) : (
+            <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
+          )}
+          <Text
+            style={[styles.meta, mine ? styles.metaMine : styles.metaOther, isImage && styles.imagePad]}
+          >
             {dayjs(item.timestamp).format('HH:mm')}
             {mine && item.status === 'sending' ? ' · Đang gửi…' : ''}
           </Text>
         </View>
         {mine && item.status === 'failed' && (
-          <Pressable onPress={() => send(item.content, item.id)} hitSlop={8}>
+          <Pressable
+            onPress={() => (isImage ? retryImage(item) : send(item.content, item.id))}
+            hitSlop={8}
+          >
             <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
           </Pressable>
         )}
@@ -122,7 +189,14 @@ export default function ChatRoomScreen() {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={<Text style={styles.empty}>Chưa có tin nhắn. Hãy gửi tin đầu tiên.</Text>}
       />
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <View style={styles.inputBar}>
+        <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
+          <Ionicons name="camera" size={26} color="#007AFF" />
+        </Pressable>
+        <Pressable onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
+          <Ionicons name="image" size={26} color="#007AFF" />
+        </Pressable>
         <TextInput
           style={styles.input}
           placeholder="Nhập tin nhắn..."
@@ -138,6 +212,7 @@ export default function ChatRoomScreen() {
           <Text style={styles.sendText}>Gửi</Text>
         </Pressable>
       </View>
+      <ImageViewer uri={viewerUri} onClose={() => setViewerUri(null)} />
     </KeyboardAvoidingView>
   );
 }
@@ -153,6 +228,8 @@ const styles = StyleSheet.create({
   bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16 },
   bubbleMine: { backgroundColor: '#007AFF', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#fff', borderBottomLeftRadius: 4 },
+  bubbleImage: { padding: 4 },
+  imagePad: { paddingHorizontal: 8 },
   sender: { fontSize: 12, fontWeight: '600', color: '#007AFF', marginBottom: 2 },
   textMine: { color: '#fff', fontSize: 16 },
   textOther: { color: '#222', fontSize: 16 },
@@ -160,6 +237,8 @@ const styles = StyleSheet.create({
   metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
   metaOther: { color: '#999' },
   failed: { color: '#FF3B30', fontSize: 12, marginTop: 2 },
+  notice: { textAlign: 'center', color: '#FF3B30', fontSize: 13, paddingVertical: 6, backgroundColor: '#fff' },
+  iconButton: { paddingHorizontal: 4, paddingBottom: 8 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',

@@ -26,14 +26,22 @@ export interface UserSummary {
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'failed';
+export type MessageType = 'text' | 'image';
 
 export interface Message {
   id: string;
   roomId: string;
   senderId: string;
-  content: string;
+  type: MessageType;
+  content: string; // image: để trống
   timestamp: number; // epoch milliseconds
   status: MessageStatus;
+  // --- chỉ dùng cho image ---
+  imageUrl?: string; // URL Cloudinary, có sau khi upload xong
+  localUri?: string; // ảnh trên máy, hiện ngay lúc đang gửi và dùng để gửi lại khi lỗi
+  imageWidth?: number;
+  imageHeight?: number;
+  uploadProgress?: number; // 0-100, chỉ có khi đang upload
 }
 
 // ---- Khớp với gateway ----
@@ -70,6 +78,10 @@ export interface SendMessageRequest {
   room_id: string;
   content: string;
   message_id?: string;
+  type?: 'TEXT' | 'IMAGE';
+  media_url?: string;
+  media_width?: number;
+  media_height?: number;
 }
 
 export interface SendMessageResponse {
@@ -86,9 +98,23 @@ export interface HistoryItem {
   sender_id: string;
   content: string;
   timestamp: number;
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO';
+  media_url?: string;
+  media_width?: number;
+  media_height?: number;
 }
 
 export interface HistoryResponse {
   messages: HistoryItem[];
   has_more: boolean;
+}
+
+// POST /api/v1/uploads/sign — chữ ký để upload thẳng lên Cloudinary
+export interface UploadSignature {
+  upload_url: string;
+  api_key: string;
+  timestamp: number;
+  public_id: string;
+  transformation: string;
+  signature: string;
 }
