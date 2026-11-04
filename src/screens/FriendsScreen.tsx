@@ -95,7 +95,13 @@ export default function FriendsScreen() {
       setTimeout(() => setFeedbackMsg(null), 3500);
     } catch (e) {
       setFeedbackMsg({
-        text: errorMessage(e, 'Không thể gửi lời mời kết bạn'),
+        text: (() => {
+          const m = errorMessage(e, 'Không thể gửi lời mời kết bạn');
+          if (m.includes('trước đó') || m.includes('đã là bạn')) {
+            setSentUserIds((p) => ({ ...p, [user.userId]: true }));
+          }
+          return m;
+        })(),
         isError: true,
       });
     }
