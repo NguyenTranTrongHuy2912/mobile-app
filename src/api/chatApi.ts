@@ -3,6 +3,8 @@ import { API_URL } from '../config';
 import type { RootState } from '../store';
 import type {
   CreateRoomRequest,
+  Friend,
+  FriendRequest,
   HistoryItem,
   HistoryResponse,
   Message,
@@ -56,7 +58,7 @@ export const chatApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Room', 'Message'],
+  tagTypes: ['Room', 'Message', 'Friend', 'FriendRequest'],
   // Giữ lâu để tin đang gửi / gửi lỗi (chỉ nằm trong cache) không mất khi rời phòng
   keepUnusedDataFor: 3600,
   endpoints: (build) => ({
@@ -278,6 +280,82 @@ export const chatApi = createApi({
         }
       },
     }),
+    // --- Hệ thống kết bạn ---
+    getFriends: build.query<Friend[], void>({
+      query: () => '/api/v1/friends',
+      transformResponse: (res: { friends: any[] }): Friend[] =>
+        res.friends.map((f) => ({
+          userId: f.user_id,
+          displayName: f.display_name,
+          email: f.email,
+          avatarUrl: f.avatar_url || undefined,
+        })),
+      providesTags: ['Friend'],
+    }),
+
+    getFriendRequests: build.query<FriendRequest[], void>({
+      query: () => '/api/v1/friends/requests',
+      transformResponse: (res: { requests: any[] }): FriendRequest[] =>
+        res.requests.map((r) => ({
+          requestId: r.request_id,
+          senderId: r.sender_id,
+          senderName: r.sender_name,
+          senderEmail: r.sender_email,
+          createdAt: r.created_at,
+        })),
+      providesTags: ['FriendRequest'],
+    }),
+
+    sendFriendRequest: build.mutation<{ ok: boolean; message: string }, string>({
+      query: (receiverId) => ({
+        url: '/api/v1/friends/request',
+        method: 'POST',
+        body: { receiver_id: receiverId },
+      }),
+      invalidatesTags: ['FriendRequest'],
+    }),
+
+    respondFriendRequest: build.mutation<
+      { ok: boolean; message: string },
+      { requestId: string; accept: boolean }
+    >({
+      query: ({ requestId, accept }) => ({
+        url: '/api/v1/friends/respond',
+        method: 'POST',
+        body: { request_id: requestId, accept },
+      }),
+      invalidatesTags: ['Friend', 'FriendRequest', 'Room'],
+    }),
+
+    // --- Tab Cá nhân ---
+    updateProfile: build.mutation<
+      { ok: boolean; display_name?: string; avatar_url?: string },
+      { displayName?: string; avatarUrl?: string }
+    >({
+      query: (body) => ({
+        url: '/api/v1/users/profile',
+        method: 'PUT',
+        body: {
+          display_name: body.displayName,
+          avatar_url: body.avatarUrl,
+        },
+      }),
+      invalidatesTags: ['Room', 'Friend'],
+    }),
+
+    changePassword: build.mutation<
+      { ok: boolean; message: string },
+      { currentPassword: string; newPassword: string }
+    >({
+      query: ({ currentPassword, newPassword }) => ({
+        url: '/api/v1/users/change-password',
+        method: 'POST',
+        body: {
+          current_password: currentPassword,
+          new_password: newPassword,
+        },
+      }),
+    }),
   }),
 });
 
@@ -290,4 +368,10 @@ export const {
   useLoadEarlierMessagesMutation,
   useSendMessageMutation,
   useGetUploadSignatureMutation,
+  useGetFriendsQuery,
+  useGetFriendRequestsQuery,
+  useSendFriendRequestMutation,
+  useRespondFriendRequestMutation,
+  useUpdateProfileMutation,
+  useChangePasswordMutation,
 } = chatApi;

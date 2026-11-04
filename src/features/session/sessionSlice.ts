@@ -14,6 +14,7 @@ const initialState: SessionState = {
   userId: '',
   displayName: '',
   token: '',
+  avatarUrl: undefined,
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -68,10 +69,23 @@ const sessionSlice = createSlice({
       state.userId = action.payload.userId;
       state.displayName = action.payload.displayName;
       state.token = action.payload.token;
+      state.avatarUrl = action.payload.avatarUrl;
       state.isAuthenticated = true;
     },
     clearError(state) {
       state.error = null;
+    },
+    updateUserProfile(state, action: PayloadAction<{ displayName?: string; avatarUrl?: string }>) {
+      if (action.payload.displayName) state.displayName = action.payload.displayName;
+      if (action.payload.avatarUrl) state.avatarUrl = action.payload.avatarUrl;
+      AsyncStorage.getItem(SESSION_KEY).then((data) => {
+        if (data) {
+          const user = JSON.parse(data);
+          if (action.payload.displayName) user.displayName = action.payload.displayName;
+          if (action.payload.avatarUrl) user.avatarUrl = action.payload.avatarUrl;
+          AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        }
+      }).catch(() => {});
     },
   },
   extraReducers: (builder) => {
@@ -84,6 +98,7 @@ const sessionSlice = createSlice({
       state.userId = action.payload.userId;
       state.displayName = action.payload.displayName;
       state.token = action.payload.token;
+      state.avatarUrl = action.payload.avatarUrl;
       state.isAuthenticated = true;
     };
     const rejected = (state: SessionState, action: { payload?: string }) => {
@@ -102,5 +117,5 @@ const sessionSlice = createSlice({
   },
 });
 
-export const { setUser, clearError } = sessionSlice.actions;
+export const { setUser, clearError, updateUserProfile } = sessionSlice.actions;
 export default sessionSlice.reducer;

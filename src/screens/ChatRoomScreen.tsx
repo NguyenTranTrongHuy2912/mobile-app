@@ -30,6 +30,18 @@ import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
 
 const MAX_IMAGES_PER_PICK = 5;
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
+
+const EMOJI_REGEX = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\uFE0F|\u200D){1,8}$/u;
+
+function isOnlyEmoji(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (/[a-zA-Z0-9\.,!\?@#\$%\^&\*\(\)_+\-=\[\]\{\};':"\\|<>\/~`]/.test(trimmed)) {
+    return false;
+  }
+  return EMOJI_REGEX.test(trimmed);
+}
 
 const toPicked = (a: ImagePicker.ImagePickerAsset): PickedImage => ({
   uri: a.uri,
@@ -58,6 +70,8 @@ export default function ChatRoomScreen() {
   const prevMessagesRef = useRef<Message[]>([]);
   const isInitialLoadRef = useRef(true);
 
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
   // Cuộn thông minh: chỉ tự cuộn xuống cuối khi vào phòng lần đầu hoặc có tin mới ở cuối
   useEffect(() => {
     if (messages.length > 0) {
@@ -81,6 +95,7 @@ export default function ChatRoomScreen() {
     const oldestTimestamp = messages[0].timestamp;
     await loadEarlier({ roomId, beforeTimestamp: oldestTimestamp });
   }, [isLoadingEarlier, hasMore, messages, loadEarlier, roomId]);
+
   const { sendImages, retryImage } = useSendImage(roomId);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -130,6 +145,14 @@ export default function ChatRoomScreen() {
   const onPressSend = () => {
     send(draft);
     dispatch(clearDraft(roomId));
+  };
+
+  const handlePickEmoji = (emoji: string) => {
+    if (!draft.trim()) {
+      send(emoji);
+    } else {
+      dispatch(setDraft({ roomId, text: draft + emoji }));
+    }
   };
 
   const pickFromLibrary = async () => {
@@ -183,6 +206,8 @@ export default function ChatRoomScreen() {
   const renderItem = ({ item }: { item: Message }) => {
     const mine = item.senderId === userId;
     const isImage = item.type === 'image';
+    const isBigEmoji = !isImage && isOnlyEmoji(item.content);
+
     return (
       <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
         <View
@@ -190,10 +215,11 @@ export default function ChatRoomScreen() {
             styles.bubble,
             mine ? styles.bubbleMine : styles.bubbleOther,
             isImage && styles.bubbleImage,
+            isBigEmoji && styles.bubbleBigEmoji,
           ]}
         >
           {!mine && (
-            <Text style={[styles.sender, isImage && styles.imagePad]}>
+            <Text style={[styles.sender, (isImage || isBigEmoji) && styles.imagePad]}>
               {names.get(item.senderId) ?? 'Người dùng'}
             </Text>
           )}
@@ -202,11 +228,18 @@ export default function ChatRoomScreen() {
               message={item}
               onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
             />
+          ) : isBigEmoji ? (
+            <Text style={styles.textBigEmoji}>{item.content}</Text>
           ) : (
             <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
           )}
           <Text
-            style={[styles.meta, mine ? styles.metaMine : styles.metaOther, isImage && styles.imagePad]}
+            style={[
+              styles.meta,
+              mine ? styles.metaMine : styles.metaOther,
+              (isImage || isBigEmoji) && styles.imagePad,
+              isBigEmoji && styles.metaBigEmoji,
+            ]}
           >
             {dayjs(item.timestamp).format('HH:mm')}
             {mine && item.status === 'sending' ? ' · Đang gửi…' : ''}
@@ -252,27 +285,64 @@ export default function ChatRoomScreen() {
         }
       />
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+      {/* Thanh chọn emoji nhanh kiểu Facebook Messenger */}
+      {showEmojiPicker && (
+        <View style={styles.emojiPickerBar}>
+          {QUICK_EMOJIS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              onPress={() => handlePickEmoji(emoji)}
+              style={styles.emojiItem}
+              hitSlop={4}
+            >
+              <Text style={styles.emojiText}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       <View style={styles.inputBar}>
         <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
-          <Ionicons name="camera" size={26} color="#007AFF" />
+          <Ionicons name="camera" size={24} color="#0084FF" />
         </Pressable>
         <Pressable onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
-          <Ionicons name="image" size={26} color="#007AFF" />
+          <Ionicons name="image" size={24} color="#0084FF" />
         </Pressable>
+        <Pressable
+          onPress={() => setShowEmojiPicker((prev) => !prev)}
+          hitSlop={6}
+          style={styles.iconButton}
+        >
+          <Ionicons
+            name={showEmojiPicker ? 'happy' : 'happy-outline'}
+            size={24}
+            color="#0084FF"
+          />
+        </Pressable>
+
         <TextInput
           style={styles.input}
           placeholder="Nhập tin nhắn..."
+          placeholderTextColor="#8A8D91"
           value={draft}
           onChangeText={(text) => dispatch(setDraft({ roomId, text }))}
           multiline
         />
-        <Pressable
-          style={[styles.sendButton, !draft.trim() && styles.sendDisabled]}
-          onPress={onPressSend}
-          disabled={!draft.trim()}
-        >
-          <Text style={styles.sendText}>Gửi</Text>
-        </Pressable>
+
+        {draft.trim() ? (
+          <Pressable style={styles.sendButton} onPress={onPressSend}>
+            <Ionicons name="send" size={18} color="#fff" />
+          </Pressable>
+        ) : (
+          <Pressable
+            style={styles.likeButton}
+            onPress={() => send('👍')}
+            hitSlop={6}
+          >
+            <Ionicons name="thumbs-up" size={26} color="#0084FF" />
+          </Pressable>
+        )}
       </View>
       <ImageViewer uri={viewerUri} onClose={() => setViewerUri(null)} />
     </KeyboardAvoidingView>
@@ -280,24 +350,42 @@ export default function ChatRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#f0f2f5' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 12, flexGrow: 1 },
-  empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  empty: { textAlign: 'center', color: '#8A8D91', marginTop: 40 },
   bubbleRow: { marginBottom: 8, maxWidth: '80%' },
   rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   rowOther: { alignSelf: 'flex-start' },
-  bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16 },
-  bubbleMine: { backgroundColor: '#007AFF', borderBottomRightRadius: 4 },
+  bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18 },
+  bubbleMine: { backgroundColor: '#0084FF', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#fff', borderBottomLeftRadius: 4 },
   bubbleImage: { padding: 4 },
+  bubbleBigEmoji: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  textBigEmoji: {
+    fontSize: 42,
+    lineHeight: 48,
+    textAlign: 'center',
+  },
+  metaBigEmoji: {
+    color: '#8A8D91',
+    textAlign: 'center',
+    fontSize: 10,
+    marginTop: 2,
+  },
   imagePad: { paddingHorizontal: 8 },
-  sender: { fontSize: 12, fontWeight: '600', color: '#007AFF', marginBottom: 2 },
+  sender: { fontSize: 12, fontWeight: '600', color: '#0084FF', marginBottom: 2 },
   textMine: { color: '#fff', fontSize: 16 },
-  textOther: { color: '#222', fontSize: 16 },
+  textOther: { color: '#050505', fontSize: 16 },
   meta: { fontSize: 11, marginTop: 2 },
   metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-  metaOther: { color: '#999' },
+  metaOther: { color: '#8A8D91' },
   loadEarlierContainer: {
     alignItems: 'center',
     marginVertical: 10,
@@ -328,33 +416,68 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0084FF',
   },
-  failed: { color: '#FF3B30', fontSize: 12, marginTop: 2 },
-  notice: { textAlign: 'center', color: '#FF3B30', fontSize: 13, paddingVertical: 6, backgroundColor: '#fff' },
-  iconButton: { paddingHorizontal: 4, paddingBottom: 8 },
+  failed: { color: '#FA383E', fontSize: 12, marginTop: 2 },
+  notice: {
+    textAlign: 'center',
+    color: '#FA383E',
+    fontSize: 13,
+    paddingVertical: 6,
+    backgroundColor: '#fff',
+  },
+  emojiPickerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E4E6EB',
+  },
+  emojiItem: {
+    padding: 6,
+    borderRadius: 20,
+  },
+  emojiText: {
+    fontSize: 26,
+  },
+  iconButton: { paddingHorizontal: 5, paddingBottom: 8 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     backgroundColor: '#fff',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#ddd',
+    borderTopColor: '#E4E6EB',
   },
   input: {
     flex: 1,
     maxHeight: 120,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#F0F2F5',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    fontSize: 16,
+    fontSize: 15,
+    color: '#050505',
+    marginHorizontal: 4,
   },
   sendButton: {
-    marginLeft: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0084FF',
     borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    marginLeft: 4,
   },
-  sendDisabled: { backgroundColor: '#9fc7ff' },
-  sendText: { color: '#fff', fontWeight: '700' },
+  likeButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+    marginLeft: 4,
+  },
 });

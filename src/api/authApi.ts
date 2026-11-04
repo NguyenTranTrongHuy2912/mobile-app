@@ -5,6 +5,7 @@ export interface AuthUser {
   userId: string;
   displayName: string;
   token: string; // JWT do gateway cấp, dùng cho /chat/*
+  avatarUrl?: string;
 }
 
 export interface OtpInfo {
@@ -33,12 +34,14 @@ interface AuthResponse {
   token: string;
   user_id: string;
   display_name: string;
+  avatar_url?: string;
 }
 
 const toUser = (d: AuthResponse): AuthUser => ({
   userId: d.user_id,
   displayName: d.display_name,
   token: d.token,
+  avatarUrl: d.avatar_url || undefined,
 });
 
 export const authApi = {

@@ -110,6 +110,10 @@ export function useRealtime() {
               );
             } else if (data.type === 'ROOM_UPDATED') {
               dispatch(chatApi.util.invalidateTags(['Room']));
+            } else if (data.type === 'FRIEND_REQUEST') {
+              dispatch(chatApi.util.invalidateTags(['FriendRequest']));
+            } else if (data.type === 'FRIEND_ACCEPTED') {
+              dispatch(chatApi.util.invalidateTags(['Friend', 'Room']));
             }
           } catch (err) {
             console.warn('[Realtime] Parse message error:', err);

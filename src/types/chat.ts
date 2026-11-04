@@ -123,3 +123,17 @@ export interface UploadSignature {
   transformation: string;
   signature: string;
 }
+export interface Friend {
+  userId: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string;
+}
+
+export interface FriendRequest {
+  requestId: string;
+  senderId: string;
+  senderName: string;
+  senderEmail: string;
+  createdAt: number;
+}

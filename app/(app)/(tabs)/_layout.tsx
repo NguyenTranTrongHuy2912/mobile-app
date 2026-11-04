@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View} from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useGetRoomsQuery } from '../../../src/api/chatApi';
+import { useGetFriendRequestsQuery, useGetRoomsQuery } from '../../../src/api/chatApi';
 import { colors } from '../../../src/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -21,6 +21,13 @@ export default function TabsLayout() {
   const router = useRouter();
 
   // Tổng số tin chưa đọc của mọi phòng, dùng chung cache với danh sách phòng
+  const { friendRequestCount } = useGetFriendRequestsQuery(undefined, {
+    pollingInterval: 10000,
+    selectFromResult: ({ data }) => ({
+      friendRequestCount: data?.length ?? 0,
+    }),
+  });
+
   const { unread } = useGetRoomsQuery(undefined, {
     pollingInterval: 5000,
     selectFromResult: ({ data }) => ({
@@ -77,6 +84,8 @@ export default function TabsLayout() {
         options={{
           title: 'Thông báo',
           tabBarIcon: tabIcon('notifications', 'notifications-outline'),
+          tabBarBadge: friendRequestCount > 0 ? (friendRequestCount > 99 ? '99+' : friendRequestCount) : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.error, color: '#fff' },
         }}
       />
       <Tabs.Screen
