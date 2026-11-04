@@ -34,7 +34,8 @@
           "photosPermission": "ChatApp cần truy cập thư viện ảnh để bạn chọn ảnh gửi đi.",
           "cameraPermission": "ChatApp cần dùng camera để bạn chụp và gửi ảnh."
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

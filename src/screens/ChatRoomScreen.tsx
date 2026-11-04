@@ -26,6 +26,7 @@ import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { newId } from '../utils/newId';
 import { useSendImage, type PickedImage } from '../features/chat/useSendImage';
 import ChatImage from '../components/ChatImage';
+import ChatVideo from '../components/ChatVideo';
 import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
 
@@ -45,9 +46,11 @@ function isOnlyEmoji(text: string): boolean {
 
 const toPicked = (a: ImagePicker.ImagePickerAsset): PickedImage => ({
   uri: a.uri,
+  type: a.type === 'video' ? 'video' : 'image',
   width: a.width,
   height: a.height,
   mimeType: a.mimeType,
+  duration: a.duration ? Math.round(a.duration * 1000) : undefined,
 });
 
 export default function ChatRoomScreen() {
@@ -157,7 +160,7 @@ export default function ChatRoomScreen() {
 
   const pickFromLibrary = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images', 'videos'],
       quality: 0.7,
       allowsMultipleSelection: true,
       selectionLimit: MAX_IMAGES_PER_PICK,
@@ -206,7 +209,9 @@ export default function ChatRoomScreen() {
   const renderItem = ({ item }: { item: Message }) => {
     const mine = item.senderId === userId;
     const isImage = item.type === 'image';
-    const isBigEmoji = !isImage && isOnlyEmoji(item.content);
+    const isVideo = item.type === 'video';
+    const isMedia = isImage || isVideo;
+    const isBigEmoji = !isMedia && isOnlyEmoji(item.content);
 
     return (
       <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
@@ -214,12 +219,12 @@ export default function ChatRoomScreen() {
           style={[
             styles.bubble,
             mine ? styles.bubbleMine : styles.bubbleOther,
-            isImage && styles.bubbleImage,
+            isMedia && styles.bubbleImage,
             isBigEmoji && styles.bubbleBigEmoji,
           ]}
         >
           {!mine && (
-            <Text style={[styles.sender, (isImage || isBigEmoji) && styles.imagePad]}>
+            <Text style={[styles.sender, (isMedia || isBigEmoji) && styles.imagePad]}>
               {names.get(item.senderId) ?? 'Người dùng'}
             </Text>
           )}
@@ -228,6 +233,8 @@ export default function ChatRoomScreen() {
               message={item}
               onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
             />
+          ) : isVideo ? (
+            <ChatVideo message={item} />
           ) : isBigEmoji ? (
             <Text style={styles.textBigEmoji}>{item.content}</Text>
           ) : (
@@ -237,7 +244,7 @@ export default function ChatRoomScreen() {
             style={[
               styles.meta,
               mine ? styles.metaMine : styles.metaOther,
-              (isImage || isBigEmoji) && styles.imagePad,
+              (isMedia || isBigEmoji) && styles.imagePad,
               isBigEmoji && styles.metaBigEmoji,
             ]}
           >
@@ -247,7 +254,7 @@ export default function ChatRoomScreen() {
         </View>
         {mine && item.status === 'failed' && (
           <Pressable
-            onPress={() => (isImage ? retryImage(item) : send(item.content, item.id))}
+            onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
             hitSlop={8}
           >
             <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>

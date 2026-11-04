@@ -26,7 +26,7 @@ export interface UserSummary {
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'failed';
-export type MessageType = 'text' | 'image';
+export type MessageType = 'text' | 'image' | 'video';
 
 export interface Message {
   id: string;
@@ -36,12 +36,14 @@ export interface Message {
   content: string; // image: để trống
   timestamp: number; // epoch milliseconds
   status: MessageStatus;
-  // --- chỉ dùng cho image ---
+  // --- dùng cho image / video ---
   imageUrl?: string; // URL Cloudinary, có sau khi upload xong
-  localUri?: string; // ảnh trên máy, hiện ngay lúc đang gửi và dùng để gửi lại khi lỗi
+  localUri?: string; // file trên máy, hiện ngay lúc đang gửi và dùng để gửi lại khi lỗi
   imageWidth?: number;
   imageHeight?: number;
   uploadProgress?: number; // 0-100, chỉ có khi đang upload
+  videoUrl?: string;
+  videoDurationMs?: number;
 }
 
 // ---- Khớp với gateway ----
@@ -78,10 +80,11 @@ export interface SendMessageRequest {
   room_id: string;
   content: string;
   message_id?: string;
-  type?: 'TEXT' | 'IMAGE';
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO';
   media_url?: string;
   media_width?: number;
   media_height?: number;
+  media_duration_ms?: number;
 }
 
 export interface SendMessageResponse {
@@ -102,6 +105,7 @@ export interface HistoryItem {
   media_url?: string;
   media_width?: number;
   media_height?: number;
+  media_duration_ms?: number;
 }
 
 export interface HistoryResponse {
@@ -122,6 +126,7 @@ export interface UploadSignature {
   public_id: string;
   transformation: string;
   signature: string;
+  resource_type?: string;
 }
 export interface Friend {
   userId: string;

@@ -26,13 +26,15 @@ const toMessage = (m: HistoryItem): Message => ({
   id: m.message_id,
   roomId: m.room_id,
   senderId: m.sender_id,
-  type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
+  type: m.type === 'IMAGE' ? ('image' as const) : m.type === 'VIDEO' ? ('video' as const) : ('text' as const),
   content: m.content,
   timestamp: m.timestamp,
   status: 'sent' as const,
-  imageUrl: m.media_url || undefined,
+  imageUrl: m.type === 'IMAGE' ? (m.media_url || undefined) : undefined,
+  videoUrl: m.type === 'VIDEO' ? (m.media_url || undefined) : undefined,
   imageWidth: m.media_width || undefined,
   imageHeight: m.media_height || undefined,
+  videoDurationMs: m.media_duration_ms || undefined,
 });
 
 const toRoom = (d: RoomDto): Room => ({
@@ -103,20 +105,7 @@ export const chatApi = createApi({
       query: (roomId) => `/api/v1/chat/history/${encodeURIComponent(roomId)}?limit=50`,
       // Gateway trả tin mới nhất trước, FlatList cần cũ nhất trước
       transformResponse: (res: HistoryResponse): MessagesState => ({
-        messages: res.messages
-          .map((m) => ({
-            id: m.message_id,
-            roomId: m.room_id,
-            senderId: m.sender_id,
-            type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
-            content: m.content,
-            timestamp: m.timestamp,
-            status: 'sent' as const,
-            imageUrl: m.media_url || undefined,
-            imageWidth: m.media_width || undefined,
-            imageHeight: m.media_height || undefined,
-          }))
-          .reverse(),
+        messages: res.messages.map(toMessage).reverse(),
         hasMore: res.has_more,
       }),
       // Khi polling, giữ lại tin cũ đã tải thêm và tin đang gửi / gửi lỗi
@@ -159,20 +148,7 @@ export const chatApi = createApi({
       async onQueryStarted({ roomId }, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          const earlierMessages: Message[] = data.messages
-            .map((m) => ({
-              id: m.message_id,
-              roomId: m.room_id,
-              senderId: m.sender_id,
-              type: m.type === 'IMAGE' ? ('image' as const) : ('text' as const),
-              content: m.content,
-              timestamp: m.timestamp,
-              status: 'sent' as const,
-              imageUrl: m.media_url || undefined,
-              imageWidth: m.media_width || undefined,
-              imageHeight: m.media_height || undefined,
-            }))
-            .reverse();
+          const earlierMessages: Message[] = data.messages.map(toMessage).reverse();
 
           dispatch(
             chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
@@ -188,9 +164,13 @@ export const chatApi = createApi({
       },
     }),
 
-    // Xin chữ ký để upload ảnh thẳng lên Cloudinary
-    getUploadSignature: build.mutation<UploadSignature, void>({
-      query: () => ({ url: '/api/v1/uploads/sign', method: 'POST' }),
+    // Xin chữ ký để upload ảnh/video thẳng lên Cloudinary
+    getUploadSignature: build.mutation<UploadSignature, { resourceType?: 'image' | 'video' } | void>({
+      query: (arg) => ({
+        url: '/api/v1/uploads/sign',
+        method: 'POST',
+        params: { resource_type: arg && typeof arg === 'object' && arg.resourceType ? arg.resourceType : 'image' },
+      }),
     }),
 
     sendMessage: build.mutation<
@@ -202,11 +182,13 @@ export const chatApi = createApi({
         localId: string;
         type?: MessageType;
         imageUrl?: string;
+        videoUrl?: string;
         imageWidth?: number;
         imageHeight?: number;
+        durationMs?: number;
       }
     >({
-      query: ({ roomId, content, localId, type, imageUrl, imageWidth, imageHeight }) => {
+      query: ({ roomId, content, localId, type, imageUrl, videoUrl, imageWidth, imageHeight, durationMs }) => {
         // senderId chỉ dùng để hiện tin tạm trong cache; gateway lấy người gửi từ token
         const body: SendMessageRequest = {
           room_id: roomId,
@@ -218,6 +200,12 @@ export const chatApi = createApi({
           body.media_url = imageUrl;
           body.media_width = imageWidth ?? 0;
           body.media_height = imageHeight ?? 0;
+        } else if (type === 'video') {
+          body.type = 'VIDEO';
+          body.media_url = videoUrl;
+          body.media_width = imageWidth ?? 0;
+          body.media_height = imageHeight ?? 0;
+          body.media_duration_ms = durationMs ?? 0;
         }
         return { url: '/api/v1/chat/send', method: 'POST', body };
       },
@@ -226,7 +214,7 @@ export const chatApi = createApi({
 
       // Optimistic update: hiện tin nhắn ngay, sau đó cập nhật trạng thái theo kết quả server.
       async onQueryStarted(
-        { roomId, senderId, content, localId, type, imageUrl, imageWidth, imageHeight },
+        { roomId, senderId, content, localId, type, imageUrl, videoUrl, imageWidth, imageHeight, durationMs },
         { dispatch, queryFulfilled },
       ) {
         dispatch(
@@ -244,8 +232,10 @@ export const chatApi = createApi({
                 timestamp: Date.now(),
                 status: 'sending',
                 imageUrl,
+                videoUrl,
                 imageWidth,
                 imageHeight,
+                videoDurationMs: durationMs,
               });
             }
           }),
