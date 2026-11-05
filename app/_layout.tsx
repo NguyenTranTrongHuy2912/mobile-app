@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
@@ -10,6 +11,11 @@ import SessionBootstrap from '../src/features/session/SessionBootstrap';
 import { chatApi } from '../src/api/chatApi';
 import { useAppDispatch, useAppSelector } from '../src/store/hooks';
 import { useRealtime } from '../src/features/realtime/useRealtime';
+
+// Bỏ qua cảnh báo phát triển nội bộ của Expo Router / React Navigation khi cập nhật danh sách route
+LogBox.ignoreLogs([
+  "The action 'ROUTE_NAMES_CHANGED'",
+]);
 
 // Tách riêng vì useAppSelector phải nằm bên trong <Provider>
 function Routes() {
