@@ -3,6 +3,7 @@ import { chatApi } from '../api/chatApi';
 import chatReducer from '../features/chat/chatSlice';
 import sessionReducer from '../features/session/sessionSlice';
 import presenceReducer from '../features/presence/presenceSlice';
+import themeReducer from '../features/theme/themeSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     chat: chatReducer,
     session: sessionReducer,
     presence: presenceReducer,
+    theme: themeReducer,
   },
   middleware: (getDefault) => getDefault().concat(chatApi.middleware),
 });

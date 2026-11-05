@@ -18,6 +18,7 @@ import {
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
 import { ActiveBadge } from '../components/ActiveBadge';
+import ScalePressable from '../components/ScalePressable';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
 
@@ -146,7 +147,15 @@ export default function RoomListScreen() {
           <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color="#8A8D91" />
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable
+            onPress={() => router.push('/(app)/ai-assistant')}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="sparkles" size={18} color="#0084FF" />
+          </Pressable>
+        )}
       </View>
 
       {/* 2. Active Friends Bar (Hàng ngang bạn bè đang hoạt động) */}
@@ -296,11 +305,55 @@ export default function RoomListScreen() {
           </Text>
         }
       />
+
+      {/* Floating Meta AI Button chuẩn Messenger (Ảnh 1) */}
+      <ScalePressable
+        style={styles.floatingAiBtn}
+        onPress={() => router.push('/(app)/ai-assistant')}
+      >
+        <View style={styles.floatingAiIcon}>
+          <Ionicons name="sparkles" size={16} color="#fff" />
+        </View>
+        <Text style={styles.floatingAiText}>Hỏi Meta AI</Text>
+      </ScalePressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  floatingAiBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E4E6EB',
+  },
+  floatingAiIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#0084FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  floatingAiText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#050505',
+  },
+
   container: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   errorText: { color: '#65676B', marginBottom: 12 },

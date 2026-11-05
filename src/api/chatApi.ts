@@ -358,6 +358,25 @@ export const chatApi = createApi({
     getOnlineUsers: build.query<{ online_user_ids: string[] }, void>({
       query: () => '/api/v1/users/online',
     }),
+    // --- Trợ lý ảo AI & Tóm tắt hội thoại ---
+    askAi: build.mutation<{ ok: boolean; reply: string; model: string }, { prompt: string }>({
+      query: (body) => ({
+        url: '/api/v1/ai/chat',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    summarizeRoom: build.mutation<
+      { ok: boolean; room_name: string; summary: string; total_messages: number },
+      { roomId: string; limit?: number }
+    >({
+      query: ({ roomId, limit }) => ({
+        url: '/api/v1/ai/summarize',
+        method: 'POST',
+        body: { room_id: roomId, limit: limit ?? 30 },
+      }),
+    }),
   }),
 });
 
@@ -378,4 +397,6 @@ export const {
   useChangePasswordMutation,
   useRegisterPushTokenMutation,
   useGetOnlineUsersQuery,
+  useAskAiMutation,
+  useSummarizeRoomMutation,
 } = chatApi;

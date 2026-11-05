@@ -12,16 +12,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ActiveBadge } from '../components/ActiveBadge';
 import dayjs from 'dayjs';
 import { formatChatDivider } from '../utils/dateFormatter';
+import AnimatedMessageItem from '../components/AnimatedMessageItem';
+import ScalePressable from '../components/ScalePressable';
+import AiSummarizeModal from '../components/AiSummarizeModal';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
   useLoadEarlierMessagesMutation,
   useMarkRoomReadMutation,
   useSendMessageMutation,
+  useSummarizeRoomMutation,
 } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
@@ -77,6 +81,30 @@ export default function ChatRoomScreen() {
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
+  const router = useRouter();
+  const [summarizeRoom, { isLoading: isSummarizing }] = useSummarizeRoomMutation();
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [summaryData, setSummaryData] = useState<{ summary: string; totalMessages: number }>({
+    summary: '',
+    totalMessages: 0,
+  });
+
+  const handleOpenAiSummarize = async () => {
+    if (!roomId) return;
+    setShowAiModal(true);
+    try {
+      const res = await summarizeRoom({ roomId }).unwrap();
+      setSummaryData({
+        summary: res.summary,
+        totalMessages: res.total_messages,
+      });
+    } catch (e) {
+      setSummaryData({
+        summary: 'Không thể tóm tắt cuộc trò chuyện lúc này. Vui lòng thử lại sau.',
+        totalMessages: 0,
+      });
+    }
+  };
 
   const navigation = useNavigation();
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
@@ -91,7 +119,10 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <View style={styles.headerContainer}>
+        <Pressable
+          style={styles.headerContainer}
+          onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
+        >
           <View style={styles.headerAvatarWrap}>
             <View style={styles.headerAvatar}>
               <Text style={styles.headerAvatarInitial}>
@@ -112,10 +143,30 @@ export default function ChatRoomScreen() {
               </Text>
             ) : currentRoom?.members.length ? (
               <Text style={styles.headerSubtitleText}>
-                {currentRoom.members.length} thành viên
+                {currentRoom.members.length} thành viên · Chi tiết
               </Text>
             ) : null}
           </View>
+        </Pressable>
+      ),
+      headerRight: () => (
+        <View style={styles.headerRightActions}>
+          {!isDirect && (
+            <ScalePressable
+              style={styles.summarizeHeaderBtn}
+              onPress={handleOpenAiSummarize}
+            >
+              <Ionicons name="sparkles" size={15} color="#0084FF" />
+              <Text style={styles.summarizeHeaderBtnText}>Tóm tắt</Text>
+            </ScalePressable>
+          )}
+          <Pressable
+            onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="information-circle-outline" size={24} color="#0084FF" />
+          </Pressable>
         </View>
       ),
     });
@@ -276,7 +327,7 @@ export default function ChatRoomScreen() {
             <Text style={styles.dateDividerText}>{dateLabel}</Text>
           </View>
         )}
-        <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
+        <AnimatedMessageItem style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
           <Pressable
             onPress={() => setSelectedMsgId(isSelected ? null : item.id)}
             style={[
@@ -328,7 +379,7 @@ export default function ChatRoomScreen() {
               <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
             </Pressable>
           )}
-        </View>
+        </AnimatedMessageItem>
       </View>
     );
   };
@@ -407,25 +458,54 @@ export default function ChatRoomScreen() {
         />
 
         {draft.trim() ? (
-          <Pressable style={styles.sendButton} onPress={onPressSend}>
+          <ScalePressable style={styles.sendButton} onPress={onPressSend}>
             <Ionicons name="send" size={18} color="#fff" />
-          </Pressable>
+          </ScalePressable>
         ) : (
-          <Pressable
+          <ScalePressable
             style={styles.likeButton}
             onPress={() => send('👍')}
             hitSlop={6}
           >
             <Ionicons name="thumbs-up" size={26} color="#0084FF" />
-          </Pressable>
+          </ScalePressable>
         )}
       </View>
       <ImageViewer uri={viewerUri} onClose={() => setViewerUri(null)} />
+      <AiSummarizeModal
+        visible={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        isLoading={isSummarizing}
+        roomName={headerTitle}
+        summary={summaryData.summary}
+        totalMessages={summaryData.totalMessages}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 6,
+  },
+  summarizeHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E7F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  summarizeHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0064D1',
+    marginLeft: 4,
+  },
+
   container: { flex: 1, backgroundColor: '#f0f2f5' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 12, flexGrow: 1 },

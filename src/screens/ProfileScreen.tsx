@@ -216,7 +216,7 @@ export default function ProfileScreen() {
 
       {/* Nhóm Menu Messenger (Ảnh 5) */}
       <View style={styles.card}>
-        <Pressable style={[styles.row, styles.rowBorder]} onPress={handleOpenNameModal}>
+        <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/(app)/settings')}>
           <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
             <Ionicons name="settings-outline" size={20} color="#050505" />
           </View>
@@ -243,7 +243,7 @@ export default function ProfileScreen() {
 
         <Pressable
           style={[styles.row, styles.rowBorder]}
-          onPress={() => Alert.alert('Meta AI', 'Trợ lý AI đang được tích hợp vào các phiên bản tiếp theo!')}
+          onPress={() => router.push('/(app)/ai-assistant')}
         >
           <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
             <Ionicons name="sparkles-outline" size={20} color="#0084FF" />
