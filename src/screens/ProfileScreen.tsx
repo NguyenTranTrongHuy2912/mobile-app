@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -40,6 +41,7 @@ function confirmLogout(onConfirm: () => void) {
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const displayName = useAppSelector((s) => s.session.displayName);
   const avatarUrl = useAppSelector((s) => s.session.avatarUrl);
   const userId = useAppSelector((s) => s.session.userId);
@@ -176,8 +178,8 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Profile Facebook Messenger style */}
-      <View style={styles.header}>
+      {/* Header Profile Facebook Messenger style (Ảnh 5) */}
+      <View style={styles.menuHeaderCard}>
         <View style={styles.avatarContainer}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
@@ -197,40 +199,69 @@ export default function ProfileScreen() {
             {isUploadingAvatar ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Ionicons name="camera" size={18} color="#fff" />
+              <Ionicons name="camera" size={14} color="#fff" />
             )}
           </Pressable>
         </View>
 
-        <Text style={styles.name} numberOfLines={1}>
-          {displayName}
-        </Text>
-        <Text style={styles.subtext}>Tài khoản cá nhân</Text>
+        <View style={styles.menuHeaderText}>
+          <Text style={styles.name} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.subtext} numberOfLines={1}>
+            Chuyển trang cá nhân · @{displayName.toLowerCase().replace(/\s+/g, '')}.{userId.slice(0, 4)}
+          </Text>
+        </View>
       </View>
 
-      {/* Nhóm Tài khoản */}
-      <Text style={styles.sectionHeader}>TÀI KHOẢN</Text>
+      {/* Nhóm Menu Messenger (Ảnh 5) */}
       <View style={styles.card}>
         <Pressable style={[styles.row, styles.rowBorder]} onPress={handleOpenNameModal}>
-          <View style={[styles.iconCircle, { backgroundColor: '#E7F3FF' }]}>
-            <Ionicons name="person-outline" size={20} color={colors.primary} />
+          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
+            <Ionicons name="settings-outline" size={20} color="#050505" />
           </View>
           <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Tên hiển thị</Text>
-            <Text style={styles.rowValue} numberOfLines={1}>
-              {displayName}
-            </Text>
+            <Text style={styles.rowLabel}>Cài đặt</Text>
+            <Text style={styles.rowSub}>Tên hiển thị: {displayName}</Text>
           </View>
-          <Ionicons name="pencil-outline" size={18} color={colors.subtext} />
+          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+        </Pressable>
+
+        <Pressable
+          style={[styles.row, styles.rowBorder]}
+          onPress={() => router.push('/(app)/(tabs)/notifications')}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
+            <Ionicons name="people-outline" size={20} color="#050505" />
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Lời mời kết bạn</Text>
+            <Text style={styles.rowSub}>Xem và xác nhận kết nối mới</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+        </Pressable>
+
+        <Pressable
+          style={[styles.row, styles.rowBorder]}
+          onPress={() => Alert.alert('Meta AI', 'Trợ lý AI đang được tích hợp vào các phiên bản tiếp theo!')}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
+            <Ionicons name="sparkles-outline" size={20} color="#0084FF" />
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Chat với AI</Text>
+            <Text style={styles.rowSub}>Hỏi đáp thông minh cùng AI Assistant</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
         </Pressable>
 
         <Pressable style={styles.row} onPress={handleOpenPasswordModal}>
-          <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
-            <Ionicons name="key-outline" size={20} color="#F57C00" />
+          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
+            <Ionicons name="key-outline" size={20} color="#050505" />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Đổi mật khẩu</Text>
-            <Text style={styles.rowSub}>Cập nhật mật khẩu đăng nhập</Text>
+            <Text style={styles.rowSub}>Bảo mật tài khoản của bạn</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
         </Pressable>
@@ -395,6 +426,23 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.screen },
   content: { padding: 16, width: '100%', maxWidth: 500, alignSelf: 'center', paddingBottom: 40 },
+  menuHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  menuHeaderText: {
+    flex: 1,
+    marginLeft: 14,
+  },
   header: { alignItems: 'center', paddingVertical: 20 },
   avatarContainer: { position: 'relative', marginBottom: 12 },
   avatarPlaceholder: {

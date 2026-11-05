@@ -34,6 +34,7 @@ export default function FriendsScreen() {
   const [activeTab, setActiveTab] = useState<SubTab>('friends');
   const [friendSearch, setFriendSearch] = useState('');
   const [findSearch, setFindSearch] = useState('');
+  const [friendFilter, setFriendFilter] = useState<'all' | 'active'>('all');
   const [sentUserIds, setSentUserIds] = useState<Record<string, boolean>>({});
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -58,14 +59,22 @@ export default function FriendsScreen() {
 
   // Lọc bạn bè theo ô tìm kiếm nhanh
   const filteredFriends = useMemo(() => {
+    let list = friends;
+    if (friendFilter === 'active') {
+      list = list.filter((f) => !!onlineUserIds[f.userId]);
+    }
     const q = friendSearch.trim().toLowerCase();
-    if (!q) return friends;
-    return friends.filter(
+    if (!q) return list;
+    return list.filter(
       (f) =>
         f.displayName.toLowerCase().includes(q) ||
         (f.email && f.email.toLowerCase().includes(q)),
     );
-  }, [friends, friendSearch]);
+  }, [friends, friendFilter, onlineUserIds, friendSearch]);
+
+  const onlineFriendsCount = useMemo(() => {
+    return friends.filter((f) => !!onlineUserIds[f.userId]).length;
+  }, [friends, onlineUserIds]);
 
   // Set các ID của bạn bè để phân biệt trong màn tìm kiếm
   const friendIdSet = useMemo(() => new Set(friends.map((f) => f.userId)), [friends]);
@@ -280,6 +289,50 @@ export default function FriendsScreen() {
       {/* Nội dung Tab 1: Bạn bè */}
       {activeTab === 'friends' && (
         <View style={styles.contentWrap}>
+          {/* Filter Pills chuẩn Messenger (Ảnh 2) */}
+          <View style={styles.messengerPillsRow}>
+            <Pressable
+              style={[
+                styles.messengerPill,
+                friendFilter === 'active' && styles.messengerPillActive,
+              ]}
+              onPress={() => setFriendFilter('active')}
+            >
+              <View style={styles.greenDotSmall} />
+              <Text
+                style={[
+                  styles.messengerPillText,
+                  friendFilter === 'active' && styles.messengerPillTextActive,
+                ]}
+              >
+                {onlineFriendsCount} đang hoạt động
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.messengerPill}
+              onPress={() => router.push('/(app)/(tabs)/notifications')}
+            >
+              <Text style={styles.messengerPillText}>Lời mời kết bạn</Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.messengerPill,
+                friendFilter === 'all' && styles.messengerPillActive,
+              ]}
+              onPress={() => setFriendFilter('all')}
+            >
+              <Text
+                style={[
+                  styles.messengerPillText,
+                  friendFilter === 'all' && styles.messengerPillTextActive,
+                ]}
+              >
+                Tất cả
+              </Text>
+            </Pressable>
+          </View>
           {friends.length > 0 && (
             <View style={styles.searchBarContainer}>
               <Ionicons name="search" size={18} color={colors.subtext} style={styles.searchIcon} />
@@ -414,6 +467,43 @@ export default function FriendsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Messenger Pills Styles (Ảnh 2)
+  messengerPillsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 8,
+    backgroundColor: '#fff',
+  },
+  messengerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: '#F0F2F5',
+  },
+  messengerPillActive: {
+    backgroundColor: '#E7F3FF',
+  },
+  greenDotSmall: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#31A24C',
+    marginRight: 6,
+  },
+  messengerPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#050505',
+  },
+  messengerPillTextActive: {
+    color: '#0064D1',
+    fontWeight: '700',
+  },
+
   container: { flex: 1, backgroundColor: colors.background },
   tabBar: {
     flexDirection: 'row',

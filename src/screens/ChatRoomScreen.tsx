@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { ActiveBadge } from '../components/ActiveBadge';
 import dayjs from 'dayjs';
+import { formatChatDivider } from '../utils/dateFormatter';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
@@ -75,6 +76,7 @@ export default function ChatRoomScreen() {
   const isInitialLoadRef = useRef(true);
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
 
   const navigation = useNavigation();
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
@@ -106,7 +108,7 @@ export default function ChatRoomScreen() {
             </Text>
             {isDirect ? (
               <Text style={[styles.headerSubtitleText, isOtherOnline && styles.headerActiveText]}>
-                {isOtherOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+                {isOtherOnline ? 'Đang hoạt động' : 'Hoạt động gần đây'}
               </Text>
             ) : currentRoom?.members.length ? (
               <Text style={styles.headerSubtitleText}>
@@ -256,26 +258,16 @@ export default function ChatRoomScreen() {
     const isVideo = item.type === 'video';
     const isMedia = isImage || isVideo;
     const isBigEmoji = !isMedia && isOnlyEmoji(item.content);
+    const isSelected = selectedMsgId === item.id;
 
-    // Tính toán Date Divider giữa các đoạn hội thoại
+    // Tính toán Date Divider giữa các đoạn hội thoại (chuẩn Messenger Ảnh 4)
     const prevMsg = index > 0 ? messages[index - 1] : null;
     const showDateDivider =
       !prevMsg ||
       !dayjs(item.timestamp).isSame(dayjs(prevMsg.timestamp), 'day') ||
-      item.timestamp - prevMsg.timestamp > 45 * 60 * 1000;
+      item.timestamp - prevMsg.timestamp > 30 * 60 * 1000;
 
-    const dateLabel = (() => {
-      const d = dayjs(item.timestamp);
-      const now = dayjs();
-      if (d.isSame(now, 'day')) {
-        return `Hôm nay ${d.format('HH:mm')}`;
-      } else if (d.isSame(now.subtract(1, 'day'), 'day')) {
-        return `Hôm qua ${d.format('HH:mm')}`;
-      } else if (d.isSame(now, 'year')) {
-        return d.format('DD [thg] MM, YYYY [lúc] HH:mm');
-      }
-      return d.format('DD/MM/YYYY [lúc] HH:mm');
-    })();
+    const dateLabel = formatChatDivider(item.timestamp);
 
     return (
       <View key={item.id}>
@@ -285,7 +277,8 @@ export default function ChatRoomScreen() {
           </View>
         )}
         <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
-          <View
+          <Pressable
+            onPress={() => setSelectedMsgId(isSelected ? null : item.id)}
             style={[
               styles.bubble,
               mine ? styles.bubbleMine : styles.bubbleOther,
@@ -310,18 +303,23 @@ export default function ChatRoomScreen() {
             ) : (
               <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
             )}
-            <Text
-              style={[
-                styles.meta,
-                mine ? styles.metaMine : styles.metaOther,
-                (isMedia || isBigEmoji) && styles.imagePad,
-                isBigEmoji && styles.metaBigEmoji,
-              ]}
-            >
-              {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
-              {mine && item.status === 'sending' ? ' · Đang gửi…' : ''}
-            </Text>
-          </View>
+
+            {isSelected && (
+              <Text
+                style={[
+                  styles.meta,
+                  mine ? styles.metaMine : styles.metaOther,
+                  (isMedia || isBigEmoji) && styles.imagePad,
+                  isBigEmoji && styles.metaBigEmoji,
+                ]}
+              >
+                {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
+              </Text>
+            )}
+            {mine && item.status === 'sending' && (
+              <Text style={styles.sendingMeta}>Đang gửi…</Text>
+            )}
+          </Pressable>
           {mine && item.status === 'failed' && (
             <Pressable
               onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
@@ -602,13 +600,15 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
   dateDividerText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#65676B',
-    backgroundColor: '#E4E6EB',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    overflow: 'hidden',
+    letterSpacing: 0.3,
+  },
+  sendingMeta: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'right',
+    marginTop: 2,
   },
 });
