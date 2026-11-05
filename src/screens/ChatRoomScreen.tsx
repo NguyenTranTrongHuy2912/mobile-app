@@ -250,60 +250,87 @@ export default function ChatRoomScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
+  const renderItem = ({ item, index }: { item: Message; index: number }) => {
     const mine = item.senderId === userId;
     const isImage = item.type === 'image';
     const isVideo = item.type === 'video';
     const isMedia = isImage || isVideo;
     const isBigEmoji = !isMedia && isOnlyEmoji(item.content);
 
+    // Tính toán Date Divider giữa các đoạn hội thoại
+    const prevMsg = index > 0 ? messages[index - 1] : null;
+    const showDateDivider =
+      !prevMsg ||
+      !dayjs(item.timestamp).isSame(dayjs(prevMsg.timestamp), 'day') ||
+      item.timestamp - prevMsg.timestamp > 45 * 60 * 1000;
+
+    const dateLabel = (() => {
+      const d = dayjs(item.timestamp);
+      const now = dayjs();
+      if (d.isSame(now, 'day')) {
+        return `Hôm nay ${d.format('HH:mm')}`;
+      } else if (d.isSame(now.subtract(1, 'day'), 'day')) {
+        return `Hôm qua ${d.format('HH:mm')}`;
+      } else if (d.isSame(now, 'year')) {
+        return d.format('DD [thg] MM, YYYY [lúc] HH:mm');
+      }
+      return d.format('DD/MM/YYYY [lúc] HH:mm');
+    })();
+
     return (
-      <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
-        <View
-          style={[
-            styles.bubble,
-            mine ? styles.bubbleMine : styles.bubbleOther,
-            isMedia && styles.bubbleImage,
-            isBigEmoji && styles.bubbleBigEmoji,
-          ]}
-        >
-          {!mine && (
-            <Text style={[styles.sender, (isMedia || isBigEmoji) && styles.imagePad]}>
-              {names.get(item.senderId) ?? 'Người dùng'}
-            </Text>
-          )}
-          {isImage ? (
-            <ChatImage
-              message={item}
-              onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
-            />
-          ) : isVideo ? (
-            <ChatVideo message={item} />
-          ) : isBigEmoji ? (
-            <Text style={styles.textBigEmoji}>{item.content}</Text>
-          ) : (
-            <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
-          )}
-          <Text
+      <View key={item.id}>
+        {showDateDivider && (
+          <View style={styles.dateDividerWrap}>
+            <Text style={styles.dateDividerText}>{dateLabel}</Text>
+          </View>
+        )}
+        <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
+          <View
             style={[
-              styles.meta,
-              mine ? styles.metaMine : styles.metaOther,
-              (isMedia || isBigEmoji) && styles.imagePad,
-              isBigEmoji && styles.metaBigEmoji,
+              styles.bubble,
+              mine ? styles.bubbleMine : styles.bubbleOther,
+              isMedia && styles.bubbleImage,
+              isBigEmoji && styles.bubbleBigEmoji,
             ]}
           >
-            {dayjs(item.timestamp).format('HH:mm')}
-            {mine && item.status === 'sending' ? ' · Đang gửi…' : ''}
-          </Text>
+            {!mine && (
+              <Text style={[styles.sender, (isMedia || isBigEmoji) && styles.imagePad]}>
+                {names.get(item.senderId) ?? 'Người dùng'}
+              </Text>
+            )}
+            {isImage ? (
+              <ChatImage
+                message={item}
+                onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
+              />
+            ) : isVideo ? (
+              <ChatVideo message={item} />
+            ) : isBigEmoji ? (
+              <Text style={styles.textBigEmoji}>{item.content}</Text>
+            ) : (
+              <Text style={mine ? styles.textMine : styles.textOther}>{item.content}</Text>
+            )}
+            <Text
+              style={[
+                styles.meta,
+                mine ? styles.metaMine : styles.metaOther,
+                (isMedia || isBigEmoji) && styles.imagePad,
+                isBigEmoji && styles.metaBigEmoji,
+              ]}
+            >
+              {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
+              {mine && item.status === 'sending' ? ' · Đang gửi…' : ''}
+            </Text>
+          </View>
+          {mine && item.status === 'failed' && (
+            <Pressable
+              onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
+              hitSlop={8}
+            >
+              <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
+            </Pressable>
+          )}
         </View>
-        {mine && item.status === 'failed' && (
-          <Pressable
-            onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
-            hitSlop={8}
-          >
-            <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
-          </Pressable>
-        )}
       </View>
     );
   };
@@ -569,5 +596,19 @@ const styles = StyleSheet.create({
   headerActiveText: {
     color: '#31A24C',
     fontWeight: '600',
+  },
+  dateDividerWrap: {
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  dateDividerText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#65676B',
+    backgroundColor: '#E4E6EB',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
 });

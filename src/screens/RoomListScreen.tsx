@@ -19,7 +19,10 @@ const POLL_MS = 20000; // Realtime qua WebSocket cập nhật tức thì, pollin
 
 const formatTime = (ts: number) => {
   const d = dayjs(ts);
-  return d.isSame(dayjs(), 'day') ? d.format('HH:mm') : d.format('DD/MM');
+  const now = dayjs();
+  if (d.isSame(now, 'day')) return d.format('HH:mm');
+  if (d.isSame(now.subtract(1, 'day'), 'day')) return 'Hôm qua';
+  return d.format('DD/MM/YYYY');
 };
 
 function previewOf(room: Room, myId: string): string {
