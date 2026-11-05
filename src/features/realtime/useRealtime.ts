@@ -48,13 +48,17 @@ export function useRealtime() {
     let isSubscribed = true;
 
     // Đăng ký Expo Push Token với backend
-    registerForPushNotificationsAsync().then((pushToken) => {
-      if (pushToken && isSubscribed) {
-        registerPushToken(pushToken).catch((err) => {
-          console.warn('[Push] Register token error:', err);
-        });
-      }
-    });
+    registerForPushNotificationsAsync()
+      .then((pushToken) => {
+        if (pushToken && isSubscribed) {
+          registerPushToken(pushToken).catch((err) => {
+            console.warn('[Push] Register token error:', err);
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('[Push] Register push error:', err);
+      });
 
     // Lắng nghe khi người dùng bấm vào notification để điều hướng tới phòng chat
     const notificationResponseSub = Notifications.addNotificationResponseReceivedListener((response) => {
