@@ -19,6 +19,7 @@ import { formatChatDivider } from '../utils/dateFormatter';
 import AnimatedMessageItem from '../components/AnimatedMessageItem';
 import ScalePressable from '../components/ScalePressable';
 import AiSummarizeModal from '../components/AiSummarizeModal';
+import SemanticSearchModal from '../components/SemanticSearchModal';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
@@ -84,6 +85,7 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const [summarizeRoom, { isLoading: isSummarizing }] = useSummarizeRoomMutation();
   const [showAiModal, setShowAiModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; totalMessages: number }>({
     summary: '',
     totalMessages: 0,
@@ -160,6 +162,13 @@ export default function ChatRoomScreen() {
               <Text style={styles.summarizeHeaderBtnText}>Tóm tắt</Text>
             </ScalePressable>
           )}
+                    <Pressable
+            onPress={() => setShowSearchModal(true)}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="search-outline" size={22} color="#0084FF" />
+          </Pressable>
           <Pressable
             onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
             hitSlop={8}
@@ -479,6 +488,12 @@ export default function ChatRoomScreen() {
         roomName={headerTitle}
         summary={summaryData.summary}
         totalMessages={summaryData.totalMessages}
+      />
+      <SemanticSearchModal
+        visible={showSearchModal}
+        roomId={roomId}
+        roomName={headerTitle}
+        onClose={() => setShowSearchModal(false)}
       />
     </KeyboardAvoidingView>
   );

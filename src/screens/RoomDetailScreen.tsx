@@ -19,6 +19,7 @@ import { useAppSelector } from '../store/hooks';
 import MemberItem from '../components/MemberItem';
 import ScalePressable from '../components/ScalePressable';
 import AiSummarizeModal from '../components/AiSummarizeModal';
+import SemanticSearchModal from '../components/SemanticSearchModal';
 
 /**
  * Màn hình Chi tiết phòng chat / Quản lý nhóm
@@ -38,6 +39,7 @@ export default function RoomDetailScreen() {
 
   // State cho AI Summarize modal
   const [showAiModal, setShowAiModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; totalMessages: number }>({
     summary: '',
     totalMessages: 0,
@@ -138,7 +140,7 @@ export default function RoomDetailScreen() {
           <View style={styles.actionItem}>
             <ScalePressable
               style={styles.actionCircle}
-              onPress={() => Alert.alert('Tìm kiếm', 'Nhập từ khóa trong ô tìm kiếm ở danh sách chat để tìm tin nhắn.')}
+              onPress={() => setShowSearchModal(true)}
             >
               <Ionicons name="search-outline" size={20} color="#050505" />
             </ScalePressable>
@@ -214,6 +216,13 @@ export default function RoomDetailScreen() {
         roomName={room.name}
         summary={summaryData.summary}
         totalMessages={summaryData.totalMessages}
+      />
+
+      <SemanticSearchModal
+        visible={showSearchModal}
+        roomId={roomId}
+        roomName={room.name}
+        onClose={() => setShowSearchModal(false)}
       />
     </ScrollView>
   );

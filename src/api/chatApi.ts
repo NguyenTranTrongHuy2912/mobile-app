@@ -377,6 +377,56 @@ export const chatApi = createApi({
         body: { room_id: roomId, limit: limit ?? 30 },
       }),
     }),
+    // --- Thuật toán Vector Database & Semantic Search & RAG ---
+    semanticSearch: build.mutation<
+      {
+        ok: boolean;
+        query: string;
+        results: Array<{
+          message_id: string;
+          content: string;
+          sender_id: string;
+          sender_name: string;
+          timestamp: number;
+          similarity_score: number;
+          match_percent: number;
+        }>;
+        total: number;
+        algorithm: string;
+      },
+      { roomId: string; query: string; topK?: number }
+    >({
+      query: ({ roomId, query, topK }) => ({
+        url: '/api/v1/ai/semantic-search',
+        method: 'POST',
+        body: { room_id: roomId, query, top_k: topK ?? 5 },
+      }),
+    }),
+
+    ragChat: build.mutation<
+      {
+        ok: boolean;
+        room_name: string;
+        question: string;
+        answer: string;
+        matched_messages: Array<{
+          message_id: string;
+          content: string;
+          sender_name: string;
+          similarity_score: number;
+          match_percent: number;
+        }>;
+        total_matches: number;
+        algorithm: string;
+      },
+      { roomId: string; question: string }
+    >({
+      query: (body) => ({
+        url: '/api/v1/ai/rag-chat',
+        method: 'POST',
+        body: { room_id: body.roomId, question: body.question },
+      }),
+    }),
   }),
 });
 
@@ -399,4 +449,6 @@ export const {
   useGetOnlineUsersQuery,
   useAskAiMutation,
   useSummarizeRoomMutation,
+  useSemanticSearchMutation,
+  useRagChatMutation,
 } = chatApi;

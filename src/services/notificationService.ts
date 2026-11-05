@@ -18,7 +18,7 @@ try {
 }
 
 /**
- * Đăng ký nhận push token từ Expo Push Service
+ * Đăng ký nhận push token từ Expo Push Service một cách an toàn, không ném exception
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (Platform.OS === 'web') {
@@ -26,17 +26,15 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 
   try {
-    // Cấu hình notification channel cho Android
+    // Cấu hình notification channel cho Android an toàn
     if (Platform.OS === 'android') {
       try {
-        await Notifications.setNotificationChannelAsync('chat-messages', {
-          name: 'Tin nhắn trò chuyện',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#0084FF',
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Tin nhắn & Thông báo',
+          importance: Notifications.AndroidImportance.HIGH,
         });
       } catch (channelError) {
-        console.warn('[Push] Error creating Android notification channel:', channelError);
+        // Channel đã tồn tại hoặc môi trường dev
       }
     }
 
@@ -53,16 +51,48 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null;
     }
 
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
+    try {
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined,
-    );
-    return tokenData.data;
+      const tokenData = await Notifications.getExpoPushTokenAsync(
+        projectId ? { projectId } : undefined,
+      );
+      return tokenData?.data ?? null;
+    } catch (tokenErr) {
+      // Trong môi trường Expo Go không có EAS project ID
+      console.log('[Push] getExpoPushTokenAsync dev note:', tokenErr);
+      return null;
+    }
   } catch (error) {
-    console.warn('[Push] Error registering push notifications:', error);
+    console.log('[Push] Note during registerForPushNotificationsAsync:', error);
     return null;
+  }
+}
+
+/**
+ * Gửi thông báo đẩy cục bộ (Local Notification) ngay lập tức lên thanh thông báo của điện thoại.
+ * Hoạt động hoàn hảo cả khi app đang chạy hoặc thu nhỏ (Background) mà không phụ thuộc remote server.
+ */
+export async function showLocalNotification(
+  title: string,
+  body: string,
+  data?: Record<string, any>
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        data: data || {},
+      },
+      trigger: null, // Hiển thị ngay lập tức
+    });
+  } catch (e) {
+    console.log('[Push] Show local notification note:', e);
   }
 }

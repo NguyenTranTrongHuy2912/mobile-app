@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { registerForPushNotificationsAsync } from '../../services/notificationService';
+import {
+  registerForPushNotificationsAsync,
+  showLocalNotification,
+} from '../../services/notificationService';
 import { WS_URL } from '../../config';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { chatApi } from '../../api/chatApi';
@@ -29,6 +32,7 @@ interface WsEvent {
 export function useRealtime() {
   const dispatch = useAppDispatch();
   const token = useAppSelector((s) => s.session.token);
+  const userId = useAppSelector((s) => s.session.userId);
   const isAuthenticated = useAppSelector((s) => s.session.isAuthenticated);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,12 +142,29 @@ export function useRealtime() {
                   }
                 }),
               );
+
+              // 3. Thông báo đẩy (Push Notification) khi nhận tin nhắn từ người khác
+              if (msg.sender_id !== userId) {
+                showLocalNotification(
+                  'Tin nhắn mới',
+                  msg.content || (msg.type === 'IMAGE' ? 'Đã gửi một hình ảnh' : 'Bạn có tin nhắn mới'),
+                  { roomId: msg.room_id }
+                );
+              }
             } else if (data.type === 'ROOM_UPDATED') {
               dispatch(chatApi.util.invalidateTags(['Room']));
             } else if (data.type === 'FRIEND_REQUEST') {
               dispatch(chatApi.util.invalidateTags(['FriendRequest']));
+              showLocalNotification(
+                'Lời mời kết bạn',
+                'Bạn vừa nhận được một lời mời kết bạn mới!'
+              );
             } else if (data.type === 'FRIEND_ACCEPTED') {
               dispatch(chatApi.util.invalidateTags(['Friend', 'Room']));
+              showLocalNotification(
+                'Kết bạn thành công',
+                'Lời mời kết bạn của bạn đã được chấp thuận!'
+              );
             } else if (data.type === 'INITIAL_PRESENCE' && Array.isArray((data as any).online_user_ids)) {
               dispatch(setInitialPresence((data as any).online_user_ids));
             } else if (data.type === 'USER_PRESENCE') {
@@ -185,5 +206,5 @@ export function useRealtime() {
         wsRef.current = null;
       }
     };
-  }, [dispatch, isAuthenticated, token]);
+  }, [dispatch, isAuthenticated, token, userId]);
 }
