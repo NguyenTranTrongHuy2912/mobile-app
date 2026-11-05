@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from '../../services/notificationService';
 import { WS_URL } from '../../config';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { chatApi } from '../../api/chatApi';
+import { setInitialPresence, setUserPresence } from '../presence/presenceSlice';
 import type { Message } from '../../types/chat';
 
 interface WsMessagePayload {
@@ -29,6 +33,8 @@ export function useRealtime() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const router = useRouter();
+  const [registerPushToken] = chatApi.useRegisterPushTokenMutation();
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -40,6 +46,26 @@ export function useRealtime() {
     }
 
     let isSubscribed = true;
+
+    // Đăng ký Expo Push Token với backend
+    registerForPushNotificationsAsync().then((pushToken) => {
+      if (pushToken && isSubscribed) {
+        registerPushToken(pushToken).catch((err) => {
+          console.warn('[Push] Register token error:', err);
+        });
+      }
+    });
+
+    // Lắng nghe khi người dùng bấm vào notification để điều hướng tới phòng chat
+    const notificationResponseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.roomId) {
+        router.push({
+          pathname: '/chat/[roomId]',
+          params: { roomId: String(data.roomId) },
+        });
+      }
+    });
 
     const connect = () => {
       try {
@@ -114,6 +140,11 @@ export function useRealtime() {
               dispatch(chatApi.util.invalidateTags(['FriendRequest']));
             } else if (data.type === 'FRIEND_ACCEPTED') {
               dispatch(chatApi.util.invalidateTags(['Friend', 'Room']));
+            } else if (data.type === 'INITIAL_PRESENCE' && Array.isArray((data as any).online_user_ids)) {
+              dispatch(setInitialPresence((data as any).online_user_ids));
+            } else if (data.type === 'USER_PRESENCE') {
+              const p = data as any;
+              dispatch(setUserPresence({ userId: p.user_id, isOnline: !!p.is_online, lastSeen: p.last_seen }));
             }
           } catch (err) {
             console.warn('[Realtime] Parse message error:', err);
@@ -142,6 +173,7 @@ export function useRealtime() {
 
     return () => {
       isSubscribed = false;
+      notificationResponseSub.remove();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {

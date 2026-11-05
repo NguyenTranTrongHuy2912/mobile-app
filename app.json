@@ -35,7 +35,14 @@
           "cameraPermission": "ChatApp cần dùng camera để bạn chụp và gửi ảnh."
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0084FF"
+        }
+      ]
     ]
   }
 }

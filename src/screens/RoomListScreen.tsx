@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import { useRouter } from 'expo-router';
 import { useGetRoomsQuery } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
+import { ActiveBadge } from '../components/ActiveBadge';
 import type { Room } from '../types/chat';
 
 // Tạm thời làm mới định kỳ để thấy tin mới / số chưa đọc, cho đến khi có realtime
@@ -38,6 +39,7 @@ function previewOf(room: Room, myId: string): string {
 export default function RoomListScreen() {
   const router = useRouter();
   const myId = useAppSelector((s) => s.session.userId);
+  const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
   const { data: rooms, isLoading, refetch } = useGetRoomsQuery(undefined, {
     pollingInterval: POLL_MS,
   });
@@ -74,6 +76,9 @@ export default function RoomListScreen() {
 
   const renderItem = ({ item }: { item: Room }) => {
     const unread = item.unreadCount > 0;
+    const isDirect = item.type === 'direct';
+    const otherUserId = isDirect ? item.memberIds.find((id) => id !== myId) : undefined;
+    const isOnline = otherUserId ? !!onlineUserIds[otherUserId] : false;
     return (
       <Pressable
         style={styles.row}
@@ -81,6 +86,7 @@ export default function RoomListScreen() {
       >
         <View style={[styles.avatar, item.type === 'group' && styles.avatarGroup]}>
           <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+          {isDirect && isOnline ? <ActiveBadge size={13} /> : null}
         </View>
         <View style={styles.rowBody}>
           <View style={styles.rowTop}>

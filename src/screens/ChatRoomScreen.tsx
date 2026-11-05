@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { ActiveBadge } from '../components/ActiveBadge';
 import dayjs from 'dayjs';
 import {
   useGetMessagesQuery,
@@ -74,6 +75,49 @@ export default function ChatRoomScreen() {
   const isInitialLoadRef = useRef(true);
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const navigation = useNavigation();
+  const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const { data: rooms } = useGetRoomsQuery();
+  const currentRoom = rooms?.find((r) => r.id === roomId);
+  const isDirect = currentRoom?.type === 'direct';
+  const otherMember = isDirect ? currentRoom?.members.find((m) => m.userId !== userId) : undefined;
+  const otherUserId = otherMember?.userId;
+  const isOtherOnline = otherUserId ? !!onlineUserIds[otherUserId] : false;
+  const headerTitle = currentRoom?.name || 'Chat';
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <View style={styles.headerContainer}>
+          <View style={styles.headerAvatarWrap}>
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarInitial}>
+                {headerTitle.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            {isDirect && isOtherOnline ? (
+              <ActiveBadge size={12} style={{ bottom: -2, right: -2 }} />
+            ) : null}
+          </View>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitleText} numberOfLines={1}>
+              {headerTitle}
+            </Text>
+            {isDirect ? (
+              <Text style={[styles.headerSubtitleText, isOtherOnline && styles.headerActiveText]}>
+                {isOtherOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+              </Text>
+            ) : currentRoom?.members.length ? (
+              <Text style={styles.headerSubtitleText}>
+                {currentRoom.members.length} thành viên
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ),
+    });
+  }, [navigation, headerTitle, isDirect, isOtherOnline, currentRoom?.members.length]);
 
   // Cuộn thông minh: chỉ tự cuộn xuống cuối khi vào phòng lần đầu hoặc có tin mới ở cuối
   useEffect(() => {
@@ -486,5 +530,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 2,
     marginLeft: 4,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    maxWidth: 240,
+  },
+  headerAvatarWrap: {
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0084FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarInitial: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  headerTextWrap: {
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#050505',
+  },
+  headerSubtitleText: {
+    fontSize: 11,
+    color: '#65676B',
+    marginTop: 1,
+  },
+  headerActiveText: {
+    color: '#31A24C',
+    fontWeight: '600',
   },
 });

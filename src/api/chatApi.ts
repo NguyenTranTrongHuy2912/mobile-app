@@ -346,6 +346,18 @@ export const chatApi = createApi({
         },
       }),
     }),
+
+    registerPushToken: build.mutation<{ ok: boolean }, string>({
+      query: (pushToken) => ({
+        url: '/api/v1/users/push-token',
+        method: 'POST',
+        body: { push_token: pushToken },
+      }),
+    }),
+
+    getOnlineUsers: build.query<{ online_user_ids: string[] }, void>({
+      query: () => '/api/v1/users/online',
+    }),
   }),
 });
 
@@ -364,4 +376,6 @@ export const {
   useRespondFriendRequestMutation,
   useUpdateProfileMutation,
   useChangePasswordMutation,
+  useRegisterPushTokenMutation,
+  useGetOnlineUsersQuery,
 } = chatApi;

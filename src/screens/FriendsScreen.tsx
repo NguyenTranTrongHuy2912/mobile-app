@@ -19,6 +19,7 @@ import {
   useSendFriendRequestMutation,
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
+import { ActiveBadge } from '../components/ActiveBadge';
 import { colors } from '../theme';
 import { errorMessage } from '../utils/errorMessage';
 import type { Friend, UserSummary } from '../types/chat';
@@ -28,6 +29,7 @@ type SubTab = 'friends' | 'find';
 export default function FriendsScreen() {
   const router = useRouter();
   const currentUserId = useAppSelector((s) => s.session.userId);
+  const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
 
   const [activeTab, setActiveTab] = useState<SubTab>('friends');
   const [friendSearch, setFriendSearch] = useState('');
@@ -91,47 +93,61 @@ export default function FriendsScreen() {
     try {
       await sendFriendRequest(user.userId).unwrap();
       setSentUserIds((prev) => ({ ...prev, [user.userId]: true }));
-      setFeedbackMsg({ text: `Đã gửi lời mời kết bạn tới ${user.displayName}` });
-      setTimeout(() => setFeedbackMsg(null), 3500);
-    } catch (e) {
       setFeedbackMsg({
-        text: (() => {
-          const m = errorMessage(e, 'Không thể gửi lời mời kết bạn');
-          if (m.includes('trước đó') || m.includes('đã là bạn')) {
-            setSentUserIds((p) => ({ ...p, [user.userId]: true }));
-          }
-          return m;
-        })(),
-        isError: true,
+        text: `Đã gửi lời mời tới ${user.displayName}! Hãy nhắc đối phương vào tab Thông báo để xác nhận nhé.`,
+        isError: false,
       });
+      setTimeout(() => setFeedbackMsg(null), 4500);
+    } catch (e) {
+      const m = errorMessage(e, "Không thể gửi lời mời kết bạn");
+      if (m.includes("trước đó") || m.includes("đã là bạn") || m.toLowerCase().includes("already") || m.toLowerCase().includes("conflict")) {
+        setSentUserIds((p) => ({ ...p, [user.userId]: true }));
+        setFeedbackMsg({
+          text: `Bạn đã gửi lời mời tới ${user.displayName} trước đó rồi. Đang chờ người này mở tab Thông báo để Chấp nhận.`,
+          isError: false,
+        });
+      } else {
+        setFeedbackMsg({
+          text: m,
+          isError: true,
+        });
+      }
+      setTimeout(() => setFeedbackMsg(null), 4500);
     }
   };
 
   // Render từng bạn bè
-  const renderFriendItem = ({ item }: { item: Friend }) => (
-    <View style={styles.userCard}>
-      <View style={styles.avatarWrap}>
-        {item.avatarUrl ? (
-          <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {item.displayName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-      </View>
+  const renderFriendItem = ({ item }: { item: Friend }) => {
+    const isOnline = !!onlineUserIds[item.userId];
+    return (
+      <View style={styles.userCard}>
+        <View style={styles.avatarWrap}>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitial}>
+                {item.displayName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          {isOnline ? <ActiveBadge size={13} /> : null}
+        </View>
 
-      <View style={styles.userInfo}>
-        <Text style={styles.userName} numberOfLines={1}>
-          {item.displayName}
-        </Text>
-        {item.email ? (
-          <Text style={styles.userSub} numberOfLines={1}>
-            {item.email}
+        <View style={styles.userInfo}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {item.displayName}
           </Text>
-        ) : null}
-      </View>
+          {isOnline ? (
+            <Text style={[styles.userSub, { color: '#31A24C', fontWeight: '600' }]} numberOfLines={1}>
+              ● Đang hoạt động
+            </Text>
+          ) : item.email ? (
+            <Text style={styles.userSub} numberOfLines={1}>
+              {item.email}
+            </Text>
+          ) : null}
+        </View>
 
       <Pressable
         style={styles.messageButton}
@@ -141,14 +157,16 @@ export default function FriendsScreen() {
         <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
         <Text style={styles.messageButtonText}>Nhắn tin</Text>
       </Pressable>
-    </View>
-  );
+      </View>
+    );
+  };
 
   // Render người dùng tìm thấy
   const renderSearchResultItem = ({ item }: { item: UserSummary }) => {
     if (item.userId === currentUserId) return null; // Không hiện chính mình
     const isFriend = friendIdSet.has(item.userId);
     const hasSent = !!sentUserIds[item.userId];
+    const isOnline = !!onlineUserIds[item.userId];
 
     return (
       <View style={styles.userCard}>
@@ -158,6 +176,7 @@ export default function FriendsScreen() {
               {item.displayName.charAt(0).toUpperCase()}
             </Text>
           </View>
+          {isOnline ? <ActiveBadge size={13} /> : null}
         </View>
 
         <View style={styles.userInfo}>

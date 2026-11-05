@@ -2,12 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import { chatApi } from '../api/chatApi';
 import chatReducer from '../features/chat/chatSlice';
 import sessionReducer from '../features/session/sessionSlice';
+import presenceReducer from '../features/presence/presenceSlice';
 
 export const store = configureStore({
   reducer: {
     [chatApi.reducerPath]: chatApi.reducer,
     chat: chatReducer,
     session: sessionReducer,
+    presence: presenceReducer,
   },
   middleware: (getDefault) => getDefault().concat(chatApi.middleware),
 });
