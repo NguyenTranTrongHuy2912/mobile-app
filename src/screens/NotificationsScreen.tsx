@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
+import FloatingAiButton from '../components/FloatingAiButton';
 import {
   useGetFriendRequestsQuery,
   useGetFriendsQuery,
@@ -139,7 +140,8 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <FlatList
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <FlatList
       data={[1]} // Fake single item để dùng FlatList với pull-to-refresh
       keyExtractor={() => 'notifications-root'}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { refetch(); }} />}
@@ -223,6 +225,8 @@ export default function NotificationsScreen() {
         </View>
       )}
     />
+      <FloatingAiButton mode="circle" bottom={24} right={20} />
+    </View>
   );
 }
 

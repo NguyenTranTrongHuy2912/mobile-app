@@ -19,6 +19,7 @@ import {
 import { useAppSelector } from '../store/hooks';
 import { ActiveBadge } from '../components/ActiveBadge';
 import ScalePressable from '../components/ScalePressable';
+import FloatingAiButton from '../components/FloatingAiButton';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
 
@@ -307,15 +308,7 @@ export default function RoomListScreen() {
       />
 
       {/* Floating Meta AI Button chuẩn Messenger (Ảnh 1) */}
-      <ScalePressable
-        style={styles.floatingAiBtn}
-        onPress={() => router.push('/(app)/ai-assistant')}
-      >
-        <View style={styles.floatingAiIcon}>
-          <Ionicons name="sparkles" size={16} color="#fff" />
-        </View>
-        <Text style={styles.floatingAiText}>Hỏi Meta AI</Text>
-      </ScalePressable>
+      <FloatingAiButton mode="pill" bottom={24} right={18} />
     </View>
   );
 }

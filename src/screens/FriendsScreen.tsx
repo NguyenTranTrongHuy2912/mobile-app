@@ -20,6 +20,7 @@ import {
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
 import { ActiveBadge } from '../components/ActiveBadge';
+import FloatingAiButton from '../components/FloatingAiButton';
 import { colors } from '../theme';
 import { errorMessage } from '../utils/errorMessage';
 import type { Friend, UserSummary } from '../types/chat';
@@ -462,6 +463,7 @@ export default function FriendsScreen() {
           />
         </View>
       )}
+      <FloatingAiButton mode="circle" bottom={24} right={20} />
     </View>
   );
 }
