@@ -43,17 +43,25 @@ function Routes() {
   );
 }
 
+function InnerRoot() {
+  const isDark = useAppSelector((s) => s.theme?.isDark ?? false);
+
+  return (
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={isDark ? 'dark' : 'light'}>
+      <SafeAreaProvider>
+        <SessionBootstrap>
+          <Routes />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </SessionBootstrap>
+      </SafeAreaProvider>
+    </TamaguiProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
-      <Provider store={store}>
-        <SafeAreaProvider>
-          <SessionBootstrap>
-            <Routes />
-            <StatusBar style="auto" />
-          </SessionBootstrap>
-        </SafeAreaProvider>
-      </Provider>
-    </TamaguiProvider>
+    <Provider store={store}>
+      <InnerRoot />
+    </Provider>
   );
 }
