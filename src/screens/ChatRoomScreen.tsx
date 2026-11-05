@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import MediaPickerModal from '../components/MediaPickerModal';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ActiveBadge } from '../components/ActiveBadge';
 import dayjs from 'dayjs';
@@ -86,6 +89,7 @@ export default function ChatRoomScreen() {
   const [summarizeRoom, { isLoading: isSummarizing }] = useSummarizeRoomMutation();
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showMediaModal, setShowMediaModal] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; totalMessages: number }>({
     summary: '',
     totalMessages: 0,
@@ -264,26 +268,71 @@ export default function ChatRoomScreen() {
     }
   };
 
+  // Mở thư viện ảnh & album thiết bị
   const pickFromLibrary = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
-      quality: 0.7,
-      allowsMultipleSelection: true,
-      selectionLimit: MAX_IMAGES_PER_PICK,
-    });
-    if (res.canceled || res.assets.length === 0) return;
-    sendImages(res.assets.slice(0, MAX_IMAGES_PER_PICK).map(toPicked));
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Quyền truy cập Thư viện', 'Vui lòng cho phép truy cập ảnh trong cài đặt.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_IMAGES_PER_PICK,
+      });
+      if (res.canceled || res.assets.length === 0) return;
+      sendImages(res.assets.slice(0, MAX_IMAGES_PER_PICK).map(toPicked));
+    } catch (e) {
+      console.warn('[Picker] Error picking from library:', e);
+    }
   };
 
-  const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      setNotice('Cần cho phép dùng camera trong cài đặt để chụp ảnh.');
-      return;
+  // Duyệt trực tiếp thư mục tệp máy (Folder / Files)
+  const pickFromFolder = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'video/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets || res.assets.length === 0) return;
+      const picked: PickedImage[] = res.assets.slice(0, MAX_IMAGES_PER_PICK).map((doc) => {
+        const isVideo = doc.mimeType?.startsWith('video/') || false;
+        return {
+          uri: doc.uri,
+          type: isVideo ? 'video' : 'image',
+          mimeType: doc.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+          width: 800,
+          height: 800,
+        };
+      });
+      sendImages(picked);
+    } catch (e) {
+      console.warn('[Picker] Error picking from folder:', e);
     }
-    const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (res.canceled || res.assets.length === 0) return;
-    sendImages([toPicked(res.assets[0])]);
+  };
+
+  // Chụp ảnh trực tiếp từ Camera trước (Front Camera)
+  const takePhoto = async () => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Quyền truy cập Camera', 'Cần cho phép dùng camera trong cài đặt để chụp ảnh.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        cameraType: ImagePicker.CameraType.front, // Mở trực tiếp Camera trước
+        quality: 0.8,
+        allowsEditing: true,
+      });
+      if (res.canceled || res.assets.length === 0) return;
+      sendImages([toPicked(res.assets[0])]);
+    } catch (e) {
+      console.warn('[Camera] Error taking photo:', e);
+    }
   };
 
   const renderHeader = () => {
@@ -442,7 +491,7 @@ export default function ChatRoomScreen() {
         <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
           <Ionicons name="camera" size={24} color="#0084FF" />
         </Pressable>
-        <Pressable onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
+        <Pressable onPress={() => setShowMediaModal(true)} hitSlop={6} style={styles.iconButton}>
           <Ionicons name="image" size={24} color="#0084FF" />
         </Pressable>
         <Pressable
@@ -488,6 +537,13 @@ export default function ChatRoomScreen() {
         roomName={headerTitle}
         summary={summaryData.summary}
         totalMessages={summaryData.totalMessages}
+      />
+      <MediaPickerModal
+        visible={showMediaModal}
+        onClose={() => setShowMediaModal(false)}
+        onPickGallery={pickFromLibrary}
+        onPickFolder={pickFromFolder}
+        onTakePhoto={takePhoto}
       />
       <SemanticSearchModal
         visible={showSearchModal}
