@@ -42,7 +42,9 @@
           "icon": "./assets/icon.png",
           "color": "#0084FF"
         }
-      ]
+      ],
+      "expo-splash-screen",
+      "expo-font"
     ]
   }
 }
