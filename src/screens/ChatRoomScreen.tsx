@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   StyleSheet,
@@ -90,6 +92,33 @@ export default function ChatRoomScreen() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
+    // Quản lý trạng thái thu gọn / mở rộng các nút hành động (Camera, Ảnh, Mic, Thêm)
+  const [isActionsExpanded, setIsActionsExpanded] = useState(false);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const isCollapsed = draft.trim().length > 0 && !isActionsExpanded;
+
+  const toggleActions = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsActionsExpanded((prev) => !prev);
+  };
+
+  const handleTextChange = (text: string) => {
+    dispatch(setDraft({ roomId, text }));
+    if (text.trim().length > 0 && isActionsExpanded) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setIsActionsExpanded(false);
+    }
+  };
+
   const [summaryData, setSummaryData] = useState<{ summary: string; totalMessages: number }>({
     summary: '',
     totalMessages: 0,
@@ -453,8 +482,8 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 25}
     >
       <FlatList
         ref={listRef}
@@ -488,32 +517,63 @@ export default function ChatRoomScreen() {
       )}
 
       <View style={styles.inputBar}>
-        <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
-          <Ionicons name="camera" size={24} color="#0084FF" />
-        </Pressable>
-        <Pressable onPress={() => setShowMediaModal(true)} hitSlop={6} style={styles.iconButton}>
-          <Ionicons name="image" size={24} color="#0084FF" />
-        </Pressable>
-        <Pressable
-          onPress={() => setShowEmojiPicker((prev) => !prev)}
-          hitSlop={6}
-          style={styles.iconButton}
-        >
-          <Ionicons
-            name={showEmojiPicker ? 'happy' : 'happy-outline'}
-            size={24}
-            color="#0084FF"
-          />
-        </Pressable>
+        {/* Nút chuyển đổi '>' hoặc hàng nút tính năng (Camera, Ảnh, Mic, Thêm) */}
+        {isCollapsed ? (
+          <Pressable onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
+            <Ionicons name="chevron-forward" size={26} color="#0084FF" />
+          </Pressable>
+        ) : (
+          <View style={styles.actionButtonsRow}>
+            <Pressable
+              onPress={() => setShowMediaModal(true)}
+              hitSlop={6}
+              style={styles.iconButton}
+            >
+              <Ionicons name="add-circle" size={26} color="#0084FF" />
+            </Pressable>
+            <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
+              <Ionicons name="camera" size={24} color="#0084FF" />
+            </Pressable>
+            <Pressable onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
+              <Ionicons name="image" size={24} color="#0084FF" />
+            </Pressable>
+            <Pressable
+              onPress={() => Alert.alert('Ghi âm', 'Tính năng tin nhắn thoại đang sẵn sàng!')}
+              hitSlop={6}
+              style={styles.iconButton}
+            >
+              <Ionicons name="mic" size={24} color="#0084FF" />
+            </Pressable>
+            {draft.trim().length > 0 && (
+              <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
+                <Ionicons name="chevron-back" size={22} color="#8A8D91" />
+              </Pressable>
+            )}
+          </View>
+        )}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Nhập tin nhắn..."
-          placeholderTextColor="#8A8D91"
-          value={draft}
-          onChangeText={(text) => dispatch(setDraft({ roomId, text }))}
-          multiline
-        />
+        {/* Khung chứa ô nhập văn bản và nút emoji */}
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Nhập tin nhắn..."
+            placeholderTextColor="#8A8D91"
+            value={draft}
+            onChangeText={handleTextChange}
+            multiline
+          />
+          <Pressable
+            onPress={() => setShowEmojiPicker((prev) => !prev)}
+            hitSlop={6}
+            style={styles.innerEmojiButton}
+          >
+            <Ionicons
+              name={showEmojiPicker ? 'happy' : 'happy-outline'}
+              size={22}
+              color="#0084FF"
+            />
+          </Pressable>
+        </View>
 
         {draft.trim() ? (
           <ScalePressable style={styles.sendButton} onPress={onPressSend}>
@@ -525,7 +585,7 @@ export default function ChatRoomScreen() {
             onPress={() => send('👍')}
             hitSlop={6}
           >
-            <Ionicons name="thumbs-up" size={26} color="#0084FF" />
+            <Ionicons name="thumbs-up" size={24} color="#0084FF" />
           </ScalePressable>
         )}
       </View>
@@ -668,26 +728,51 @@ const styles = StyleSheet.create({
   emojiText: {
     fontSize: 26,
   },
-  iconButton: { paddingHorizontal: 5, paddingBottom: 8 },
+  iconButton: { paddingHorizontal: 4, paddingBottom: 6 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 6,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 8,
     backgroundColor: '#fff',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E4E6EB',
   },
-  input: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+    paddingBottom: 2,
+  },
+  chevronButton: {
+    paddingHorizontal: 6,
+    paddingBottom: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputWrapper: {
     flex: 1,
-    maxHeight: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F0F2F5',
     borderRadius: 20,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    marginHorizontal: 4,
+    minHeight: 38,
+    maxHeight: 120,
+  },
+  input: {
+    flex: 1,
     paddingVertical: 8,
     fontSize: 15,
     color: '#050505',
-    marginHorizontal: 4,
+    paddingRight: 6,
+  },
+  innerEmojiButton: {
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButton: {
     backgroundColor: '#0084FF',

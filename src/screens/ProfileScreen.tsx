@@ -45,6 +45,7 @@ export default function ProfileScreen() {
   const displayName = useAppSelector((s) => s.session.displayName);
   const avatarUrl = useAppSelector((s) => s.session.avatarUrl);
   const userId = useAppSelector((s) => s.session.userId);
+  const role = useAppSelector((s) => s.session.role) || 'USER';
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   // API Mutations
@@ -205,17 +206,47 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuHeaderText}>
-          <Text style={styles.name} numberOfLines={1}>
-            {displayName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.name} numberOfLines={1}>
+              {displayName}
+            </Text>
+            {role === 'ADMIN' ? (
+              <View style={styles.adminBadge}>
+                <Ionicons name="shield-checkmark" size={11} color="#fff" />
+                <Text style={styles.adminBadgeText}>Admin</Text>
+              </View>
+            ) : (
+              <View style={styles.userBadge}>
+                <Text style={styles.userBadgeText}>Thành viên</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.subtext} numberOfLines={1}>
-            Chuyển trang cá nhân · @{displayName.toLowerCase().replace(/\s+/g, '')}.{userId.slice(0, 4)}
+            Vai trò: {role === 'ADMIN' ? 'Quản trị viên hệ thống' : 'Người dùng tiêu chuẩn'} · @{displayName.toLowerCase().replace(/\s+/g, '')}
           </Text>
         </View>
       </View>
 
       {/* Nhóm Menu Messenger (Ảnh 5) */}
       <View style={styles.card}>
+        {role === 'ADMIN' && (
+          <Pressable
+            style={[styles.row, styles.rowBorder, { backgroundColor: '#F0F5FF' }]}
+            onPress={() => router.push('/(app)/admin' as any)}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#4F46E5' }]}>
+              <Ionicons name="shield-checkmark" size={20} color="#fff" />
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={[styles.rowLabel, { color: '#4F46E5', fontWeight: '700' }]}>
+                Bảng điều khiển Quản trị (Admin)
+              </Text>
+              <Text style={styles.rowSub}>Thống kê hệ thống, quản lý tài khoản & phân quyền</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#4F46E5" />
+          </Pressable>
+        )}
+
         <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/(app)/settings')}>
           <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
             <Ionicons name="settings-outline" size={20} color="#050505" />
@@ -480,6 +511,33 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
     elevation: 4,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4F46E5',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 3,
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  userBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  userBadgeText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
   },
   name: { fontSize: 22, fontWeight: '700', color: colors.text },
   subtext: { fontSize: 13, color: colors.subtext, marginTop: 4 },

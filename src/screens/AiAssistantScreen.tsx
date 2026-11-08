@@ -26,10 +26,9 @@ const INITIAL_MESSAGES: ChatMessageItem[] = [
   {
     id: 'ai-welcome',
     content:
-      'Xin chào! Tôi là Trợ lý AI của ChatApp (được hỗ trợ bởi Google Gemini) 🤖✨.\n\n' +
-      'Tôi có thể giúp bạn giải đáp thắc mắc về lập trình, viết nội dung, hoặc tóm tắt các cuộc trò chuyện. Hãy hỏi tôi bất cứ điều gì nhé!',
+      'Xin chào! Tôi là Trợ lý AI của ChatApp 🤖✨.\n\n' +
+      'Tôi có thể giúp bạn giải đáp thắc mắc, viết nội dung, hoặc tìm kiếm thông tin trong các cuộc trò chuyện. Hãy hỏi tôi bất cứ điều gì nhé!',
     isAi: true,
-    modelName: 'Gemini 1.5 Flash',
   },
 ];
 
@@ -68,7 +67,7 @@ export default function AiAssistantScreen() {
         id: `ai-${Date.now()}`,
         content: res.reply || 'Không có phản hồi từ AI.',
         isAi: true,
-        modelName: res.model || 'Gemini 1.5 Flash',
+        
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (e: any) {
@@ -111,7 +110,7 @@ export default function AiAssistantScreen() {
               </View>
               <View style={styles.thinkingBubble}>
                 <ActivityIndicator size="small" color="#0084FF" />
-                <Text style={styles.thinkingText}>Gemini đang suy nghĩ...</Text>
+                <Text style={styles.thinkingText}>Trợ lý AI đang suy nghĩ...</Text>
               </View>
             </View>
           ) : undefined
