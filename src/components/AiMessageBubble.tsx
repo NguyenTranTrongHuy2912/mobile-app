@@ -10,8 +10,9 @@ interface AiMessageBubbleProps {
 
 /**
  * Bubble hiển thị tin nhắn trong màn hình Trợ lý AI
+ * Tinh gọn, chỉ tập trung vào nội dung tin nhắn, không hiển thị tag phiên bản thừa thãi.
  */
-export default function AiMessageBubble({ content, isAi, modelName = 'Gemini 1.5 Flash' }: AiMessageBubbleProps) {
+export default function AiMessageBubble({ content, isAi }: AiMessageBubbleProps) {
   if (!isAi) {
     return (
       <View style={[styles.container, styles.containerUser]}>
@@ -30,10 +31,6 @@ export default function AiMessageBubble({ content, isAi, modelName = 'Gemini 1.5
       <View style={styles.bubbleAiWrap}>
         <View style={styles.bubbleAi}>
           <Text style={styles.textAi}>{content}</Text>
-        </View>
-        <View style={styles.modelTag}>
-          <Ionicons name="hardware-chip-outline" size={11} color="#65676B" style={{ marginRight: 3 }} />
-          <Text style={styles.modelTagText}>{modelName}</Text>
         </View>
       </View>
     </View>
@@ -57,7 +54,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#0084FF',
+    backgroundColor: '#4F46E5', // Indigo hiện đại
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -67,39 +64,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bubbleAi: {
-    backgroundColor: '#F0F2F5',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: '#F1F5F9',
     borderRadius: 18,
     borderTopLeftRadius: 4,
-  },
-  bubbleUser: {
-    backgroundColor: '#0084FF',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 18,
-    borderBottomRightRadius: 4,
-    maxWidth: '82%',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   textAi: {
+    color: '#0F172A',
     fontSize: 15,
-    color: '#050505',
     lineHeight: 22,
   },
+  bubbleUser: {
+    backgroundColor: '#4F46E5', // Indigo
+    borderRadius: 18,
+    borderTopRightRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: '85%',
+  },
   textUser: {
-    fontSize: 15,
     color: '#fff',
-    lineHeight: 21,
-  },
-  modelTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  modelTagText: {
-    fontSize: 11,
-    color: '#65676B',
-    fontWeight: '500',
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

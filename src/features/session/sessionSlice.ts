@@ -15,6 +15,7 @@ const initialState: SessionState = {
   displayName: '',
   token: '',
   avatarUrl: undefined,
+  role: 'USER',
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -70,6 +71,7 @@ const sessionSlice = createSlice({
       state.displayName = action.payload.displayName;
       state.token = action.payload.token;
       state.avatarUrl = action.payload.avatarUrl;
+      state.role = action.payload.role || 'USER';
       state.isAuthenticated = true;
     },
     clearError(state) {
@@ -99,6 +101,7 @@ const sessionSlice = createSlice({
       state.displayName = action.payload.displayName;
       state.token = action.payload.token;
       state.avatarUrl = action.payload.avatarUrl;
+      state.role = action.payload.role || 'USER';
       state.isAuthenticated = true;
     };
     const rejected = (state: SessionState, action: { payload?: string }) => {

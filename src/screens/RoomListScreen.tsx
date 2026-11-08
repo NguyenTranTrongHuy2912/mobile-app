@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
@@ -20,6 +21,7 @@ import { useAppSelector } from '../store/hooks';
 import { ActiveBadge } from '../components/ActiveBadge';
 import ScalePressable from '../components/ScalePressable';
 import FloatingAiButton from '../components/FloatingAiButton';
+import UserNoteModal from '../components/UserNoteModal';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
 
@@ -50,6 +52,29 @@ export default function RoomListScreen() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [userNote, setUserNote] = useState('');
+
+  // Tải ghi chú suy nghĩ đã lưu
+  useEffect(() => {
+    if (myId) {
+      AsyncStorage.getItem(`@user_thought_note_${myId}`).then((saved) => {
+        if (saved) setUserNote(saved);
+      });
+    }
+  }, [myId]);
+
+  const handleSaveNote = async (newNote: string) => {
+    setUserNote(newNote);
+    if (myId) {
+      await AsyncStorage.setItem(`@user_thought_note_${myId}`, newNote);
+    }
+  };
+
+  const shortMyName = useMemo(() => {
+    const parts = myName.trim().split(' ');
+    return parts[parts.length - 1] || 'Bạn';
+  }, [myName]);
 
   const { data: rooms, isLoading, refetch } = useGetRoomsQuery(undefined, {
     pollingInterval: POLL_MS,
@@ -165,20 +190,25 @@ export default function RoomListScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.activeBarScroll}
       >
-        {/* Story / Ghi chú của tôi */}
-        <View style={styles.activeItem}>
+        {/* Ghi chú suy nghĩ của tôi (Thought Note) */}
+        <Pressable style={styles.activeItem} onPress={() => setShowNoteModal(true)}>
           <View style={styles.myAvatarWrap}>
-            <View style={styles.storyAvatar}>
-              <Text style={styles.storyAvatarText}>{myName.charAt(0).toUpperCase()}</Text>
+            {/* Bong bóng suy nghĩ nổi trên avatar */}
+            <View style={styles.thoughtBadge}>
+              <Text style={styles.thoughtBadgeText} numberOfLines={1}>
+                {userNote ? userNote : 'Ghi chú'}
+              </Text>
             </View>
-            <View style={styles.addStoryPlus}>
-              <Ionicons name="add" size={14} color="#fff" />
+            <View style={styles.thoughtTailDot} />
+
+            <View style={styles.storyAvatarMe}>
+              <Text style={styles.storyAvatarTextMe}>{myName.charAt(0).toUpperCase()}</Text>
             </View>
           </View>
           <Text style={styles.activeName} numberOfLines={1}>
-            Tạo tin
+            {shortMyName}
           </Text>
-        </View>
+        </Pressable>
 
         {/* Danh sách bạn bè Online */}
         {onlineFriends.map((f) => {
@@ -307,8 +337,17 @@ export default function RoomListScreen() {
         }
       />
 
-      {/* Floating Meta AI Button chuẩn Messenger (Ảnh 1) */}
+      {/* Floating Meta AI Button */}
       <FloatingAiButton mode="pill" bottom={24} right={18} />
+
+      {/* Modal tạo ghi chú suy nghĩ & cảm xúc */}
+      <UserNoteModal
+        visible={showNoteModal}
+        currentNote={userNote}
+        onClose={() => setShowNoteModal(false)}
+        onSave={handleSaveNote}
+        userInitial={myName.charAt(0)}
+      />
     </View>
   );
 }
@@ -392,6 +431,51 @@ const styles = StyleSheet.create({
   myAvatarWrap: {
     position: 'relative',
     marginBottom: 4,
+  },
+  thoughtBadge: {
+    backgroundColor: '#fff',
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 2,
+    maxWidth: 72,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  thoughtBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  thoughtTailDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 2,
+  },
+  storyAvatarMe: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 2.5,
+    borderColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyAvatarTextMe: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#4F46E5',
   },
   storyAvatar: {
     width: 54,
