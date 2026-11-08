@@ -229,6 +229,24 @@ export default function ProfileScreen() {
 
       {/* Nhóm Menu Messenger (Ảnh 5) */}
       <View style={styles.card}>
+        {role === 'ADMIN' && (
+          <Pressable
+            style={[styles.row, styles.rowBorder, { backgroundColor: '#F0F5FF' }]}
+            onPress={() => router.push('/(app)/admin' as any)}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#4F46E5' }]}>
+              <Ionicons name="shield-checkmark" size={20} color="#fff" />
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={[styles.rowLabel, { color: '#4F46E5', fontWeight: '700' }]}>
+                Bảng điều khiển Quản trị (Admin)
+              </Text>
+              <Text style={styles.rowSub}>Thống kê hệ thống, quản lý tài khoản & phân quyền</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#4F46E5" />
+          </Pressable>
+        )}
+
         <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/(app)/settings')}>
           <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
             <Ionicons name="settings-outline" size={20} color="#050505" />
