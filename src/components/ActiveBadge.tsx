@@ -1,36 +1,25 @@
 import React from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View } from 'tamagui';
 
-interface ActiveBadgeProps {
-  size?: number;
-  style?: StyleProp<ViewStyle>;
-}
+type Props = { size?: number } & React.ComponentProps<typeof View>;
 
-export function ActiveBadge({ size = 14, style }: ActiveBadgeProps) {
+export function ActiveBadge({ size = 14, ...rest }: Props) {
   const borderWidth = Math.max(2, Math.round(size / 6));
   return (
     <View
-      style={[
-        styles.badge,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth,
-        },
-        style,
-      ]}
-      accessibilityLabel="Đang hoạt động"
+      borderColor="background"
+      backgroundColor="#31A24C"
+      style={{
+        position: 'absolute',
+        bottom: -1,
+        right: -1,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: borderWidth,
+      }}
+      aria-label="Đang hoạt động"
+      {...rest}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    backgroundColor: '#31A24C',
-    borderColor: '#FFFFFF',
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-  },
-});

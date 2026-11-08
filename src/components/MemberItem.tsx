@@ -1,8 +1,8 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Image } from 'react-native'; // Đổi sang thẻ Image của React Native
 import { Ionicons } from '@expo/vector-icons';
+import { Text, useTheme, View, XStack, YStack } from 'tamagui';
 import { ActiveBadge } from './ActiveBadge';
-import ScalePressable from './ScalePressable';
 
 interface MemberItemProps {
   userId: string;
@@ -14,9 +14,12 @@ interface MemberItemProps {
   onDirectChat?: () => void;
 }
 
-/**
- * Hiển thị một thành viên trong màn hình chi tiết phòng chat
- */
+const ROLE_BG = '#E7F3FF';
+const ROLE_TEXT = '#0064D1';
+const ONLINE = '#31A24C';
+
+const AVATAR = 44;
+
 export default function MemberItem({
   displayName,
   avatarUrl,
@@ -25,120 +28,98 @@ export default function MemberItem({
   isSelf = false,
   onDirectChat,
 }: MemberItemProps) {
+  const theme = useTheme();
+
   return (
-    <View style={styles.container}>
-      <View style={styles.avatarWrap}>
+    <XStack
+      borderBottomColor="line"
+      style={{
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+      }}
+    >
+      <View style={{ position: 'relative', marginRight: 12 }}>
         {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2 }}
+          />
         ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
-          </View>
+          <YStack
+            backgroundColor="brand"
+            style={{
+              width: AVATAR,
+              height: AVATAR,
+              borderRadius: AVATAR / 2,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text color="#fff" fontSize={18} fontWeight="700">
+              {displayName.charAt(0).toUpperCase()}
+            </Text>
+          </YStack>
         )}
-        {isOnline ? <ActiveBadge size={13} style={styles.badgePos} /> : null}
+        {isOnline ? <ActiveBadge size={13} /> : null}
       </View>
 
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {displayName} {isSelf && '(Bạn)'}
+      <YStack style={{ flex: 1 }}>
+        <XStack style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <Text color="ink" fontSize={15} fontWeight="600" numberOfLines={1}>
+            {isSelf ? `${displayName} (Bạn)` : displayName}
           </Text>
-          {isCreator && (
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>Trưởng nhóm</Text>
+          {isCreator ? (
+            <View
+              style={{
+                backgroundColor: ROLE_BG,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}
+            >
+              <Text style={{ color: ROLE_TEXT }} fontSize={11} fontWeight="600">
+                Trưởng nhóm
+              </Text>
             </View>
-          )}
-        </View>
-        <Text style={[styles.status, isOnline && styles.statusOnline]}>
+          ) : null}
+        </XStack>
+        <Text
+          fontSize={12}
+          style={{
+            color: isOnline ? ONLINE : (theme.muted.get() as string),
+            fontWeight: isOnline ? '500' : '400',
+            marginTop: 2,
+          }}
+        >
           {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
         </Text>
-      </View>
+      </YStack>
 
-      {!isSelf && onDirectChat && (
-        <ScalePressable style={styles.chatBtn} onPress={onDirectChat}>
-          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#0084FF" />
-        </ScalePressable>
-      )}
-    </View>
+      {!isSelf && onDirectChat ? (
+        <View
+          backgroundColor="surface"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginLeft: 8,
+          }}
+          scale={"1 press:0.92" as any}
+          onPress={onDirectChat}
+          role="button"
+          aria-label="Nhắn tin"
+        >
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={18}
+            color={theme.brand.get() as string}
+          />
+        </View>
+      ) : null}
+    </XStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E6EB',
-  },
-  avatarWrap: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#0084FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  badgePos: {
-    bottom: -1,
-    right: -1,
-  },
-  info: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#050505',
-  },
-  roleBadge: {
-    backgroundColor: '#E7F3FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#0064D1',
-  },
-  status: {
-    fontSize: 12,
-    color: '#65676B',
-    marginTop: 2,
-  },
-  statusOnline: {
-    color: '#31A24C',
-    fontWeight: '500',
-  },
-  chatBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0F2F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-});

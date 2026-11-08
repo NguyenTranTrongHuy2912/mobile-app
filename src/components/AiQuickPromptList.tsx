@@ -1,6 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import ScalePressable from './ScalePressable';
+import { ScrollView, Text, View, XStack, YStack } from 'tamagui';
 
 interface AiQuickPromptListProps {
   onSelectPrompt: (prompt: string) => void;
@@ -13,54 +12,40 @@ const QUICK_PROMPTS = [
   { id: '4', title: '📝 Email xin nghỉ học', prompt: 'Soạn giúp tôi một mẫu email xin phép nghỉ ốm gửi thầy giáo' },
 ];
 
-/**
- * Thanh gợi ý các câu hỏi nhanh cho Trợ lý AI
- */
+const SOFT_BG = '#E7F3FF';
+const SOFT_BORDER = '#D0E6FF';
+const SOFT_TEXT = '#0064D1';
+
 export default function AiQuickPromptList({ onSelectPrompt }: AiQuickPromptListProps) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Gợi ý câu hỏi nhanh:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {QUICK_PROMPTS.map((item) => (
-          <ScalePressable
-            key={item.id}
-            style={styles.pill}
-            onPress={() => onSelectPrompt(item.prompt)}
-          >
-            <Text style={styles.pillText}>{item.title}</Text>
-          </ScalePressable>
-        ))}
+    <YStack style={{ paddingVertical: 8 }}>
+      <Text color="muted" fontSize={12} fontWeight="600" style={{ paddingHorizontal: 16, marginBottom: 6 }}>
+        Gợi ý câu hỏi nhanh:
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <XStack style={{ paddingHorizontal: 16, gap: 8 }}>
+          {QUICK_PROMPTS.map((item) => (
+            <View
+              key={item.id}
+              backgroundColor={SOFT_BG}
+              borderColor={SOFT_BORDER}
+              style={{
+                paddingVertical: 7,
+                paddingHorizontal: 12,
+                borderRadius: 16,
+                borderWidth: 1,
+              }}
+              scale={"1 press:0.96" as any}
+              onPress={() => onSelectPrompt(item.prompt)}
+              role="button"
+            >
+              <Text color={SOFT_TEXT} fontSize={13} fontWeight="600">
+                {item.title}
+              </Text>
+            </View>
+          ))}
+        </XStack>
       </ScrollView>
-    </View>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 8,
-  },
-  headerTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#65676B',
-    paddingHorizontal: 16,
-    marginBottom: 6,
-  },
-  scroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  pill: {
-    backgroundColor: '#E7F3FF',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D0E6FF',
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0064D1',
-  },
-});

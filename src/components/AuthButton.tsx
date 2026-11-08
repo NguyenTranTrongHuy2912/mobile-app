@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Spinner } from 'tamagui';
-import { colors } from '../theme';
+import { Button, Spinner, Text, useTheme } from 'tamagui';
 
 interface Props {
   title: string;
@@ -19,24 +18,36 @@ export default function AuthButton({
 }: Props) {
   const outline = variant === 'outline';
   const [pressed, setPressed] = useState(false);
+  const theme = useTheme();
 
-   return (
+  const bgColor = outline ? theme.background.get() : theme.brand.get();
+  const textColor = outline ? theme.brand.get() : '#fff';
+  const borderColor = theme.brand.get();
+
+  return (
     <Button
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       disabled={disabled || loading}
-      height={52}
-      borderRadius={26}
-      backgroundColor={outline ? colors.background : colors.primary}
-      borderWidth={outline ? 1 : 0}
-      borderColor={colors.primary}
-      color={outline ? colors.primary : '#fff'}
-      fontSize={17}
-      fontWeight="600"
-      opacity={disabled || pressed ? 0.6 : 1}
+      style={{
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: bgColor as string,
+        borderWidth: outline ? 1 : 0,
+        borderColor: borderColor as string,
+        opacity: disabled || pressed ? 0.6 : 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
     >
-      {loading ? <Spinner color={outline ? colors.primary : '#fff'} /> : title}
+      {loading ? (
+        <Spinner style={{ color: textColor as string }} />
+      ) : (
+        <Text style={{ color: textColor as string }} fontSize={17} fontWeight="600">
+          {title}
+        </Text>
+      )}
     </Button>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Spinner, Text, View } from 'tamagui';
 import { thumbUrl } from '../utils/imageUrl';
 import type { Message } from '../types/chat';
 
@@ -22,32 +22,38 @@ export default function ChatImage({ message, onPress }: Props) {
   const uploading = message.status === 'sending' && (message.uploadProgress ?? 100) < 100;
 
   return (
-    <Pressable onPress={onPress}>
-      <View style={[styles.box, { width: WIDTH, height }]}>
-        <Image source={{ uri }} style={styles.image} resizeMode="cover" />
-        {uploading && (
-          <View style={styles.overlay}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.percent}>{message.uploadProgress ?? 0}%</Text>
-          </View>
-        )}
-      </View>
-    </Pressable>
+    <View
+      backgroundColor="surface"
+      style={{
+        width: WIDTH,
+        height: height,
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+      onPress={onPress}
+      aria-label="Xem ảnh"
+    >
+      <Image 
+        src={uri} 
+        style={{ width: '100%', height: '100%' }} 
+        objectFit="cover" 
+      />
+      {uploading ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Spinner color="#fff" />
+          <Text color="#fff" fontSize={13} fontWeight="600" style={{ marginTop: 6 }}>
+            {message.uploadProgress ?? 0}%
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  box: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#ddd' },
-  image: { width: '100%', height: '100%' },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  percent: { color: '#fff', fontSize: 13, fontWeight: '600', marginTop: 6 },
-});
