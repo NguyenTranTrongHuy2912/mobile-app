@@ -1,21 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AuthButton from '../components/AuthButton';
 import AuthInput from '../components/AuthInput';
+import AuthScreenLayout, {
+  AuthError,
+  AuthLink,
+  AuthSubtitle,
+  AuthTitle,
+} from '../components/AuthScreenLayout';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearError, register } from '../features/session/sessionSlice';
 import { authApi } from '../api/authApi';
-import { colors } from '../theme';
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
@@ -70,8 +65,13 @@ export default function RegisterScreen() {
       setLocalError('Vui lòng nhập email hợp lệ.');
       return;
     }
-    if (password.length < 6) {
-      setLocalError('Mật khẩu cần ít nhất 6 ký tự.');
+    // Backend yêu cầu mật khẩu 6 đến 64 ký tự, tên hiển thị tối đa 50 ký tự
+    if (password.length < 6 || password.length > 64) {
+      setLocalError('Mật khẩu cần từ 6 đến 64 ký tự.');
+      return;
+    }
+    if (name.trim().length > 50) {
+      setLocalError('Tên hiển thị tối đa 50 ký tự.');
       return;
     }
     if (password !== confirm) {
@@ -103,102 +103,69 @@ export default function RegisterScreen() {
   const message = localError ?? error;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable onPress={onBack} style={styles.back} hitSlop={8}>
-            <Ionicons name="arrow-back" size={26} color={colors.text} />
-          </Pressable>
+    <AuthScreenLayout onBack={onBack}>
+      {step === 'form' ? (
+        <>
+          <AuthTitle>Tạo tài khoản</AuthTitle>
+          <AuthSubtitle>Nhanh chóng và miễn phí.</AuthSubtitle>
 
-          {step === 'form' ? (
-            <>
-              <Text style={styles.title}>Tạo tài khoản</Text>
-              <Text style={styles.subtitle}>Nhanh chóng và miễn phí.</Text>
+          <AuthInput
+            placeholder="Họ và tên"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+          />
+          <AuthInput
+            placeholder="Email"
+            value={account}
+            onChangeText={setAccount}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <AuthInput
+            placeholder="Mật khẩu"
+            value={password}
+            onChangeText={setPassword}
+            isPassword
+          />
+          <AuthInput
+            placeholder="Nhập lại mật khẩu"
+            value={confirm}
+            onChangeText={setConfirm}
+            isPassword
+          />
 
-              <AuthInput
-                placeholder="Họ và tên"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-              />
-              <AuthInput
-                placeholder="Email"
-                value={account}
-                onChangeText={setAccount}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <AuthInput
-                placeholder="Mật khẩu"
-                value={password}
-                onChangeText={setPassword}
-                isPassword
-              />
-              <AuthInput
-                placeholder="Nhập lại mật khẩu"
-                value={confirm}
-                onChangeText={setConfirm}
-                isPassword
-              />
+          <AuthError message={message} />
 
-              {message ? <Text style={styles.error}>{message}</Text> : null}
+          <AuthButton title="Tiếp tục" onPress={onSubmitForm} loading={sending} />
+        </>
+      ) : (
+        <>
+          <AuthTitle>Xác thực email</AuthTitle>
+          <AuthSubtitle>
+            Chúng tôi đã gửi mã xác thực tới {account.trim()}. Kiểm tra cả mục thư rác.
+          </AuthSubtitle>
 
-              <AuthButton title="Tiếp tục" onPress={onSubmitForm} loading={sending} />
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Xác thực email</Text>
-              <Text style={styles.subtitle}>
-                Chúng tôi đã gửi mã xác thực tới {account.trim()}. Kiểm tra cả mục thư rác.
-              </Text>
+          <AuthInput
+            placeholder="Mã xác thực"
+            value={otp}
+            onChangeText={setOtp}
+            keyboardType="number-pad"
+          />
 
-              <AuthInput
-                placeholder="Mã xác thực"
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-              />
+          <AuthError message={message} />
 
-              {message ? <Text style={styles.error}>{message}</Text> : null}
+          <AuthButton title="Đăng ký" onPress={onConfirmOtp} loading={loading} />
 
-              <AuthButton title="Đăng ký" onPress={onConfirmOtp} loading={loading} />
+          <AuthLink
+            title={cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : 'Gửi lại mã'}
+            onPress={sendOtp}
+            disabled={cooldown > 0 || sending}
+          />
+        </>
+      )}
 
-              <Pressable
-                style={styles.already}
-                onPress={sendOtp}
-                disabled={cooldown > 0 || sending}
-              >
-                <Text style={[styles.link, (cooldown > 0 || sending) && styles.disabled]}>
-                  {cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : 'Gửi lại mã'}
-                </Text>
-              </Pressable>
-            </>
-          )}
-
-          <Pressable style={styles.already} onPress={() => router.replace('/login')}>
-            <Text style={styles.link}>Bạn đã có tài khoản rồi?</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <AuthLink title="Bạn đã có tài khoản rồi?" onPress={() => router.replace('/login')} />
+    </AuthScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: {
-    flexGrow: 1, paddingHorizontal: 24, paddingTop: 8,
-    width: '100%', maxWidth: 480, alignSelf: 'center'
-  },
-  back: { width: 40, height: 40, justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 16 },
-  subtitle: { fontSize: 15, color: colors.subtext, marginTop: 4, marginBottom: 24 },
-  error: { color: colors.error, fontSize: 14, marginBottom: 8 },
-  already: { alignItems: 'center', marginTop: 24 },
-  link: { color: colors.primary, fontSize: 15, fontWeight: '500' },
-  disabled: { opacity: 0.5 },
-});

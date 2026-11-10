@@ -1,56 +1,52 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Text, YStack } from 'tamagui';
 import AppLogo from '../components/AppLogo';
 import AuthButton from '../components/AuthButton';
-import { colors } from '../theme';
+import { useAuthColors } from '../components/AuthScreenLayout';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const c = useAuthColors();
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.hero}>
-        <AppLogo size={112} />
-        <Text style={styles.title}>Chào mừng bạn đến với ChatApp</Text>
-        <Text style={styles.subtitle}>
-          Nhắn tin và kết nối với bạn bè, người thân mọi lúc mọi nơi.
-        </Text>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+      <YStack style={{ flex: 1, paddingHorizontal: 24, width: '100%', maxWidth: 480, alignSelf: 'center' }}>
+        <YStack style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <AppLogo size={112} />
+          <Text
+            style={{
+              fontSize: 26,
+              fontWeight: '700',
+              textAlign: 'center',
+              marginTop: 32,
+              color: c.ink
+            }}
+          >
+            Chào mừng bạn đến với ChatApp
+          </Text>
+          <Text
+            style={{
+              fontSize: 15,
+              textAlign: 'center',
+              marginTop: 12,
+              color: c.muted
+            }}
+          >
+            Nhắn tin và kết nối với bạn bè, người thân mọi lúc mọi nơi.
+          </Text>
+        </YStack>
 
-      <View style={styles.actions}>
-        <AuthButton title="Đăng nhập" onPress={() => router.push('/login')} />
-        <View style={styles.gap} />
-        <AuthButton
-          title="Tạo tài khoản mới"
-          variant="outline"
-          onPress={() => router.push('/register')}
-        />
-      </View>
+        <YStack style={{ paddingBottom: 24 }}>
+          <AuthButton title="Đăng nhập" onPress={() => router.push('/login')} />
+          <YStack style={{ height: 12 }} />
+          <AuthButton
+            title="Tạo tài khoản mới"
+            variant="outline"
+            onPress={() => router.push('/register')}
+          />
+        </YStack>
+      </YStack>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1, backgroundColor: colors.background,
-    paddingHorizontal: 24, width: '100%', maxWidth: 480, alignSelf: 'center'
-  },
-  hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: colors.text,
-    textAlign: 'center',
-    marginTop: 32,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: colors.subtext,
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 22,
-  },
-  actions: { paddingBottom: 24 },
-  gap: { height: 12 },
-});

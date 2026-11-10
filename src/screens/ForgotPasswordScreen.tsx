@@ -1,19 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AuthButton from '../components/AuthButton';
 import AuthInput from '../components/AuthInput';
+import AuthScreenLayout, {
+  AuthError,
+  AuthLink,
+  AuthSubtitle,
+  AuthTitle,
+} from '../components/AuthScreenLayout';
 import { authApi } from '../api/authApi';
-import { colors } from '../theme';
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
@@ -101,113 +96,78 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable onPress={onBack} style={styles.back} hitSlop={8}>
-            <Ionicons name="arrow-back" size={26} color={colors.text} />
-          </Pressable>
+    <AuthScreenLayout onBack={onBack}>
+      {step === 'email' && (
+        <>
+          <AuthTitle>Quên mật khẩu</AuthTitle>
+          <AuthSubtitle>
+            Nhập email đã đăng ký, chúng tôi sẽ gửi mã xác thực để bạn đặt lại mật khẩu.
+          </AuthSubtitle>
 
-          {step === 'email' && (
-            <>
-              <Text style={styles.title}>Quên mật khẩu</Text>
-              <Text style={styles.subtitle}>
-                Nhập email đã đăng ký, chúng tôi sẽ gửi mã xác thực để bạn đặt lại mật khẩu.
-              </Text>
+          <AuthInput
+            placeholder="Email"
+            value={account}
+            onChangeText={setAccount}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
 
-              <AuthInput
-                placeholder="Email"
-                value={account}
-                onChangeText={setAccount}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+          <AuthError message={error} />
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+          <AuthButton title="Gửi mã xác thực" onPress={onSubmitEmail} loading={sending} />
+        </>
+      )}
 
-              <AuthButton title="Gửi mã xác thực" onPress={onSubmitEmail} loading={sending} />
-            </>
-          )}
+      {step === 'reset' && (
+        <>
+          <AuthTitle>Đặt lại mật khẩu</AuthTitle>
+          <AuthSubtitle>
+            Nếu {account.trim()} đã đăng ký, mã xác thực đã được gửi tới email này. Kiểm tra cả
+            mục thư rác.
+          </AuthSubtitle>
 
-          {step === 'reset' && (
-            <>
-              <Text style={styles.title}>Đặt lại mật khẩu</Text>
-              <Text style={styles.subtitle}>
-                Nếu {account.trim()} đã đăng ký, mã xác thực đã được gửi tới email này. Kiểm tra cả
-                mục thư rác.
-              </Text>
+          <AuthInput
+            placeholder="Mã xác thực"
+            value={otp}
+            onChangeText={setOtp}
+            keyboardType="number-pad"
+          />
+          <AuthInput
+            placeholder="Mật khẩu mới"
+            value={password}
+            onChangeText={setPassword}
+            isPassword
+          />
+          <AuthInput
+            placeholder="Nhập lại mật khẩu mới"
+            value={confirm}
+            onChangeText={setConfirm}
+            isPassword
+          />
 
-              <AuthInput
-                placeholder="Mã xác thực"
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-              />
-              <AuthInput
-                placeholder="Mật khẩu mới"
-                value={password}
-                onChangeText={setPassword}
-                isPassword
-              />
-              <AuthInput
-                placeholder="Nhập lại mật khẩu mới"
-                value={confirm}
-                onChangeText={setConfirm}
-                isPassword
-              />
+          <AuthError message={error} />
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+          <AuthButton title="Đổi mật khẩu" onPress={onSubmitReset} loading={submitting} />
 
-              <AuthButton title="Đổi mật khẩu" onPress={onSubmitReset} loading={submitting} />
+          <AuthLink
+            title={cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : 'Gửi lại mã'}
+            onPress={sendOtp}
+            disabled={cooldown > 0 || sending}
+          />
+        </>
+      )}
 
-              <Pressable
-                style={styles.center}
-                onPress={sendOtp}
-                disabled={cooldown > 0 || sending}
-              >
-                <Text style={[styles.link, (cooldown > 0 || sending) && styles.disabled]}>
-                  {cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : 'Gửi lại mã'}
-                </Text>
-              </Pressable>
-            </>
-          )}
+      {step === 'done' && (
+        <>
+          <AuthTitle>Đã đổi mật khẩu</AuthTitle>
+          <AuthSubtitle>Bạn có thể đăng nhập bằng mật khẩu mới.</AuthSubtitle>
+          <AuthButton title="Đăng nhập" onPress={() => router.replace('/login')} />
+        </>
+      )}
 
-          {step === 'done' && (
-            <>
-              <Text style={styles.title}>Đã đổi mật khẩu</Text>
-              <Text style={styles.subtitle}>
-                Bạn có thể đăng nhập bằng mật khẩu mới.
-              </Text>
-              <AuthButton title="Đăng nhập" onPress={() => router.replace('/login')} />
-            </>
-          )}
-
-          {step !== 'done' && (
-            <Pressable style={styles.center} onPress={() => router.replace('/login')}>
-              <Text style={styles.link}>Quay lại đăng nhập</Text>
-            </Pressable>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      {step !== 'done' && (
+        <AuthLink title="Quay lại đăng nhập" onPress={() => router.replace('/login')} />
+      )}
+    </AuthScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: {
-    flexGrow: 1, paddingHorizontal: 24, paddingTop: 8,
-    width: '100%', maxWidth: 480, alignSelf: 'center'
-  },
-  back: { width: 40, height: 40, justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 16 },
-  subtitle: { fontSize: 15, color: colors.subtext, marginTop: 4, marginBottom: 24 },
-  error: { color: colors.error, fontSize: 14, marginBottom: 8 },
-  center: { alignItems: 'center', marginTop: 24 },
-  link: { color: colors.primary, fontSize: 15, fontWeight: '500' },
-  disabled: { opacity: 0.5 },
-});

@@ -1,22 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { YStack } from 'tamagui';
 import AppLogo from '../components/AppLogo';
 import AuthButton from '../components/AuthButton';
 import AuthInput from '../components/AuthInput';
+import AuthScreenLayout, { AuthError, AuthLink, AuthTitle } from '../components/AuthScreenLayout';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearError, login } from '../features/session/sessionSlice';
-import { colors } from '../theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -40,79 +30,43 @@ export default function LoginScreen() {
     dispatch(login({ account, password }));
   };
 
-  const message = localError ?? error;
-
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable onPress={() => goBack()} style={styles.back} hitSlop={8}>
-            <Ionicons name="arrow-back" size={26} color={colors.text} />
-          </Pressable>
+    <AuthScreenLayout onBack={goBack}>
+      <YStack style={{ alignItems: 'center', marginTop: 16, marginBottom: 20 }}>
+        <AppLogo size={72} />
+      </YStack>
+      <AuthTitle size={22} center marginTop={0} marginBottom={28}>
+        Đăng nhập vào ChatApp
+      </AuthTitle>
 
-          <View style={styles.logo}>
-            <AppLogo size={72} />
-          </View>
-          <Text style={styles.title}>Đăng nhập vào ChatApp</Text>
+      <AuthInput
+        placeholder="Email"
+        value={account}
+        onChangeText={setAccount}
+        keyboardType="email-address"
+      />
+      <AuthInput
+        placeholder="Mật khẩu"
+        value={password}
+        onChangeText={setPassword}
+        isPassword
+      />
 
-          <AuthInput
-            placeholder="Email"
-            value={account}
-            onChangeText={setAccount}
-            keyboardType="email-address"
-          />
-          <AuthInput
-            placeholder="Mật khẩu"
-            value={password}
-            onChangeText={setPassword}
-            isPassword
-          />
+      <AuthError message={localError ?? error} />
 
-          {message ? <Text style={styles.error}>{message}</Text> : null}
+      <YStack style={{ marginTop: 8 }}>
+        <AuthButton title="Đăng nhập" onPress={onSubmit} loading={loading} />
+      </YStack>
 
-          <View style={styles.submit}>
-            <AuthButton title="Đăng nhập" onPress={onSubmit} loading={loading} />
-          </View>
+      <AuthLink title="Quên mật khẩu?" onPress={() => router.push('/forgot-password')} />
 
-          <Pressable style={styles.forgot} onPress={() => router.push('/forgot-password')}>
-            <Text style={styles.link}>Quên mật khẩu?</Text>
-          </Pressable>
-
-          <View style={styles.footer}>
-            <AuthButton
-              title="Tạo tài khoản mới"
-              variant="outline"
-              onPress={() => router.replace('/register')}
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <YStack style={{ flex: 1, justifyContent: 'flex-end', paddingTop: 32, paddingBottom: 16 }}>
+        <AuthButton
+          title="Tạo tài khoản mới"
+          variant="outline"
+          onPress={() => router.replace('/register')}
+        />
+      </YStack>
+    </AuthScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: {
-    flexGrow: 1, paddingHorizontal: 24, paddingTop: 8,
-    width: '100%', maxWidth: 480, alignSelf: 'center'
-  },
-  back: { width: 40, height: 40, justifyContent: 'center' },
-  logo: { alignItems: 'center', marginTop: 16, marginBottom: 20 },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  error: { color: colors.error, fontSize: 14, marginBottom: 8 },
-  submit: { marginTop: 8 },
-  forgot: { alignItems: 'center', marginTop: 16 },
-  link: { color: colors.primary, fontSize: 15, fontWeight: '500' },
-  footer: { flex: 1, justifyContent: 'flex-end', paddingTop: 32, paddingBottom: 16 },
-});
