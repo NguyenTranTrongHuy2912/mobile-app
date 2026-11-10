@@ -98,7 +98,9 @@ export function useSendImage(roomId: string) {
           imageHeight: height,
           durationMs: duration,
         }).unwrap();
-      } catch {
+      } catch (e) {
+        // Ghi lại lỗi thật (lấy chữ ký / upload Cloudinary / gửi tin) để biết bước nào hỏng
+        console.warn('[SendMedia] Gửi thất bại:', e);
         patch(localId, (m) => {
           m.status = 'failed';
         });
