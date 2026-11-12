@@ -44,7 +44,7 @@ export default function FloatingAiButton({
         scale={"1 press:0.94" as any}
         onPress={handlePress}
         role="button"
-        aria-label="Hỏi Meta AI"
+        aria-label="Hỏi HQ AI"
       >
         <View
           backgroundColor="brand"
@@ -84,7 +84,7 @@ export default function FloatingAiButton({
       scale={"1 press:0.96" as any}
       onPress={handlePress}
       role="button"
-      aria-label="Hỏi Meta AI"
+      aria-label="Hỏi HQ AI"
     >
       <View
         backgroundColor="brand"
@@ -100,7 +100,7 @@ export default function FloatingAiButton({
         <Ionicons name="sparkles" size={16} color="#fff" />
       </View>
       <Text color="ink" fontSize={14} fontWeight="700">
-        Hỏi Meta AI
+        Hỏi HQ AI
       </Text>
     </XStack>
   );

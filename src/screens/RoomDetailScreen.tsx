@@ -133,7 +133,7 @@ export default function RoomDetailScreen() {
               <ScalePressable style={styles.actionCircle} onPress={handleOpenAiSummarize}>
                 <Ionicons name="sparkles" size={20} color="#0084FF" />
               </ScalePressable>
-              <Text style={styles.actionLabel}>AI Tóm tắt</Text>
+              <Text style={styles.actionLabel}>HQ AI Tóm tắt</Text>
             </View>
           )}
 

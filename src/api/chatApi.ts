@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../config';
 import type { RootState } from '../store';
+import { logout } from '../features/session/sessionSlice';
 import type {
   CreateRoomRequest,
   Friend,
@@ -359,11 +360,24 @@ export const chatApi = createApi({
       query: () => '/api/v1/users/online',
     }),
     // --- Trợ lý ảo AI & Tóm tắt hội thoại ---
-    askAi: build.mutation<{ ok: boolean; reply: string; model: string }, { prompt: string }>({
+    askAi: build.mutation<
+      { ok: boolean; reply: string; model: string },
+      { prompt: string; history?: { role: string; content: string }[] }
+    >({
       query: (body) => ({
         url: '/api/v1/ai/chat',
         method: 'POST',
         body,
+      }),
+    }),
+    rewriteText: build.mutation<
+      { ok: boolean; original: string; rewritten: string; tone: string },
+      { text: string; tone?: 'formal' | 'friendly' | 'short' | 'english' }
+    >({
+      query: (body) => ({
+        url: '/api/v1/ai/rewrite',
+        method: 'POST',
+        body: { text: body.text, tone: body.tone ?? 'formal' },
       }),
     }),
 
@@ -448,6 +462,7 @@ export const {
   useRegisterPushTokenMutation,
   useGetOnlineUsersQuery,
   useAskAiMutation,
+  useRewriteTextMutation,
   useSummarizeRoomMutation,
   useSemanticSearchMutation,
   useRagChatMutation,

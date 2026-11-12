@@ -164,7 +164,7 @@ export default function RoomListScreen() {
         <Ionicons name="search" size={18} color="#65676B" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Hỏi Meta AI hoặc tìm kiếm..."
+          placeholder="Hỏi HQ AI hoặc tìm kiếm..."
           placeholderTextColor="#8A8D91"
           value={searchQuery}
           onChangeText={setSearchQuery}

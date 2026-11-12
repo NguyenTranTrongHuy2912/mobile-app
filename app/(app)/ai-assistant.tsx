@@ -7,7 +7,7 @@ export default function AiAssistantRoute() {
     <>
       <Stack.Screen
         options={{
-          title: 'Meta AI',
+          title: 'HQ AI',
           headerTitleAlign: 'center',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#fff' },

@@ -43,7 +43,7 @@ export default function AiSummarizeModal({
                 <Ionicons name="sparkles" size={18} color="#fff" />
               </View>
               <View style={styles.headerTextWrap}>
-                <Text style={styles.headerTitle}>AI Tóm tắt cuộc trò chuyện</Text>
+                <Text style={styles.headerTitle}>HQ AI Tóm tắt cuộc trò chuyện</Text>
                 <Text style={styles.headerSub} numberOfLines={1}>
                   Phòng: {roomName}
                 </Text>
@@ -60,7 +60,7 @@ export default function AiSummarizeModal({
               <View style={styles.loadingWrap}>
                 <ActivityIndicator size="large" color="#0084FF" />
                 <Text style={styles.loadingText}>
-                  AI Gemini đang phân tích nội dung cuộc trò chuyện...
+                  HQ AI đang phân tích nội dung cuộc trò chuyện...
                 </Text>
               </View>
             ) : (

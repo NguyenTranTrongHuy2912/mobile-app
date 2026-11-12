@@ -88,7 +88,7 @@ export default function SettingsScreen() {
             <Ionicons name="sparkles" size={18} color="#0084FF" />
           </View>
           <View style={styles.rowInfo}>
-            <Text style={styles.rowTitle}>Trợ lý AI (Google Gemini)</Text>
+            <Text style={styles.rowTitle}>Trợ lý HQ AI</Text>
             <Text style={styles.rowSubtitle}>Trò chuyện và tóm tắt cuộc trò chuyện thông minh</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#8A8D91" />
@@ -107,7 +107,7 @@ export default function SettingsScreen() {
           <Text style={styles.infoValue}>FastAPI + Java gRPC + Expo SDK 58</Text>
         </View>
         <View style={[styles.infoRow, styles.rowBorder]}>
-          <Text style={styles.infoLabel}>Trợ lý AI</Text>
+          <Text style={styles.infoLabel}>Trợ lý HQ AI</Text>
           <Text style={styles.infoValue}>Google Gemini 1.5 Flash</Text>
         </View>
         <View style={styles.infoRow}>

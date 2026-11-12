@@ -10,6 +10,7 @@ import { WS_URL } from '../../config';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { chatApi } from '../../api/chatApi';
 import { setInitialPresence, setUserPresence } from '../presence/presenceSlice';
+import { logout } from '../session/sessionSlice';
 import type { Message } from '../../types/chat';
 
 interface WsMessagePayload {
@@ -235,14 +236,19 @@ export function useRealtime() {
           }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (e: any) => {
           if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
           if (wsRef.current === ws) wsRef.current = null;
           if (!isSubscribed) return;
           // Chỉ reset backoff khi kết nối đã sống đủ lâu; nếu mở lên là đóng ngay thì tiếp tục lùi dần
           if (openedAt && Date.now() - openedAt >= STABLE_AFTER_MS) attempt = 0;
           openedAt = 0;
-          console.log('[Realtime] WebSocket closed');
+          console.log('[Realtime] WebSocket closed', e?.code, e?.reason);
+          if (e?.code === 1008 || e?.code === 4003 || e?.code === 4403 || e?.code === 403 || (e?.reason && e.reason.includes('token'))) {
+            console.warn('[Realtime] Token rejected by server, auto logging out');
+            dispatch(logout());
+            return;
+          }
           scheduleReconnect();
         };
 
