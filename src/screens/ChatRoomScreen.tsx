@@ -545,8 +545,8 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDark && { backgroundColor: '#18191A' }] }
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 25}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
         ref={listRef}
@@ -579,11 +579,30 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
-      <View style={styles.inputBar}>
-        {/* Nút chuyển đổi '>' hoặc hàng nút tính năng (Camera, Ảnh, Mic, Thêm) */}
-        {isCollapsed ? (
+      {/* Banner gợi ý triệu hồi @HQ AI khi gõ @ (nằm trên inputBar với chiều rộng 100%) */}
+      {draft.includes('@') && (
+        <Pressable
+          style={[styles.mentionBanner, isDark && { backgroundColor: '#1A2332', borderTopColor: '#2C3E5A' }]}
+          onPress={() => {
+            const base = draft.replace(/@[^@\s]*$/, '');
+            dispatch(setDraft({ roomId, text: (base ? base + ' ' : '') + '@HQ AI ' }));
+          }}
+        >
+          <View style={styles.mentionAvatar}>
+            <Ionicons name="sparkles" size={13} color="#fff" />
+          </View>
+          <Text style={[styles.mentionText, isDark && { color: '#E4E6EB' }]}>
+            Nhắc tên <Text style={styles.mentionBold}>@HQ AI</Text> để hỏi đáp hoặc tóm tắt phòng
+          </Text>
+          <Ionicons name="arrow-forward-circle" size={18} color="#0084FF" />
+        </Pressable>
+      )}
+
+      <View style={[styles.inputBar, isDark && { backgroundColor: '#242526', borderTopColor: '#3A3B3C' }]}>
+        {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
+        {isCollapsed || draft.trim().length > 0 ? (
           <Pressable onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
-            <Ionicons name="chevron-forward" size={26} color="#0084FF" />
+            <Ionicons name="chevron-forward" size={24} color="#0084FF" />
           </Pressable>
         ) : (
           <View style={styles.actionButtonsRow}>
@@ -614,34 +633,11 @@ export default function ChatRoomScreen() {
             >
               <Ionicons name="sparkles" size={24} color="#0084FF" />
             </Pressable>
-            {draft.trim().length > 0 && (
-              <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
-                <Ionicons name="chevron-back" size={22} color="#8A8D91" />
-              </Pressable>
-            )}
           </View>
         )}
 
-        {/* Banner gợi ý triệu hồi @HQ AI khi gõ @ */}
-        {draft.includes('@') && (
-          <Pressable
-            style={styles.mentionBanner}
-            onPress={() => {
-              const base = draft.replace(/@[^@\s]*$/, '');
-              dispatch(setDraft({ roomId, text: (base ? base + ' ' : '') + '@HQ AI ' }));
-            }}
-          >
-            <View style={styles.mentionAvatar}>
-              <Ionicons name="sparkles" size={12} color="#fff" />
-            </View>
-            <Text style={styles.mentionText}>
-              Nhắc tên <Text style={styles.mentionBold}>@HQ AI</Text> để hỏi đáp hoặc tóm tắt phòng
-            </Text>
-          </Pressable>
-        )}
-
         {/* Khung chứa ô nhập văn bản và nút emoji */}
-        <View style={styles.inputWrapper}>
+        <View style={[styles.inputWrapper, isDark && { backgroundColor: '#3A3B3C' }]}>
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn..."
@@ -1122,6 +1118,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   mentionText: {
+    flex: 1,
     fontSize: 13,
     color: '#050505',
   },
