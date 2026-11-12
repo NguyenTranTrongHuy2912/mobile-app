@@ -109,6 +109,15 @@ export const chatApi = createApi({
       invalidatesTags: ['Room'],
     }),
 
+    // Rời khỏi phòng chat nhóm (xử lý dữ liệu thật trên MongoDB Atlas)
+    leaveRoom: build.mutation<{ ok: boolean; message: string }, string>({
+      query: (roomId) => ({
+        url: `/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Room'],
+    }),
+
     getMessages: build.query<MessagesState, string>({
       query: (roomId) => `/api/v1/chat/history/${encodeURIComponent(roomId)}?limit=50`,
       // Gateway trả tin mới nhất trước, FlatList cần cũ nhất trước
@@ -457,6 +466,7 @@ export const {
   useGetSuggestedUsersQuery,
   useCreateRoomMutation,
   useMarkRoomReadMutation,
+  useLeaveRoomMutation,
   useGetMessagesQuery,
   useLoadEarlierMessagesMutation,
   useSendMessageMutation,

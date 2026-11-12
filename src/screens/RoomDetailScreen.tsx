@@ -14,6 +14,7 @@ import {
   useCreateRoomMutation,
   useGetRoomsQuery,
   useSummarizeRoomMutation,
+  useLeaveRoomMutation,
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
 import MemberItem from '../components/MemberItem';
@@ -76,18 +77,25 @@ export default function RoomDetailScreen() {
     }
   };
 
+  const [leaveRoomMutation] = useLeaveRoomMutation();
+
   const handleLeaveGroup = () => {
     Alert.alert(
       'Rời nhóm',
-      'Bạn có chắc chắn muốn rời khỏi nhóm này không?',
+      'Bạn có chắc chắn muốn rời khỏi nhóm này không? Bạn sẽ không nhận được tin nhắn mới từ nhóm nữa.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Rời nhóm',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Thông báo', 'Bạn đã rời nhóm thành công.');
-            router.replace('/(app)/(tabs)/rooms');
+          onPress: async () => {
+            try {
+              await leaveRoomMutation(roomId).unwrap();
+              Alert.alert('Thông báo', 'Bạn đã rời nhóm thành công.');
+              router.replace('/(app)/(tabs)/rooms');
+            } catch (e) {
+              Alert.alert('Lỗi', 'Không thể rời nhóm lúc này. Vui lòng thử lại sau.');
+            }
           },
         },
       ]

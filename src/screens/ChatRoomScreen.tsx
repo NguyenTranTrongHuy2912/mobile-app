@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import { formatChatDivider } from '../utils/dateFormatter';
 import AnimatedMessageItem from '../components/AnimatedMessageItem';
 import ScalePressable from '../components/ScalePressable';
+import * as Clipboard from 'expo-clipboard';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
 import {
@@ -108,6 +109,10 @@ export default function ChatRoomScreen() {
     }
   };
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const isDark = useAppSelector((s) => s.theme.isDark);
+  const [reactions, setReactions] = useState<Record<string, string>>({});
+  const [reactionTargetMsg, setReactionTargetMsg] = useState<Message | null>(null);
+  const [showActionModal, setShowActionModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
     // Quản lý trạng thái thu gọn / mở rộng các nút hành động (Camera, Ảnh, Mic, Thêm)
   const [isActionsExpanded, setIsActionsExpanded] = useState(false);
@@ -126,6 +131,31 @@ export default function ChatRoomScreen() {
   const toggleActions = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsActionsExpanded((prev) => !prev);
+  };
+
+  const handleLongPress = (msg: Message) => {
+    setReactionTargetMsg(msg);
+    setShowActionModal(true);
+  };
+
+  const handleSelectReaction = (emoji: string) => {
+    if (reactionTargetMsg) {
+      setReactions((prev) => ({
+        ...prev,
+        [reactionTargetMsg.id]: prev[reactionTargetMsg.id] === emoji ? '' : emoji,
+      }));
+    }
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+  };
+
+  const handleCopyContent = async () => {
+    if (reactionTargetMsg?.content) {
+      await Clipboard.setStringAsync(reactionTargetMsg.content);
+      Alert.alert('Thành công', 'Đã sao chép nội dung tin nhắn.');
+    }
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
   };
 
   const handleTextChange = (text: string) => {
@@ -436,6 +466,8 @@ export default function ChatRoomScreen() {
         <AnimatedMessageItem style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
           <Pressable
             onPress={() => setSelectedMsgId(isSelected ? null : item.id)}
+            onLongPress={() => handleLongPress(item)}
+            delayLongPress={250}
             style={[
               styles.bubble,
               mine ? styles.bubbleMine : isHqAi ? styles.bubbleAi : styles.bubbleOther,
@@ -483,6 +515,11 @@ export default function ChatRoomScreen() {
             {mine && item.status === 'sending' && (
               <Text style={styles.sendingMeta}>Đang gửi…</Text>
             )}
+            {reactions[item.id] ? (
+              <View style={[styles.reactionBadge, mine ? styles.reactionBadgeMine : styles.reactionBadgeOther]}>
+                <Text style={styles.reactionBadgeText}>{reactions[item.id]}</Text>
+              </View>
+            ) : null}
           </Pressable>
           {mine && item.status === 'failed' && (
             <Pressable
@@ -507,7 +544,7 @@ export default function ChatRoomScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, isDark && { backgroundColor: '#18191A' }] }
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 25}
     >
@@ -764,6 +801,40 @@ export default function ChatRoomScreen() {
               </View>
             </Pressable>
           </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal Thả Reaction & Sao Chép Tin Nhắn */}
+      <Modal
+        visible={showActionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActionModal(false)}
+      >
+        <Pressable style={styles.reactionModalOverlay} onPress={() => setShowActionModal(false)}>
+          <View style={[styles.reactionCard, isDark && { backgroundColor: '#242526' }]}>
+            {/* Thanh biểu cảm Reaction */}
+            <View style={styles.reactionBar}>
+              {['❤️', '👍', '😂', '😮', '😢'].map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  style={styles.reactionEmojiBtn}
+                  onPress={() => handleSelectReaction(emoji)}
+                >
+                  <Text style={styles.reactionEmojiText}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Menu hành động */}
+            <View style={styles.actionMenuDivider} />
+            <Pressable style={styles.actionMenuItem} onPress={handleCopyContent}>
+              <Ionicons name="copy-outline" size={18} color={isDark ? '#E4E6EB' : '#1E293B'} />
+              <Text style={[styles.actionMenuItemText, isDark && { color: '#E4E6EB' }]}>
+                Sao chép văn bản
+              </Text>
+            </Pressable>
+          </View>
         </Pressable>
       </Modal>
     </KeyboardAvoidingView>
@@ -1163,5 +1234,77 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0084FF',
     marginLeft: 6,
+  },
+  reactionBadge: {
+    position: 'absolute',
+    bottom: -8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  reactionBadgeMine: {
+    right: 6,
+  },
+  reactionBadgeOther: {
+    left: 6,
+  },
+  reactionBadgeText: {
+    fontSize: 12,
+  },
+  reactionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  reactionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  reactionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+  },
+  reactionEmojiBtn: {
+    padding: 6,
+  },
+  reactionEmojiText: {
+    fontSize: 28,
+  },
+  actionMenuDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 10,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 10,
+  },
+  actionMenuItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
   },
 });

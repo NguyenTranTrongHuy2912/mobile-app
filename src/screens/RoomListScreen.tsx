@@ -49,6 +49,7 @@ export default function RoomListScreen() {
   const myId = useAppSelector((s) => s.session.userId);
   const myName = useAppSelector((s) => s.session.displayName) || 'Tôi';
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const isDark = useAppSelector((s) => s.theme.isDark);
 
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -317,7 +318,7 @@ export default function RoomListScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && { backgroundColor: '#18191A' }]}>
       <FlatList
         data={filteredRooms}
         keyExtractor={(r) => r.id}
@@ -326,7 +327,7 @@ export default function RoomListScreen() {
         refreshing={refreshing}
         onRefresh={onRefresh}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, isDark && { backgroundColor: '#18191A' }]}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconCircle}>
