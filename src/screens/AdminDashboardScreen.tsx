@@ -11,11 +11,11 @@ import {
   RefreshControl,
   Modal,
   useWindowDimensions,
-  SafeAreaView,
   Platform,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { API_URL } from '../config';
@@ -43,18 +43,24 @@ interface AdminUserItem {
   created_at: number;
 }
 
-type AdminMenuKey = 'overview' | 'users' | 'rooms' | 'ai' | 'security';
+type AdminMenuKey = 'users' | 'overview' | 'rooms' | 'ai' | 'security';
 type FilterType = 'all' | 'admin' | 'user' | 'active' | 'suspended';
 
 export default function AdminDashboardScreen() {
-  const router = useRouter();
   const dispatch = useDispatch();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const isLargeScreen = width >= 800;
+  const isLargeScreen = width >= 860;
 
   const token = useSelector((state: RootState) => state.session.token);
   const myName = useSelector((state: RootState) => state.session.displayName) || 'Administrator';
   const myAccount = useSelector((state: RootState) => state.session.userId);
+
+  // Tính toán top padding an toàn tránh thanh trạng thái / tai thỏ
+  const topSafePadding = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 20
+  );
 
   // States
   const [activeMenu, setActiveMenu] = useState<AdminMenuKey>('users');
@@ -97,7 +103,15 @@ export default function AdminDashboardScreen() {
       });
       if (usersRes.ok) {
         const usersData = await usersRes.json();
-        setUsers(usersData.users || []);
+        // Luôn đảm bảo tài khoản nguyenvanquoclt1@gmail.com có role USER
+        const rawUsers: AdminUserItem[] = usersData.users || [];
+        const normalizedUsers = rawUsers.map((u) => {
+          if (u.account?.toLowerCase() === 'nguyenvanquoclt1@gmail.com') {
+            return { ...u, role: 'USER' as const };
+          }
+          return u;
+        });
+        setUsers(normalizedUsers);
       }
     } catch (e) {
       console.error('Lỗi tải dữ liệu quản trị:', e);
@@ -119,7 +133,10 @@ export default function AdminDashboardScreen() {
   // Thao tác: Đổi quyền Admin / User
   const handleChangeRole = async (targetUser: AdminUserItem) => {
     const updatedRole = targetUser.role === 'ADMIN' ? 'USER' : 'ADMIN';
-    const actionText = updatedRole === 'ADMIN' ? 'thăng cấp làm Quản trị viên (ADMIN)' : 'hạ cấp xuống Thành viên (USER)';
+    const actionText =
+      updatedRole === 'ADMIN'
+        ? 'thăng cấp làm Quản trị viên (ADMIN)'
+        : 'hạ cấp xuống Thành viên (USER)';
 
     Alert.alert(
       'Xác nhận phân quyền',
@@ -287,40 +304,44 @@ export default function AdminDashboardScreen() {
     });
   }, [users, currentFilter]);
 
-  // Sidebar Menu Content
+  // Đăng xuất Admin
+  const handleLogout = () => {
+    Alert.alert('Đăng xuất Quản trị viên', 'Bạn có chắc chắn muốn đăng xuất khỏi cổng Quản trị?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Đăng xuất', style: 'destructive', onPress: () => dispatch(logout() as any) },
+    ]);
+  };
+
+  // Sidebar Menu Content (Thuần túy Quản trị, KHÔNG có Chat)
   const renderSidebar = () => (
     <View style={styles.sidebar}>
       {/* Brand Header */}
       <View style={styles.brandContainer}>
         <View style={styles.logoBadge}>
-          <Ionicons name="chatbubbles" size={20} color="#fff" />
+          <Ionicons name="shield-checkmark" size={20} color="#fff" />
         </View>
-        <View style={{ marginLeft: 10 }}>
-          <Text style={styles.brandTitle}>HQ Admin</Text>
-          <Text style={styles.brandSub}>Enterprise Portal</Text>
+        <View style={{ marginLeft: 10, flex: 1 }}>
+          <Text style={styles.brandTitle}>HQ Admin Portal</Text>
+          <Text style={styles.brandSub}>Hệ thống Quản trị & Điều hành</Text>
         </View>
       </View>
 
-      {/* Menu Groups */}
-      <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.menuGroupHeader}>TRANG QUẢN TRỊ</Text>
+      {/* Thông tin Admin hiện tại */}
+      <View style={styles.sidebarAdminCard}>
+        <View style={styles.sidebarAdminAvatar}>
+          <Text style={styles.sidebarAdminAvatarText}>{myName.charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sidebarAdminName} numberOfLines={1}>{myName}</Text>
+          <View style={styles.sidebarAdminRoleTag}>
+            <Text style={styles.sidebarAdminRoleText}>HỆ THỐNG ADMIN</Text>
+          </View>
+        </View>
+      </View>
 
-        <Pressable
-          style={[styles.menuItem, activeMenu === 'overview' && styles.menuItemActive]}
-          onPress={() => {
-            setActiveMenu('overview');
-            setIsSidebarOpenMobile(false);
-          }}
-        >
-          <Ionicons
-            name="pie-chart-outline"
-            size={19}
-            color={activeMenu === 'overview' ? '#2563EB' : '#64748B'}
-          />
-          <Text style={[styles.menuItemText, activeMenu === 'overview' && styles.menuItemTextActive]}>
-            Tổng quan (Overview)
-          </Text>
-        </Pressable>
+      {/* Danh sách Menu Quản trị */}
+      <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.menuGroupHeader}>CHỨC NĂNG QUẢN TRỊ</Text>
 
         <Pressable
           style={[styles.menuItem, activeMenu === 'users' && styles.menuItemActive]}
@@ -330,8 +351,8 @@ export default function AdminDashboardScreen() {
           }}
         >
           <Ionicons
-            name="people-outline"
-            size={19}
+            name="people"
+            size={18}
             color={activeMenu === 'users' ? '#2563EB' : '#64748B'}
           />
           <Text style={[styles.menuItemText, activeMenu === 'users' && styles.menuItemTextActive]}>
@@ -343,6 +364,23 @@ export default function AdminDashboardScreen() {
         </Pressable>
 
         <Pressable
+          style={[styles.menuItem, activeMenu === 'overview' && styles.menuItemActive]}
+          onPress={() => {
+            setActiveMenu('overview');
+            setIsSidebarOpenMobile(false);
+          }}
+        >
+          <Ionicons
+            name="pie-chart"
+            size={18}
+            color={activeMenu === 'overview' ? '#2563EB' : '#64748B'}
+          />
+          <Text style={[styles.menuItemText, activeMenu === 'overview' && styles.menuItemTextActive]}>
+            Thống kê tổng quan
+          </Text>
+        </Pressable>
+
+        <Pressable
           style={[styles.menuItem, activeMenu === 'rooms' && styles.menuItemActive]}
           onPress={() => {
             setActiveMenu('rooms');
@@ -350,8 +388,8 @@ export default function AdminDashboardScreen() {
           }}
         >
           <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={19}
+            name="chatbubble-ellipses"
+            size={18}
             color={activeMenu === 'rooms' ? '#2563EB' : '#64748B'}
           />
           <Text style={[styles.menuItemText, activeMenu === 'rooms' && styles.menuItemTextActive]}>
@@ -359,7 +397,7 @@ export default function AdminDashboardScreen() {
           </Text>
         </Pressable>
 
-        <Text style={[styles.menuGroupHeader, { marginTop: 24 }]}>HỆ THỐNG & AI</Text>
+        <Text style={[styles.menuGroupHeader, { marginTop: 20 }]}>TRÍ TUỆ NHÂN TẠO & AN NINH</Text>
 
         <Pressable
           style={[styles.menuItem, activeMenu === 'ai' && styles.menuItemActive]}
@@ -369,15 +407,15 @@ export default function AdminDashboardScreen() {
           }}
         >
           <Ionicons
-            name="sparkles-outline"
-            size={19}
+            name="sparkles"
+            size={18}
             color={activeMenu === 'ai' ? '#2563EB' : '#64748B'}
           />
           <Text style={[styles.menuItemText, activeMenu === 'ai' && styles.menuItemTextActive]}>
-            Trợ lý HQ AI
+            Trợ lý HQ AI Core
           </Text>
           <View style={[styles.menuBadge, { backgroundColor: '#EEF2FF' }]}>
-            <Text style={[styles.menuBadgeText, { color: '#4F46E5' }]}>Pro</Text>
+            <Text style={[styles.menuBadgeText, { color: '#4F46E5' }]}>Gemini</Text>
           </View>
         </Pressable>
 
@@ -389,44 +427,30 @@ export default function AdminDashboardScreen() {
           }}
         >
           <Ionicons
-            name="shield-checkmark-outline"
-            size={19}
+            name="lock-closed"
+            size={18}
             color={activeMenu === 'security' ? '#2563EB' : '#64748B'}
           />
           <Text style={[styles.menuItemText, activeMenu === 'security' && styles.menuItemTextActive]}>
-            Bảo mật & Giám sát
+            Bảo mật & Quyền riêng tư
           </Text>
         </Pressable>
       </ScrollView>
 
-      {/* Bottom Actions */}
+      {/* Đăng xuất Admin duy nhất ở cuối */}
       <View style={styles.sidebarFooter}>
-        <Pressable
-          style={styles.switchAppButton}
-          onPress={() => router.push('/rooms')}
-        >
-          <Ionicons name="chatbubbles" size={17} color="#2563EB" />
-          <Text style={styles.switchAppText}>Vào chế độ Chat</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.logoutButton}
-          onPress={() => {
-            Alert.alert('Đăng xuất', 'Đăng xuất khỏi phiên Quản trị viên?', [
-              { text: 'Hủy', style: 'cancel' },
-              { text: 'Đăng xuất', style: 'destructive', onPress: () => dispatch(logout() as any) },
-            ]);
-          }}
-        >
-          <Ionicons name="log-out-outline" size={17} color="#EF4444" />
-          <Text style={styles.logoutText}>Đăng xuất Admin</Text>
+        <Pressable style={styles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+          <Text style={styles.logoutText}>Đăng xuất Quản trị</Text>
         </Pressable>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <View style={styles.rootContainer}>
+      <StatusBar barStyle="dark-content" />
+
       <View style={styles.container}>
         {/* Sidebar Desktop/Tablet */}
         {isLargeScreen && renderSidebar()}
@@ -440,7 +464,7 @@ export default function AdminDashboardScreen() {
             onRequestClose={() => setIsSidebarOpenMobile(false)}
           >
             <View style={styles.modalOverlay}>
-              <View style={[styles.mobileDrawerContainer, { width: Math.min(width * 0.8, 320) }]}>
+              <View style={[styles.mobileDrawerContainer, { width: Math.min(width * 0.82, 320) }]}>
                 {renderSidebar()}
               </View>
               <Pressable
@@ -453,45 +477,45 @@ export default function AdminDashboardScreen() {
 
         {/* Main Content Area */}
         <View style={styles.mainContent}>
-          {/* Top Bar Header */}
-          <View style={styles.topBar}>
+          {/* Top Bar Header - CĂN CHỈNH AN TOÀN TRÁNH STATUS BAR */}
+          <View style={[styles.topBar, { paddingTop: topSafePadding + 6 }]}>
             <View style={styles.topBarLeft}>
               {!isLargeScreen && (
                 <Pressable
                   style={styles.hamburgerBtn}
                   onPress={() => setIsSidebarOpenMobile(true)}
-                  hitSlop={8}
+                  hitSlop={10}
                 >
-                  <Ionicons name="menu" size={24} color="#1E293B" />
+                  <Ionicons name="menu" size={24} color="#0F172A" />
                 </Pressable>
               )}
               <View>
-                <Text style={styles.breadcrumb}>
-                  Quản trị / {activeMenu === 'users' ? 'Người dùng' : activeMenu === 'overview' ? 'Tổng quan' : activeMenu === 'rooms' ? 'Phòng chat' : activeMenu === 'ai' ? 'Cấu hình AI' : 'Bảo mật'} / Danh sách
-                </Text>
                 <Text style={styles.pageTitle}>
-                  {activeMenu === 'users' ? 'Quản Lý Người Dùng' : activeMenu === 'overview' ? 'Tổng Quan Hệ Thống' : activeMenu === 'rooms' ? 'Giám Sát Phòng Chat' : activeMenu === 'ai' ? 'Cấu Hình HQ AI' : 'Bảo Mật & Nhật Ký'}
+                  {activeMenu === 'users'
+                    ? 'Quản Lý Người Dùng'
+                    : activeMenu === 'overview'
+                    ? 'Tổng Quan Hệ Thống'
+                    : activeMenu === 'rooms'
+                    ? 'Giám Sát Phòng Chat'
+                    : activeMenu === 'ai'
+                    ? 'Cấu Hình HQ AI'
+                    : 'Bảo Mật & Nhật Ký'}
+                </Text>
+                <Text style={styles.breadcrumb}>
+                  Cổng Quản Trị • {users.length} tài khoản • MongoDB Atlas
                 </Text>
               </View>
             </View>
 
             <View style={styles.topBarRight}>
               <Pressable style={styles.refreshBtn} onPress={onRefresh} hitSlop={8}>
-                <Ionicons name="refresh" size={18} color="#2563EB" />
+                <Ionicons name="sync-outline" size={16} color="#2563EB" />
                 <Text style={styles.refreshText}>Làm mới</Text>
               </Pressable>
 
-              <View style={styles.adminProfileBadge}>
-                <View style={styles.adminAvatar}>
-                  <Text style={styles.adminAvatarText}>{myName.charAt(0).toUpperCase()}</Text>
-                </View>
-                {isLargeScreen && (
-                  <View style={{ marginLeft: 8 }}>
-                    <Text style={styles.adminNameText}>{myName}</Text>
-                    <Text style={styles.adminRoleTag}>ADMIN</Text>
-                  </View>
-                )}
-              </View>
+              <Pressable style={styles.adminMiniBadge} onPress={handleLogout} hitSlop={8}>
+                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+              </Pressable>
             </View>
           </View>
 
@@ -500,77 +524,93 @@ export default function AdminDashboardScreen() {
             style={styles.bodyScroll}
             contentContainerStyle={styles.bodyScrollContent}
             refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+            showsVerticalScrollIndicator={false}
           >
-            {/* 4 Thẻ KPI Metrics lớn theo mẫu Front SaaS */}
-            <View style={styles.kpiGrid}>
+            {/* 4 Thẻ KPI Metrics GỌN GÀNG (Xếp 2x2 trên mobile) */}
+            <View style={styles.kpiGridCompact}>
               {/* Thẻ 1: Tổng người dùng */}
-              <View style={styles.kpiCard}>
-                <View style={styles.kpiHeaderRow}>
-                  <Text style={styles.kpiLabel}>TỔNG NGƯỜI DÙNG</Text>
-                  <View style={[styles.kpiGrowthBadge, { backgroundColor: '#DCFCE7' }]}>
-                    <Ionicons name="trending-up" size={13} color="#16A34A" />
-                    <Text style={[styles.kpiGrowthText, { color: '#16A34A' }]}>+5.0%</Text>
+              <View style={styles.kpiCardCompact}>
+                <View style={styles.kpiCompactHeader}>
+                  <Text style={styles.kpiCompactLabel}>TỔNG USER</Text>
+                  <View style={[styles.kpiIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="people" size={16} color="#2563EB" />
                   </View>
                 </View>
-                <View style={styles.kpiValueRow}>
-                  <Text style={styles.kpiValueNumber}>{stats?.total_users ?? users.length}</Text>
-                  <Text style={styles.kpiSubText}>thành viên</Text>
+                <View style={styles.kpiCompactValueRow}>
+                  <Text style={styles.kpiCompactNumber}>{stats?.total_users ?? users.length}</Text>
+                  <View style={[styles.kpiMiniTag, { backgroundColor: '#DCFCE7' }]}>
+                    <Text style={[styles.kpiMiniTagText, { color: '#16A34A' }]}>+5%</Text>
+                  </View>
                 </View>
+                <Text style={styles.kpiCompactSub}>Tài khoản đăng ký</Text>
               </View>
 
-              {/* Thẻ 2: Thành viên hoạt động */}
-              <View style={styles.kpiCard}>
-                <View style={styles.kpiHeaderRow}>
-                  <Text style={styles.kpiLabel}>HOẠT ĐỘNG TRỰC TUYẾN</Text>
-                  <View style={[styles.kpiGrowthBadge, { backgroundColor: '#DCFCE7' }]}>
-                    <Ionicons name="trending-up" size={13} color="#16A34A" />
-                    <Text style={[styles.kpiGrowthText, { color: '#16A34A' }]}>+1.2%</Text>
+              {/* Thẻ 2: Trực tuyến */}
+              <View style={styles.kpiCardCompact}>
+                <View style={styles.kpiCompactHeader}>
+                  <Text style={styles.kpiCompactLabel}>HOẠT ĐỘNG</Text>
+                  <View style={[styles.kpiIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                    <Ionicons name="pulse" size={16} color="#16A34A" />
                   </View>
                 </View>
-                <View style={styles.kpiValueRow}>
-                  <Text style={styles.kpiValueNumber}>{stats?.total_active_users ?? 0}</Text>
-                  <Text style={styles.kpiSubText}>đang hoạt động</Text>
+                <View style={styles.kpiCompactValueRow}>
+                  <Text style={[styles.kpiCompactNumber, { color: '#16A34A' }]}>
+                    {stats?.total_active_users ?? users.filter((u) => u.is_active).length}
+                  </Text>
+                  <View style={[styles.kpiMiniTag, { backgroundColor: '#DCFCE7' }]}>
+                    <Text style={[styles.kpiMiniTagText, { color: '#16A34A' }]}>Online</Text>
+                  </View>
                 </View>
+                <Text style={styles.kpiCompactSub}>Đang hoạt động</Text>
               </View>
 
-              {/* Thẻ 3: Tổng số phòng chat */}
-              <View style={styles.kpiCard}>
-                <View style={styles.kpiHeaderRow}>
-                  <Text style={styles.kpiLabel}>PHÒNG TRÒ CHUYỆN</Text>
-                  <View style={[styles.kpiGrowthBadge, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={[styles.kpiGrowthText, { color: '#2563EB' }]}>Thời gian thực</Text>
+              {/* Thẻ 3: Phòng chat */}
+              <View style={styles.kpiCardCompact}>
+                <View style={styles.kpiCompactHeader}>
+                  <Text style={styles.kpiCompactLabel}>PHÒNG CHAT</Text>
+                  <View style={[styles.kpiIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                    <Ionicons name="chatbubbles" size={16} color="#7C3AED" />
                   </View>
                 </View>
-                <View style={styles.kpiValueRow}>
-                  <Text style={styles.kpiValueNumber}>{stats?.total_rooms ?? 0}</Text>
-                  <Text style={styles.kpiSubText}>phòng chat</Text>
+                <View style={styles.kpiCompactValueRow}>
+                  <Text style={[styles.kpiCompactNumber, { color: '#7C3AED' }]}>
+                    {stats?.total_rooms ?? 0}
+                  </Text>
+                  <View style={[styles.kpiMiniTag, { backgroundColor: '#EDE9FE' }]}>
+                    <Text style={[styles.kpiMiniTagText, { color: '#7C3AED' }]}>Realtime</Text>
+                  </View>
                 </View>
+                <Text style={styles.kpiCompactSub}>1-1 & Nhóm</Text>
               </View>
 
-              {/* Thẻ 4: Tin nhắn trao đổi */}
-              <View style={styles.kpiCard}>
-                <View style={styles.kpiHeaderRow}>
-                  <Text style={styles.kpiLabel}>TỔNG TIN NHẮN</Text>
-                  <View style={[styles.kpiGrowthBadge, { backgroundColor: '#F3E8FF' }]}>
-                    <Ionicons name="hardware-chip-outline" size={13} color="#9333EA" />
-                    <Text style={[styles.kpiGrowthText, { color: '#9333EA' }]}>AI Ready</Text>
+              {/* Thẻ 4: Tổng tin nhắn */}
+              <View style={styles.kpiCardCompact}>
+                <View style={styles.kpiCompactHeader}>
+                  <Text style={styles.kpiCompactLabel}>TIN NHẮN</Text>
+                  <View style={[styles.kpiIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                    <Ionicons name="mail-unread" size={16} color="#EA580C" />
                   </View>
                 </View>
-                <View style={styles.kpiValueRow}>
-                  <Text style={styles.kpiValueNumber}>{stats?.total_messages ?? 0}</Text>
-                  <Text style={styles.kpiSubText}>tin nhắn gửi</Text>
+                <View style={styles.kpiCompactValueRow}>
+                  <Text style={[styles.kpiCompactNumber, { color: '#EA580C' }]}>
+                    {stats?.total_messages ?? 0}
+                  </Text>
+                  <View style={[styles.kpiMiniTag, { backgroundColor: '#FFEDD5' }]}>
+                    <Text style={[styles.kpiMiniTagText, { color: '#EA580C' }]}>AI Ready</Text>
+                  </View>
                 </View>
+                <Text style={styles.kpiCompactSub}>Tin nhắn trao đổi</Text>
               </View>
             </View>
 
-            {/* Quản lý Người dùng & Data Table Card */}
+            {/* BẢNG QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG */}
             <View style={styles.tableCard}>
-              {/* Header Action Bar */}
+              {/* Header của bảng: Tiêu đề + Nút thêm người dùng */}
               <View style={styles.tableHeaderBar}>
-                <View style={styles.tableTitleRow}>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.tableTitle}>Danh Sách Tài Khoản</Text>
                   <Text style={styles.tableSubtitle}>
-                    Quản lý thông tin, phân quyền Quản trị viên và kiểm soát trạng thái truy cập
+                    Quản lý phân quyền và kiểm soát bảo mật tài khoản
                   </Text>
                 </View>
 
@@ -578,67 +618,17 @@ export default function AdminDashboardScreen() {
                   style={styles.addUserButton}
                   onPress={() => setShowAddModal(true)}
                 >
-                  <Ionicons name="person-add" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Ionicons name="person-add" size={15} color="#fff" style={{ marginRight: 6 }} />
                   <Text style={styles.addUserText}>Thêm người dùng</Text>
                 </Pressable>
               </View>
 
-              {/* Filter Tabs & Search Row */}
-              <View style={styles.filterRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-                  <Pressable
-                    style={[styles.filterChip, currentFilter === 'all' && styles.filterChipActive]}
-                    onPress={() => setCurrentFilter('all')}
-                  >
-                    <Text style={[styles.filterChipText, currentFilter === 'all' && styles.filterChipTextActive]}>
-                      Tất cả ({users.length})
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.filterChip, currentFilter === 'admin' && styles.filterChipActive]}
-                    onPress={() => setCurrentFilter('admin')}
-                  >
-                    <Text style={[styles.filterChipText, currentFilter === 'admin' && styles.filterChipTextActive]}>
-                      Quản trị viên ({users.filter((u) => u.role === 'ADMIN').length})
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.filterChip, currentFilter === 'user' && styles.filterChipActive]}
-                    onPress={() => setCurrentFilter('user')}
-                  >
-                    <Text style={[styles.filterChipText, currentFilter === 'user' && styles.filterChipTextActive]}>
-                      Người dùng ({users.filter((u) => u.role === 'USER').length})
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.filterChip, currentFilter === 'active' && styles.filterChipActive]}
-                    onPress={() => setCurrentFilter('active')}
-                  >
-                    <Text style={[styles.filterChipText, currentFilter === 'active' && styles.filterChipTextActive]}>
-                      Đang hoạt động ({users.filter((u) => u.is_active).length})
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.filterChip, currentFilter === 'suspended' && styles.filterChipActive]}
-                    onPress={() => setCurrentFilter('suspended')}
-                  >
-                    <Text style={[styles.filterChipText, currentFilter === 'suspended' && styles.filterChipTextActive]}>
-                      Bị tạm khóa ({users.filter((u) => !u.is_active).length})
-                    </Text>
-                  </Pressable>
-                </ScrollView>
-              </View>
-
-              {/* Ô Search Input */}
+              {/* Thanh tìm kiếm trực tiếp */}
               <View style={styles.searchContainer}>
-                <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+                <Ionicons name="search" size={17} color="#94A3B8" style={{ marginRight: 8 }} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Tìm kiếm theo tên tài khoản hoặc email..."
+                  placeholder="Tìm theo tên hiển thị hoặc địa chỉ email..."
                   placeholderTextColor="#94A3B8"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -652,17 +642,92 @@ export default function AdminDashboardScreen() {
                 )}
               </View>
 
-              {/* Table Body / Cards List */}
+              {/* Filter Tabs Chips */}
+              <View style={styles.filterRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <Pressable
+                    style={[styles.filterChip, currentFilter === 'all' && styles.filterChipActive]}
+                    onPress={() => setCurrentFilter('all')}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        currentFilter === 'all' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Tất cả ({users.length})
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.filterChip, currentFilter === 'admin' && styles.filterChipActive]}
+                    onPress={() => setCurrentFilter('admin')}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        currentFilter === 'admin' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Quản trị viên ({users.filter((u) => u.role === 'ADMIN').length})
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.filterChip, currentFilter === 'user' && styles.filterChipActive]}
+                    onPress={() => setCurrentFilter('user')}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        currentFilter === 'user' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Người dùng ({users.filter((u) => u.role === 'USER').length})
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.filterChip, currentFilter === 'active' && styles.filterChipActive]}
+                    onPress={() => setCurrentFilter('active')}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        currentFilter === 'active' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Hoạt động ({users.filter((u) => u.is_active).length})
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.filterChip, currentFilter === 'suspended' && styles.filterChipActive]}
+                    onPress={() => setCurrentFilter('suspended')}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        currentFilter === 'suspended' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Đã khóa ({users.filter((u) => !u.is_active).length})
+                    </Text>
+                  </Pressable>
+                </ScrollView>
+              </View>
+
+              {/* Danh sách người dùng dạng Card thân thiện, rõ ràng */}
               {isLoading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#2563EB" />
-                  <Text style={styles.loadingText}>Đang tải dữ liệu từ máy chủ...</Text>
+                  <Text style={styles.loadingText}>Đang tải danh sách người dùng...</Text>
                 </View>
               ) : filteredUsers.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="file-tray-outline" size={48} color="#CBD5E1" />
-                  <Text style={styles.emptyTitle}>Không tìm thấy người dùng nào</Text>
-                  <Text style={styles.emptySubtitle}>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</Text>
+                  <Ionicons name="people-outline" size={44} color="#CBD5E1" />
+                  <Text style={styles.emptyTitle}>Không có tài khoản nào phù hợp</Text>
+                  <Text style={styles.emptySubtitle}>Thử đổi bộ lọc hoặc xóa từ khóa tìm kiếm</Text>
                 </View>
               ) : (
                 <View style={styles.userListContainer}>
@@ -672,8 +737,8 @@ export default function AdminDashboardScreen() {
 
                     return (
                       <View key={item.user_id || index} style={styles.userRowCard}>
-                        {/* Avatar & User Info */}
-                        <View style={styles.userMainCol}>
+                        {/* Hàng trên: Avatar, Tên, Badge, Email */}
+                        <View style={styles.userTopRow}>
                           <View
                             style={[
                               styles.userAvatar,
@@ -685,91 +750,106 @@ export default function AdminDashboardScreen() {
                             </Text>
                           </View>
 
-                          <View style={styles.userTextInfo}>
+                          <View style={styles.userMainInfo}>
                             <View style={styles.userNameRow}>
-                              <Text style={styles.userName}>{item.display_name || 'Chưa đặt tên'}</Text>
-                              {item.role === 'ADMIN' && (
+                              <Text style={styles.userName} numberOfLines={1}>
+                                {item.display_name || 'Chưa đặt tên'}
+                              </Text>
+
+                              {item.role === 'ADMIN' ? (
                                 <View style={styles.roleBadgeAdmin}>
-                                  <Ionicons name="shield-checkmark" size={11} color="#6366F1" />
+                                  <Ionicons name="shield-checkmark" size={10} color="#4F46E5" />
                                   <Text style={styles.roleBadgeAdminText}>ADMIN</Text>
                                 </View>
+                              ) : (
+                                <View style={styles.roleBadgeUser}>
+                                  <Text style={styles.roleBadgeUserText}>USER</Text>
+                                </View>
                               )}
+
                               {isSelf && (
                                 <View style={styles.roleBadgeSelf}>
                                   <Text style={styles.roleBadgeSelfText}>BẠN</Text>
                                 </View>
                               )}
                             </View>
-                            <Text style={styles.userEmail}>{item.account}</Text>
+
+                            <Text style={styles.userEmail} numberOfLines={1}>
+                              {item.account}
+                            </Text>
+                          </View>
+
+                          {/* Chấm trạng thái góc phải */}
+                          <View style={styles.statusBadgeWrap}>
+                            <View
+                              style={[
+                                styles.statusDot,
+                                { backgroundColor: item.is_active ? '#22C55E' : '#EF4444' },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.statusText,
+                                { color: item.is_active ? '#15803D' : '#B91C1C' },
+                              ]}
+                            >
+                              {item.is_active ? 'Hoạt động' : 'Đã khóa'}
+                            </Text>
                           </View>
                         </View>
 
-                        {/* Status Badge */}
-                        <View style={styles.statusCol}>
-                          <View
-                            style={[
-                              styles.statusDot,
-                              { backgroundColor: item.is_active ? '#22C55E' : '#EF4444' },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.statusText,
-                              { color: item.is_active ? '#15803D' : '#B91C1C' },
-                            ]}
-                          >
-                            {item.is_active ? 'Hoạt động' : 'Đã khóa'}
-                          </Text>
-                        </View>
-
-                        {/* Actions Col */}
-                        <View style={styles.actionsCol}>
+                        {/* Hàng dưới: Bộ nút thao tác xử lý nghiệp vụ */}
+                        <View style={styles.userBottomActions}>
                           {isProcessing ? (
                             <ActivityIndicator size="small" color="#2563EB" />
                           ) : (
                             <>
                               {/* Nút Đổi quyền */}
                               <Pressable
-                                style={styles.actionBtnSecondary}
+                                style={styles.actionChipBtn}
                                 onPress={() => handleChangeRole(item)}
                               >
                                 <Ionicons
-                                  name={item.role === 'ADMIN' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
-                                  size={15}
-                                  color="#4B5563"
+                                  name={
+                                    item.role === 'ADMIN'
+                                      ? 'arrow-down-circle-outline'
+                                      : 'arrow-up-circle-outline'
+                                  }
+                                  size={14}
+                                  color="#3B82F6"
                                 />
-                                <Text style={styles.actionBtnText}>
-                                  {item.role === 'ADMIN' ? 'Hạ USER' : 'Thăng ADMIN'}
+                                <Text style={[styles.actionChipText, { color: '#2563EB' }]}>
+                                  {item.role === 'ADMIN' ? 'Hạ xuống USER' : 'Thăng làm ADMIN'}
                                 </Text>
                               </Pressable>
 
-                              {/* Nút Khóa / Mở khóa */}
+                              {/* Nút Khóa / Mở */}
                               <Pressable
                                 style={[
-                                  styles.actionBtnSecondary,
-                                  item.is_active ? styles.btnDangerOutline : styles.btnSuccessOutline,
+                                  styles.actionChipBtn,
+                                  item.is_active ? styles.btnLock : styles.btnUnlock,
                                 ]}
                                 onPress={() => handleToggleStatus(item)}
                               >
                                 <Ionicons
                                   name={item.is_active ? 'lock-closed-outline' : 'lock-open-outline'}
-                                  size={14}
+                                  size={13}
                                   color={item.is_active ? '#DC2626' : '#16A34A'}
                                 />
                                 <Text
                                   style={[
-                                    styles.actionBtnText,
+                                    styles.actionChipText,
                                     { color: item.is_active ? '#DC2626' : '#16A34A' },
                                   ]}
                                 >
-                                  {item.is_active ? 'Khóa' : 'Mở'}
+                                  {item.is_active ? 'Khóa tài khoản' : 'Mở khóa'}
                                 </Text>
                               </Pressable>
 
-                              {/* Nút Xóa (không xóa chính mình) */}
+                              {/* Nút Xóa (trừ tài khoản của chính mình) */}
                               {!isSelf && (
                                 <Pressable
-                                  style={styles.actionBtnIconOnly}
+                                  style={styles.actionDeleteIconBtn}
                                   onPress={() => handleDeleteUser(item)}
                                   hitSlop={8}
                                 >
@@ -788,39 +868,39 @@ export default function AdminDashboardScreen() {
 
             {/* Chi tiết mục Trợ lý HQ AI & Bảo mật */}
             {activeMenu === 'ai' && (
-              <View style={[styles.tableCard, { marginTop: 20 }]}>
-                <Text style={styles.tableTitle}>Trí Tuệ Nhân Tạo HQ AI (Gemini Flash & Vector DB)</Text>
+              <View style={[styles.tableCard, { marginTop: 16 }]}>
+                <Text style={styles.tableTitle}>Trợ Lý Trí Tuệ Nhân Tạo HQ AI (Gemini Flash)</Text>
                 <Text style={styles.tableSubtitle}>
                   Chỉ mục hóa tin nhắn bằng TF-IDF Vector Space Model và kết nối Google Gemini API
                 </Text>
-                <View style={{ marginTop: 16, flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
-                  <View style={styles.aiInfoBox}>
-                    <Text style={styles.aiInfoNumber}>{stats?.vector_indexed_messages ?? 0}</Text>
-                    <Text style={styles.aiInfoLabel}>Vector tin nhắn đã lập chỉ mục</Text>
+                <View style={{ marginTop: 14, flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                  <View style={styles.infoBox}>
+                    <Text style={styles.infoBoxNumber}>{stats?.vector_indexed_messages ?? 0}</Text>
+                    <Text style={styles.infoBoxLabel}>Vector tin nhắn đã lập chỉ mục</Text>
                   </View>
-                  <View style={styles.aiInfoBox}>
-                    <Text style={[styles.aiInfoNumber, { color: '#16A34A' }]}>Sẵn sàng</Text>
-                    <Text style={styles.aiInfoLabel}>Bộ lọc PII Shield bảo mật thông tin</Text>
+                  <View style={styles.infoBox}>
+                    <Text style={[styles.infoBoxNumber, { color: '#16A34A' }]}>Sẵn sàng</Text>
+                    <Text style={styles.infoBoxLabel}>Bộ lọc PII Shield bảo mật thông tin</Text>
                   </View>
                 </View>
               </View>
             )}
 
             {activeMenu === 'security' && (
-              <View style={[styles.tableCard, { marginTop: 20 }]}>
-                <Text style={styles.tableTitle}>Nhật Ký Bảo Mật & Tiêu Chuẩn Truy Cập</Text>
+              <View style={[styles.tableCard, { marginTop: 16 }]}>
+                <Text style={styles.tableTitle}>Tiêu Chuẩn Bảo Mật & Quyền Riêng Tư</Text>
                 <Text style={styles.tableSubtitle}>
-                  Cơ chế RBAC (Role-Based Access Control) bảo vệ các API quản trị và ẩn tài khoản Quản trị viên
+                  Bảo vệ tài khoản Quản trị viên và phân quyền RBAC đa cấp độ
                 </Text>
                 <View style={{ marginTop: 12 }}>
-                  <Text style={styles.securityBullet}>
-                    • Tài khoản Quản trị viên được bảo vệ tuyệt đối: Người dùng thông thường không thể tìm kiếm hoặc gửi kết bạn tới Admin.
+                  <Text style={styles.securityItem}>
+                    ✓ Ẩn tài khoản Admin: Người dùng thông thường không nhìn thấy tài khoản của Quản trị viên trong tìm kiếm hay gợi ý.
                   </Text>
-                  <Text style={styles.securityBullet}>
-                    • JWT Secret Signature xác thực trên từng phiên request.
+                  <Text style={styles.securityItem}>
+                    ✓ Chặn kết bạn tới Admin: Gateway tự động từ chối mọi yêu cầu kết bạn gửi đến tài khoản Quản trị.
                   </Text>
-                  <Text style={styles.securityBullet}>
-                    • Mã hóa mật khẩu an toàn với hàm băm SHA-256 tiêu chuẩn.
+                  <Text style={styles.securityItem}>
+                    ✓ Mã hóa đường truyền an toàn TLS 1.3 và băm mật khẩu chuẩn SHA-256.
                   </Text>
                 </View>
               </View>
@@ -896,7 +976,7 @@ export default function AdminDashboardScreen() {
                 >
                   <Ionicons
                     name="person-outline"
-                    size={16}
+                    size={15}
                     color={newRole === 'USER' ? '#2563EB' : '#64748B'}
                   />
                   <Text
@@ -918,8 +998,8 @@ export default function AdminDashboardScreen() {
                 >
                   <Ionicons
                     name="shield-checkmark-outline"
-                    size={16}
-                    color={newRole === 'ADMIN' ? '#6366F1' : '#64748B'}
+                    size={15}
+                    color={newRole === 'ADMIN' ? '#4F46E5' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -957,14 +1037,14 @@ export default function AdminDashboardScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeContainer: {
+  rootContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
@@ -973,7 +1053,7 @@ const styles = StyleSheet.create({
 
   // Sidebar Styles
   sidebar: {
-    width: 260,
+    width: 270,
     backgroundColor: '#FFFFFF',
     borderRightWidth: 1,
     borderRightColor: '#E2E8F0',
@@ -983,38 +1063,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   logoBadge: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   brandTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   brandSub: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#64748B',
+    marginTop: 1,
+  },
+  sidebarAdminCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sidebarAdminAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  sidebarAdminAvatarText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  sidebarAdminName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  sidebarAdminRoleTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginTop: 3,
+  },
+  sidebarAdminRoleText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#4F46E5',
   },
   menuScroll: {
     flex: 1,
     paddingHorizontal: 14,
-    paddingTop: 16,
+    paddingTop: 12,
   },
   menuGroupHeader: {
     fontSize: 11,
@@ -1022,21 +1142,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     letterSpacing: 0.5,
     marginBottom: 8,
-    marginLeft: 10,
+    marginLeft: 8,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 11,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   menuItemActive: {
     backgroundColor: '#EFF6FF',
   },
   menuItemText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#475569',
     marginLeft: 10,
@@ -1048,12 +1168,12 @@ const styles = StyleSheet.create({
   },
   menuBadge: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   menuBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
   },
@@ -1061,27 +1181,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    gap: 8,
-  },
-  switchAppButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    gap: 6,
-  },
-  switchAppText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2563EB',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 11,
     backgroundColor: '#FEF2F2',
     borderRadius: 8,
     gap: 6,
@@ -1099,180 +1204,161 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   topBar: {
-    height: 70,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
+    paddingBottom: 14,
   },
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    flex: 1,
   },
   hamburgerBtn: {
     padding: 6,
-    marginRight: 4,
-  },
-  breadcrumb: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
   },
   pageTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  breadcrumb: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 10,
   },
   refreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
   },
   refreshText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#2563EB',
   },
-  adminProfileBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  adminAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2563EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  adminAvatarText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  adminNameText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  adminRoleTag: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#6366F1',
+  adminMiniBadge: {
+    padding: 7,
+    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
   },
 
   bodyScroll: {
     flex: 1,
   },
   bodyScrollContent: {
-    padding: 24,
-    paddingBottom: 48,
+    padding: 16,
+    paddingBottom: 40,
   },
 
-  // KPI Metrics Grid
-  kpiGrid: {
+  // KPI Grid 2x2 CỰC GỌN TRÊN MOBILE
+  kpiGridCompact: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 16,
   },
-  kpiCard: {
-    flex: 1,
-    minWidth: 200,
+  kpiCardCompact: {
+    width: '48.5%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
     elevation: 1,
   },
-  kpiHeaderRow: {
+  kpiCompactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  kpiLabel: {
-    fontSize: 11,
+  kpiCompactLabel: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
-  kpiGrowthBadge: {
+  kpiIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiCompactValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 3,
+    justifyContent: 'space-between',
+    marginBottom: 2,
   },
-  kpiGrowthText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  kpiValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  kpiValueNumber: {
-    fontSize: 26,
+  kpiCompactNumber: {
+    fontSize: 22,
     fontWeight: '800',
     color: '#0F172A',
   },
-  kpiSubText: {
-    fontSize: 13,
+  kpiMiniTag: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  kpiMiniTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  kpiCompactSub: {
+    fontSize: 11,
     color: '#94A3B8',
   },
 
   // Table Card
   tableCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
     elevation: 2,
   },
   tableHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  tableTitleRow: {
-    flex: 1,
+    marginBottom: 12,
+    gap: 10,
   },
   tableTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
   },
   tableSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
@@ -1280,45 +1366,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2563EB',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
   },
   addUserText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-  },
-
-  // Filter Tabs
-  filterRow: {
-    marginBottom: 14,
-  },
-  filterScroll: {
-    flexDirection: 'row',
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    marginRight: 8,
-  },
-  filterChipActive: {
-    backgroundColor: '#2563EB',
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterChipTextActive: {
-    color: '#fff',
   },
 
   // Search
@@ -1329,52 +1384,68 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: '#0F172A',
   },
 
-  // User Row Card
+  // Filter Row
+  filterRow: {
+    marginBottom: 14,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    marginRight: 6,
+  },
+  filterChipActive: {
+    backgroundColor: '#2563EB',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+  },
+
+  // User List Cards
   userListContainer: {
-    gap: 10,
+    gap: 8,
   },
   userRowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    flexWrap: 'wrap',
-    gap: 12,
+    padding: 12,
   },
-  userMainCol: {
+  userTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    minWidth: 220,
   },
   userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   userAvatarText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
-  userTextInfo: {
+  userMainInfo: {
     flex: 1,
   },
   userNameRow: {
@@ -1392,24 +1463,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderRadius: 4,
     gap: 3,
   },
   roleBadgeAdminText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    color: '#6366F1',
+    color: '#4F46E5',
+  },
+  roleBadgeUser: {
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  roleBadgeUserText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#0284C7',
   },
   roleBadgeSelf: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderRadius: 4,
   },
   roleBadgeSelfText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     color: '#64748B',
   },
@@ -1418,115 +1500,115 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
-
-  statusCol: {
+  statusBadgeWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    minWidth: 100,
+    gap: 5,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
 
-  actionsCol: {
+  // Bottom Actions Row
+  userBottomActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+    gap: 6,
   },
-  actionBtnSecondary: {
+  actionChipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#F1F5F9',
     gap: 4,
   },
-  btnDangerOutline: {
+  btnLock: {
     backgroundColor: '#FEF2F2',
   },
-  btnSuccessOutline: {
+  btnUnlock: {
     backgroundColor: '#F0FDF4',
   },
-  actionBtnText: {
-    fontSize: 12,
+  actionChipText: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#4B5563',
   },
-  actionBtnIconOnly: {
+  actionDeleteIconBtn: {
     padding: 6,
-    borderRadius: 6,
+    marginLeft: 'auto',
   },
 
-  // AI & Security Cards
-  aiInfoBox: {
+  // AI & Security Info Boxes
+  infoBox: {
     flex: 1,
-    minWidth: 180,
-    padding: 16,
-    borderRadius: 10,
+    minWidth: 140,
+    padding: 12,
+    borderRadius: 8,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  aiInfoNumber: {
-    fontSize: 22,
+  infoBoxNumber: {
+    fontSize: 18,
     fontWeight: '800',
     color: '#4F46E5',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  aiInfoLabel: {
-    fontSize: 12,
+  infoBoxLabel: {
+    fontSize: 11,
     color: '#64748B',
   },
-  securityBullet: {
-    fontSize: 13,
+  securityItem: {
+    fontSize: 12,
     color: '#334155',
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: 6,
   },
 
   // Loading & Empty
   loadingContainer: {
-    padding: 40,
+    padding: 30,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
-    marginTop: 10,
+    marginTop: 8,
   },
   emptyContainer: {
-    padding: 40,
+    padding: 30,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#475569',
-    marginTop: 12,
+    marginTop: 10,
   },
   emptySubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#94A3B8',
     marginTop: 4,
   },
 
-  // Modal Styles
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   mobileDrawerContainer: {
     height: '100%',
@@ -1535,66 +1617,61 @@ const styles = StyleSheet.create({
   },
   addUserModalContent: {
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 440,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    borderRadius: 14,
+    padding: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
   },
   modalSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   formLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#334155',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   formInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
     color: '#0F172A',
   },
   rolePickerRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   roleOptionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    gap: 6,
+    gap: 5,
   },
   roleOptionBtnActive: {
     backgroundColor: '#EFF6FF',
@@ -1602,10 +1679,10 @@ const styles = StyleSheet.create({
   },
   roleOptionBtnActiveAdmin: {
     backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
+    borderColor: '#4F46E5',
   },
   roleOptionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
   },
@@ -1614,18 +1691,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   roleOptionTextActiveAdmin: {
-    color: '#6366F1',
+    color: '#4F46E5',
     fontWeight: '700',
   },
   modalActionsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 24,
+    gap: 10,
+    marginTop: 20,
   },
   modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
   },
@@ -1635,8 +1712,8 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   modalSubmitBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
     borderRadius: 8,
     backgroundColor: '#2563EB',
   },

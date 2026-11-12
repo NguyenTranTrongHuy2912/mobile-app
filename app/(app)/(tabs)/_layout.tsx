@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View} from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, Redirect } from 'expo-router';
+import { useAppSelector } from '../../../src/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { useGetFriendRequestsQuery, useGetRoomsQuery } from '../../../src/api/chatApi';
 import { colors } from '../../../src/theme';
@@ -19,6 +20,12 @@ const tabIcon =
 
 export default function TabsLayout() {
   const router = useRouter();
+  const role = useAppSelector((s) => s.session.role);
+
+  // Admin chỉ đảm nhiệm quản lý, không vào giao diện chat
+  if (role === 'ADMIN') {
+    return <Redirect href="/admin" />;
+  }
 
   // Tổng số tin chưa đọc của mọi phòng, dùng chung cache với danh sách phòng
   const { friendRequestCount } = useGetFriendRequestsQuery(undefined, {
