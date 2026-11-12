@@ -16,7 +16,7 @@ export interface OtpInfo {
 
 // Gateway gọi Java qua gRPC (mặc định timeout 5s) và gửi mail nằm trong lệnh gọi đó,
 // nên timeout phía app để rộng hơn.
-const http = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 20000 });
+const http = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 45000 });
 
 // Gateway trả lỗi dạng { detail: string } (hoặc mảng nếu sai định dạng body, mã 422)
 function toError(e: unknown, fallback: string): Error {
