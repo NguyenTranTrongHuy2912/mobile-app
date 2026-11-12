@@ -78,6 +78,13 @@ export const chatApi = createApi({
       keepUnusedDataFor: 30,
     }),
 
+    getSuggestedUsers: build.query<UserSummary[], void>({
+      query: () => '/api/v1/users/suggestions',
+      transformResponse: (res: SearchUsersResponse): UserSummary[] =>
+        res.users.map((u) => ({ userId: u.user_id, displayName: u.display_name, email: u.email })),
+      providesTags: ['Friend'],
+    }),
+
     // direct: memberIds có đúng 1 người; group: cần name và ít nhất 2 người
     createRoom: build.mutation<Room, { type: RoomType; name?: string; memberIds: string[] }>({
       query: ({ type, name, memberIds }) => {
@@ -447,6 +454,7 @@ export const chatApi = createApi({
 export const {
   useGetRoomsQuery,
   useSearchUsersQuery,
+  useGetSuggestedUsersQuery,
   useCreateRoomMutation,
   useMarkRoomReadMutation,
   useGetMessagesQuery,

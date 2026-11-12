@@ -15,7 +15,7 @@ interface ScalePressableProps extends PressableProps {
 
 /**
  * Component nút bấm có hiệu ứng nảy (Scale/Spring animation)
- * Đáp ứng tiêu chí "Animation basic" theo yêu cầu của Giảng viên.
+ * Đáp ứng tiêu chí "Animation basic" chuẩn trải nghiệm người dùng.
  */
 export default function ScalePressable({
   style,

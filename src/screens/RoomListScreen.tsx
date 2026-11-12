@@ -24,6 +24,7 @@ import FloatingAiButton from '../components/FloatingAiButton';
 import UserNoteModal from '../components/UserNoteModal';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
+import { colors } from '../theme';
 
 const POLL_MS = 20000;
 
@@ -327,13 +328,43 @@ export default function RoomListScreen() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            {filter === 'unread'
-              ? 'Không có tin nhắn chưa đọc nào.'
-              : filter === 'group'
-              ? 'Chưa có nhóm chat nào.'
-              : 'Chưa có cuộc trò chuyện nào.'}
-          </Text>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons
+                name={filter === 'unread' ? 'checkmark-done-circle' : filter === 'group' ? 'people' : 'chatbubbles'}
+                size={40}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {filter === 'unread'
+                ? 'Đã đọc hết tin nhắn!'
+                : filter === 'group'
+                ? 'Chưa có nhóm chat'
+                : 'Chưa có cuộc trò chuyện nào'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {filter === 'unread'
+                ? 'Hộp thư của bạn đang rất gọn gàng và không có tin nhắn nào bị bỏ lỡ.'
+                : filter === 'group'
+                ? 'Tạo ngay nhóm trò chuyện để kết nối cùng bạn bè và đồng nghiệp.'
+                : 'Khám phá bạn bè mới hoặc bắt đầu gửi tin nhắn ngay bây giờ!'}
+            </Text>
+            <Pressable
+              style={styles.emptyCtaButton}
+              onPress={() => router.push(filter === 'group' ? '/new-group' : '/new-chat')}
+            >
+              <Ionicons
+                name={filter === 'group' ? 'people-outline' : 'person-add-outline'}
+                size={18}
+                color="#fff"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.emptyCtaText}>
+                {filter === 'group' ? 'Tạo nhóm mới' : 'Bắt đầu cuộc trò chuyện'}
+              </Text>
+            </Pressable>
+          </View>
         }
       />
 
@@ -393,6 +424,54 @@ const styles = StyleSheet.create({
   retryText: { color: '#fff', fontWeight: '600' },
   list: { flexGrow: 1, backgroundColor: '#fff', paddingBottom: 16 },
   empty: { textAlign: 'center', color: '#8A8D91', marginTop: 40, paddingHorizontal: 24, fontSize: 14 },
+  emptyCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 44,
+    marginHorizontal: 16,
+    marginTop: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F0F2F5',
+  },
+  emptyIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.subtext,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  emptyCtaText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 
   // List Header Styles
   listHeaderContainer: {

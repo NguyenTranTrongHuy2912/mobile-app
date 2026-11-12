@@ -22,7 +22,7 @@ interface AiSummarizeModalProps {
 
 /**
  * Modal hiển thị bản tóm tắt cuộc trò chuyện nhóm từ AI
- * Đáp ứng tiêu chí "AI basic" theo yêu cầu của Giảng viên.
+ * Đáp ứng tiêu chí "AI basic" chuẩn trải nghiệm người dùng.
  */
 export default function AiSummarizeModal({
   visible,

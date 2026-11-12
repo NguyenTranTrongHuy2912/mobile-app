@@ -69,7 +69,7 @@ export default function SemanticSearchModal({
               <Ionicons name="search" size={18} color="#65676B" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.input}
-                placeholder="Tìm theo ý nghĩa (VD: học phí, đồ án, quán ăn...)"
+                placeholder="Tìm theo ý nghĩa (VD: kế hoạch công việc, tài liệu, lịch họp...)"
                 placeholderTextColor="#8A8D91"
                 value={query}
                 onChangeText={setQuery}

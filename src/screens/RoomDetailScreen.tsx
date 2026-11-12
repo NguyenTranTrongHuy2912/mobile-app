@@ -23,7 +23,7 @@ import SemanticSearchModal from '../components/SemanticSearchModal';
 
 /**
  * Màn hình Chi tiết phòng chat / Quản lý nhóm
- * Đáp ứng tiêu chí "10-15 màn hình" và "Quản lý nhóm" theo yêu cầu của Giảng viên.
+ * Đáp ứng tiêu chí "10-15 màn hình" và "Quản lý nhóm" chuẩn trải nghiệm người dùng.
  */
 export default function RoomDetailScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
