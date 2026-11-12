@@ -5,6 +5,10 @@
 # dependencies
 node_modules/
 
+# graphify
+graphify-out/*
+!graphify-out/graph.json 
+
 # Expo
 .expo/
 dist/
