@@ -73,13 +73,17 @@ export default function AdminDashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  // Modal Thêm người dùng mới
+  // Modal Thêm người dùng mới với xác thực mã OTP
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'USER' | 'ADMIN'>('USER');
   const [isSubmittingNewUser, setIsSubmittingNewUser] = useState(false);
+  const [otpStep, setOtpStep] = useState<'form' | 'otp'>('form');
+  const [otpCode, setOtpCode] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
 
   // Fetch dữ liệu từ Gateway
   const fetchData = useCallback(async () => {
@@ -249,14 +253,62 @@ export default function AdminDashboardScreen() {
     );
   };
 
-  // Tạo người dùng mới qua Admin API
-  const handleCreateUser = async () => {
-    if (!newEmail.trim() || !newEmail.includes('@')) {
+  // Đếm ngược gửi lại mã OTP
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = setTimeout(() => setOtpCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
+
+  // Bước 1: Admin yêu cầu gửi mã OTP về email của người dùng mới
+  const handleRequestOtpForNewUser = async () => {
+    const cleanMail = newEmail.trim().toLowerCase();
+    if (!cleanMail || !cleanMail.includes('@') || !cleanMail.includes('.')) {
       Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ email hợp lệ.');
       return;
     }
     if (!newPassword || newPassword.length < 6) {
       Alert.alert('Thông báo', 'Mật khẩu phải có độ dài ít nhất 6 ký tự.');
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/admin/request-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          account: cleanMail,
+          display_name: newName.trim() || cleanMail.split('@')[0],
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert(
+          'Đã gửi mã OTP',
+          `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư "${cleanMail}". Vui lòng kiểm tra hộp thư đến (hoặc thư rác Spam) để lấy mã xác thực.`,
+          [{ text: 'Nhập mã ngay' }]
+        );
+        setOtpStep('otp');
+        setOtpCooldown(60);
+        setOtpCode('');
+      } else {
+        Alert.alert('Lỗi', data.detail || 'Không thể gửi mã xác thực OTP.');
+      }
+    } catch {
+      Alert.alert('Lỗi', 'Lỗi kết nối máy chủ khi gửi mã OTP.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Bước 2: Admin xác thực mã OTP và hoàn tất tạo người dùng mới
+  const handleCreateUser = async () => {
+    if (!otpCode.trim() || otpCode.trim().length < 4) {
+      Alert.alert('Thông báo', 'Vui lòng nhập mã xác thực OTP gồm 6 chữ số đã được gửi về email.');
       return;
     }
     setIsSubmittingNewUser(true);
@@ -272,22 +324,25 @@ export default function AdminDashboardScreen() {
           display_name: newName.trim() || newEmail.split('@')[0],
           password: newPassword,
           role: newRole,
+          otp_code: otpCode.trim(),
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        Alert.alert('Thành công', 'Đã thêm người dùng mới thành công!');
+        Alert.alert('Thành công', 'Đã xác thực OTP và tạo tài khoản người dùng mới thành công!');
         setShowAddModal(false);
         setNewEmail('');
         setNewName('');
         setNewPassword('');
+        setOtpCode('');
+        setOtpStep('form');
         setNewRole('USER');
         fetchData();
       } else {
-        Alert.alert('Lỗi', data.detail || 'Không thể tạo người dùng.');
+        Alert.alert('Lỗi', data.detail || 'Mã xác thực OTP không đúng hoặc đã hết hạn.');
       }
     } catch {
-      Alert.alert('Lỗi', 'Lỗi kết nối máy chủ.');
+      Alert.alert('Lỗi', 'Lỗi kết nối máy chủ khi xác thực tạo tài khoản.');
     } finally {
       setIsSubmittingNewUser(false);
     }
@@ -909,131 +964,215 @@ export default function AdminDashboardScreen() {
         </View>
       </View>
 
-      {/* Modal Thêm Người Dùng Mới */}
+      {/* Modal Thêm Người Dùng Mới với Quy Trình Xác Thực OTP Bắt Buộc */}
       <Modal
         visible={showAddModal}
         animationType="fade"
         transparent
-        onRequestClose={() => setShowAddModal(false)}
+        onRequestClose={() => {
+          setShowAddModal(false);
+          setOtpStep('form');
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.addUserModalContent}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Thêm Người Dùng Mới</Text>
-                <Text style={styles.modalSubtitle}>Tạo tài khoản trực tiếp từ hệ thống quản trị</Text>
+                <Text style={styles.modalSubtitle}>
+                  {otpStep === 'form'
+                    ? 'Bước 1: Nhập thông tin & gửi mã OTP xác thực'
+                    : 'Bước 2: Nhập mã OTP đã gửi về email'}
+                </Text>
               </View>
-              <Pressable onPress={() => setShowAddModal(false)} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  setShowAddModal(false);
+                  setOtpStep('form');
+                }}
+                hitSlop={8}
+              >
                 <Ionicons name="close" size={24} color="#64748B" />
               </Pressable>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Họ và tên hiển thị</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="VD: Nguyễn Văn A"
-                placeholderTextColor="#94A3B8"
-                value={newName}
-                onChangeText={setNewName}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Địa chỉ Email</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="VD: user@chatapp.com"
-                placeholderTextColor="#94A3B8"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={newEmail}
-                onChangeText={setNewEmail}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Mật khẩu ban đầu</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Tối thiểu 6 ký tự"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Vai trò tài khoản (Role)</Text>
-              <View style={styles.rolePickerRow}>
-                <Pressable
-                  style={[
-                    styles.roleOptionBtn,
-                    newRole === 'USER' && styles.roleOptionBtnActive,
-                  ]}
-                  onPress={() => setNewRole('USER')}
-                >
-                  <Ionicons
-                    name="person-outline"
-                    size={15}
-                    color={newRole === 'USER' ? '#2563EB' : '#64748B'}
+            {otpStep === 'form' ? (
+              <>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Họ và tên hiển thị</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="VD: Nguyễn Văn A"
+                    placeholderTextColor="#94A3B8"
+                    value={newName}
+                    onChangeText={setNewName}
                   />
-                  <Text
-                    style={[
-                      styles.roleOptionText,
-                      newRole === 'USER' && styles.roleOptionTextActive,
-                    ]}
-                  >
-                    Thành viên (USER)
-                  </Text>
-                </Pressable>
+                </View>
 
-                <Pressable
-                  style={[
-                    styles.roleOptionBtn,
-                    newRole === 'ADMIN' && styles.roleOptionBtnActiveAdmin,
-                  ]}
-                  onPress={() => setNewRole('ADMIN')}
-                >
-                  <Ionicons
-                    name="shield-checkmark-outline"
-                    size={15}
-                    color={newRole === 'ADMIN' ? '#4F46E5' : '#64748B'}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Địa chỉ Email nhận OTP</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="VD: user@chatapp.com"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={newEmail}
+                    onChangeText={setNewEmail}
                   />
-                  <Text
-                    style={[
-                      styles.roleOptionText,
-                      newRole === 'ADMIN' && styles.roleOptionTextActiveAdmin,
-                    ]}
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Mật khẩu khởi tạo</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Tối thiểu 6 ký tự"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Vai trò tài khoản (Role)</Text>
+                  <View style={styles.rolePickerRow}>
+                    <Pressable
+                      style={[
+                        styles.roleOptionBtn,
+                        newRole === 'USER' && styles.roleOptionBtnActive,
+                      ]}
+                      onPress={() => setNewRole('USER')}
+                    >
+                      <Ionicons
+                        name="person-outline"
+                        size={15}
+                        color={newRole === 'USER' ? '#2563EB' : '#64748B'}
+                      />
+                      <Text
+                        style={[
+                          styles.roleOptionText,
+                          newRole === 'USER' && styles.roleOptionTextActive,
+                        ]}
+                      >
+                        Thành viên (USER)
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.roleOptionBtn,
+                        newRole === 'ADMIN' && styles.roleOptionBtnActiveAdmin,
+                      ]}
+                      onPress={() => setNewRole('ADMIN')}
+                    >
+                      <Ionicons
+                        name="shield-checkmark-outline"
+                        size={15}
+                        color={newRole === 'ADMIN' ? '#4F46E5' : '#64748B'}
+                      />
+                      <Text
+                        style={[
+                          styles.roleOptionText,
+                          newRole === 'ADMIN' && styles.roleOptionTextActiveAdmin,
+                        ]}
+                      >
+                        Quản trị viên (ADMIN)
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {/* Modal Buttons Form Step */}
+                <View style={styles.modalActionsRow}>
+                  <Pressable
+                    style={styles.modalCancelBtn}
+                    onPress={() => setShowAddModal(false)}
                   >
-                    Quản trị viên (ADMIN)
+                    <Text style={styles.modalCancelText}>Hủy</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.modalSubmitBtn}
+                    onPress={handleRequestOtpForNewUser}
+                    disabled={isSendingOtp}
+                  >
+                    {isSendingOtp ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="mail" size={14} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={styles.modalSubmitText}>Gửi mã OTP xác thực</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Bước 2: Nhập mã OTP đã gửi */}
+                <View style={styles.otpNoticeBox}>
+                  <Ionicons name="mail-open-outline" size={24} color="#2563EB" style={{ marginBottom: 6 }} />
+                  <Text style={styles.otpNoticeTitle}>Đã gửi mã xác thực OTP!</Text>
+                  <Text style={styles.otpNoticeSub}>
+                    Mã 6 chữ số đã được gửi đến email <Text style={{ fontWeight: '700', color: '#0F172A' }}>{newEmail}</Text>. Vui lòng kiểm tra hộp thư đến (hoặc thư rác/Spam).
                   </Text>
-                </Pressable>
-              </View>
-            </View>
+                </View>
 
-            {/* Modal Buttons */}
-            <View style={styles.modalActionsRow}>
-              <Pressable
-                style={styles.modalCancelBtn}
-                onPress={() => setShowAddModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Hủy</Text>
-              </Pressable>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Mã xác thực OTP (6 chữ số)</Text>
+                  <TextInput
+                    style={[styles.formInput, styles.otpBigInput]}
+                    placeholder="• • • • • •"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={otpCode}
+                    onChangeText={setOtpCode}
+                    autoFocus
+                  />
+                </View>
 
-              <Pressable
-                style={styles.modalSubmitBtn}
-                onPress={handleCreateUser}
-                disabled={isSubmittingNewUser}
-              >
-                {isSubmittingNewUser ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Tạo tài khoản</Text>
-                )}
-              </Pressable>
-            </View>
+                <View style={styles.resendRow}>
+                  {otpCooldown > 0 ? (
+                    <Text style={styles.resendCooldownText}>
+                      Gửi lại mã sau {otpCooldown}s
+                    </Text>
+                  ) : (
+                    <Pressable onPress={handleRequestOtpForNewUser} disabled={isSendingOtp}>
+                      <Text style={styles.resendActionText}>
+                        {isSendingOtp ? 'Đang gửi lại...' : 'Chưa nhận được mã? Gửi lại ngay'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Modal Buttons OTP Step */}
+                <View style={styles.modalActionsRow}>
+                  <Pressable
+                    style={styles.modalCancelBtn}
+                    onPress={() => setOtpStep('form')}
+                  >
+                    <Text style={styles.modalCancelText}>Quay lại</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.modalSubmitBtn}
+                    onPress={handleCreateUser}
+                    disabled={isSubmittingNewUser}
+                  >
+                    {isSubmittingNewUser ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={15} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={styles.modalSubmitText}>Xác thực OTP & Tạo</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1721,5 +1860,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#fff',
+  },
+  otpNoticeBox: {
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  otpNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E40AF',
+    marginBottom: 2,
+  },
+  otpNoticeSub: {
+    fontSize: 12,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  otpBigInput: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 6,
+    textAlign: 'center',
+    paddingVertical: 12,
+    color: '#2563EB',
+    backgroundColor: '#F8FAFC',
+  },
+  resendRow: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resendCooldownText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  resendActionText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '700',
   },
 });
