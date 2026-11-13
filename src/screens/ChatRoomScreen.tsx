@@ -37,6 +37,8 @@ import {
 } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
+import { startOutgoingCall } from '../features/call/callSlice';
+import { sendCallSignal } from '../features/call/callSignalEmitter';
 import { newId } from '../utils/newId';
 import { useSendImage, type PickedImage } from '../features/chat/useSendImage';
 import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
@@ -268,6 +270,28 @@ export default function ChatRoomScreen() {
       ),
       headerRight: () => (
         <View style={styles.headerRightActions}>
+          {isDirect && (
+            <>
+              {/* Nút Gọi Thoại (Audio Call) */}
+              <Pressable
+                onPress={() => handleStartCall('audio')}
+                hitSlop={8}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="call" size={21} color="#0084FF" />
+              </Pressable>
+
+              {/* Nút Gọi Video (Video Call) */}
+              <Pressable
+                onPress={() => handleStartCall('video')}
+                hitSlop={8}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="videocam" size={23} color="#0084FF" />
+              </Pressable>
+            </>
+          )}
+
           {!isDirect && (
             <ScalePressable
               style={styles.summarizeHeaderBtn}
@@ -339,6 +363,45 @@ export default function ChatRoomScreen() {
     () => new Map((currentRoom?.members ?? []).map((m) => [m.userId, m.displayName] as const)),
     [currentRoom],
   );
+
+  const myDisplayName = useAppSelector((s) => s.session.displayName) || 'Tôi';
+
+  const handleStartCall = (type: 'audio' | 'video') => {
+    if (!isDirect) {
+      Alert.alert('Thông báo', 'Tính năng gọi nhóm đang được phát triển. Vui lòng gọi trong cuộc trò chuyện 1-1.');
+      return;
+    }
+    if (!otherMember) {
+      Alert.alert('Lỗi', 'Không tìm thấy thông tin người nhận cuộc gọi.');
+      return;
+    }
+    if (otherMember.userId === 'hq_ai_bot') {
+      Alert.alert('Thông báo', 'Không thể gọi điện cho Trợ lý ảo HQ AI.');
+      return;
+    }
+
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    dispatch(
+      startOutgoingCall({
+        callId,
+        roomId,
+        receiverId: otherMember.userId,
+        receiverName: otherMember.displayName,
+        callerId: userId,
+        callerName: myDisplayName,
+        callType: type,
+      }),
+    );
+    sendCallSignal({
+      type: 'CALL_OFFER',
+      call_id: callId,
+      room_id: roomId,
+      caller_id: userId,
+      caller_name: myDisplayName,
+      receiver_id: otherMember.userId,
+      call_type: type,
+    });
+  };
 
   // Đánh dấu đã đọc khi mở phòng và mỗi khi có tin mới từ người khác
   const lastIncomingId = useMemo(() => {
@@ -528,6 +591,33 @@ export default function ChatRoomScreen() {
               <ChatVideo message={item} />
             ) : isBigEmoji ? (
               <Text style={styles.textBigEmoji}>{item.content}</Text>
+            ) : item.content.startsWith('📞') || item.content.startsWith('📹') || item.content.startsWith('❌') || item.content.startsWith('🚫') ? (
+              <View style={styles.callBubbleContent}>
+                <View style={[styles.callIconBadge, (item.content.startsWith('❌') || item.content.startsWith('🚫')) && styles.callIconMissed]}>
+                  <Ionicons
+                    name={item.content.includes('video') ? 'videocam' : 'call'}
+                    size={18}
+                    color="#fff"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={[styles.callTitleText, mine && { color: '#fff' }]}>
+                    {item.content.includes('video') ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}
+                  </Text>
+                  <Text style={[styles.callSubText, mine && { color: 'rgba(255,255,255,0.85)' }]}>
+                    {item.content}
+                  </Text>
+                </View>
+                {isDirect && (
+                  <Pressable
+                    style={[styles.callBackBtn, mine && { backgroundColor: 'rgba(255,255,255,0.25)' }]}
+                    onPress={() => handleStartCall(item.content.includes('video') ? 'video' : 'audio')}
+                    hitSlop={6}
+                  >
+                    <Text style={[styles.callBackBtnText, mine && { color: '#fff' }]}>Gọi lại</Text>
+                  </Pressable>
+                )}
+              </View>
             ) : (
               <Text style={mine ? styles.textMine : isHqAi ? styles.textAi : styles.textOther}>{displayContent}</Text>
             )}
@@ -885,6 +975,45 @@ const makeStyles = (C: ScreenColors) =>
     alignItems: 'center',
     gap: 8,
     marginRight: 6,
+  },
+  callBubbleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    minWidth: 200,
+  },
+  callIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#38A169',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  callIconMissed: {
+    backgroundColor: '#E53E3E',
+  },
+  callTitleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#050505',
+  },
+  callSubText: {
+    fontSize: 12,
+    color: '#65676B',
+    marginTop: 2,
+  },
+  callBackBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#E7F3FF',
+    marginLeft: 8,
+  },
+  callBackBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0084FF',
   },
   summarizeHeaderBtn: {
     flexDirection: 'row',

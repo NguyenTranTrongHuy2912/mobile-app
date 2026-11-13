@@ -4,6 +4,7 @@ import chatReducer from '../features/chat/chatSlice';
 import sessionReducer from '../features/session/sessionSlice';
 import presenceReducer from '../features/presence/presenceSlice';
 import themeReducer from '../features/theme/themeSlice';
+import callReducer from '../features/call/callSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     session: sessionReducer,
     presence: presenceReducer,
     theme: themeReducer,
+    call: callReducer,
   },
   middleware: (getDefault) => getDefault().concat(chatApi.middleware),
 });

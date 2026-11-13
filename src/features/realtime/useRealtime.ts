@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Vibration } from 'react-native';
+import {
+  receiveIncomingCall,
+  callConnected,
+  setCallEnded,
+} from '../call/callSlice';
+import { registerCallWebSocketProvider } from '../call/callSignalEmitter';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
@@ -114,6 +120,7 @@ export function useRealtime() {
         const url = `${WS_URL}/api/v1/ws?token=${encodeURIComponent(token)}`;
         const ws = new WebSocket(url);
         wsRef.current = ws;
+        registerCallWebSocketProvider(() => wsRef.current);
 
         ws.onopen = () => {
           if (!isSubscribed) return;
@@ -230,6 +237,38 @@ export function useRealtime() {
             } else if (data.type === 'USER_PRESENCE') {
               const p = data as any;
               dispatch(setUserPresence({ userId: p.user_id, isOnline: !!p.is_online, lastSeen: p.last_seen }));
+            } else if (data.type === 'CALL_OFFER') {
+              const offer = data as any;
+              Vibration.vibrate([500, 1000, 500, 1000], true);
+              dispatch(
+                receiveIncomingCall({
+                  callId: offer.call_id,
+                  roomId: offer.room_id,
+                  callerId: offer.caller_id,
+                  callerName: offer.caller_name || 'Người dùng',
+                  callerAvatar: offer.caller_avatar,
+                  receiverId: offer.receiver_id,
+                  callType: offer.call_type || 'audio',
+                })
+              );
+            } else if (data.type === 'CALL_ANSWER') {
+              const ans = data as any;
+              if (ans.accepted) {
+                Vibration.cancel();
+                dispatch(callConnected());
+              }
+            } else if (data.type === 'CALL_HANGUP') {
+              Vibration.cancel();
+              const hang = data as any;
+              dispatch(setCallEnded({ reason: hang.message || 'Cuộc gọi đã kết thúc' }));
+            } else if (data.type === 'CALL_UNAVAILABLE') {
+              Vibration.cancel();
+              const un = data as any;
+              dispatch(setCallEnded({ reason: un.message || 'Người dùng hiện không trực tuyến' }));
+            } else if (data.type === 'CALL_BUSY') {
+              Vibration.cancel();
+              const b = data as any;
+              dispatch(setCallEnded({ reason: b.message || 'Người dùng đang bận' }));
             }
           } catch (err) {
             console.warn('[Realtime] Parse message error:', err);

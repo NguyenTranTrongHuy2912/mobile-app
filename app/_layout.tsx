@@ -8,6 +8,7 @@ import { TamaguiProvider, Theme } from 'tamagui'; // Thêm import Theme
 import { store } from '../src/store';
 import { tamaguiConfig } from '../tamagui.config';
 import SessionBootstrap from '../src/features/session/SessionBootstrap';
+import CallModal from '../src/components/call/CallModal';
 import { chatApi } from '../src/api/chatApi';
 import { useAppDispatch, useAppSelector } from '../src/store/hooks';
 import { useRealtime } from '../src/features/realtime/useRealtime';
@@ -48,6 +49,7 @@ function InnerRoot() {
         <SafeAreaProvider>
           <SessionBootstrap>
             <Routes />
+            <CallModal />
             <StatusBar style={isDark ? 'light' : 'dark'} />
           </SessionBootstrap>
         </SafeAreaProvider>
