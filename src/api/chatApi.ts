@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../config';
 import type { RootState } from '../store';
+import { logout } from '../features/session/sessionSlice';
 import type {
   CreateRoomRequest,
   Friend,
@@ -77,6 +78,13 @@ export const chatApi = createApi({
       keepUnusedDataFor: 30,
     }),
 
+    getSuggestedUsers: build.query<UserSummary[], void>({
+      query: () => '/api/v1/users/suggestions',
+      transformResponse: (res: SearchUsersResponse): UserSummary[] =>
+        res.users.map((u) => ({ userId: u.user_id, displayName: u.display_name, email: u.email })),
+      providesTags: ['Friend'],
+    }),
+
     // direct: memberIds có đúng 1 người; group: cần name và ít nhất 2 người
     createRoom: build.mutation<Room, { type: RoomType; name?: string; memberIds: string[] }>({
       query: ({ type, name, memberIds }) => {
@@ -97,6 +105,15 @@ export const chatApi = createApi({
         url: `/api/v1/rooms/${encodeURIComponent(roomId)}/read`,
         method: 'POST',
         body: {},
+      }),
+      invalidatesTags: ['Room'],
+    }),
+
+    // Rời khỏi phòng chat nhóm (xử lý dữ liệu thật trên MongoDB Atlas)
+    leaveRoom: build.mutation<{ ok: boolean; message: string }, string>({
+      query: (roomId) => ({
+        url: `/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,
+        method: 'POST',
       }),
       invalidatesTags: ['Room'],
     }),
@@ -359,11 +376,24 @@ export const chatApi = createApi({
       query: () => '/api/v1/users/online',
     }),
     // --- Trợ lý ảo AI & Tóm tắt hội thoại ---
-    askAi: build.mutation<{ ok: boolean; reply: string; model: string }, { prompt: string }>({
+    askAi: build.mutation<
+      { ok: boolean; reply: string; model: string },
+      { prompt: string; history?: { role: string; content: string }[] }
+    >({
       query: (body) => ({
         url: '/api/v1/ai/chat',
         method: 'POST',
         body,
+      }),
+    }),
+    rewriteText: build.mutation<
+      { ok: boolean; original: string; rewritten: string; tone: string },
+      { text: string; tone?: 'formal' | 'friendly' | 'short' | 'english' }
+    >({
+      query: (body) => ({
+        url: '/api/v1/ai/rewrite',
+        method: 'POST',
+        body: { text: body.text, tone: body.tone ?? 'formal' },
       }),
     }),
 
@@ -433,8 +463,10 @@ export const chatApi = createApi({
 export const {
   useGetRoomsQuery,
   useSearchUsersQuery,
+  useGetSuggestedUsersQuery,
   useCreateRoomMutation,
   useMarkRoomReadMutation,
+  useLeaveRoomMutation,
   useGetMessagesQuery,
   useLoadEarlierMessagesMutation,
   useSendMessageMutation,
@@ -448,6 +480,7 @@ export const {
   useRegisterPushTokenMutation,
   useGetOnlineUsersQuery,
   useAskAiMutation,
+  useRewriteTextMutation,
   useSummarizeRoomMutation,
   useSemanticSearchMutation,
   useRagChatMutation,

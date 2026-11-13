@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
+import { Pressable, StyleSheet, View} from 'react-native';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { XStack } from 'tamagui';
 import { useGetFriendRequestsQuery, useGetRoomsQuery } from '../../../src/api/chatApi';
 import { useScreenColors } from '../../../src/features/theme/useScreenColors';
+import { useAppSelector } from '../../../src/store/hooks';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -20,6 +21,12 @@ const tabIcon =
 
 export default function TabsLayout() {
   const router = useRouter();
+  const role = useAppSelector((s) => s.session.role);
+
+  // Admin chỉ đảm nhiệm quản lý, không vào giao diện chat
+  if (role === 'ADMIN') {
+    return <Redirect href="/admin" />;
+  }
   const C = useScreenColors();
   const icon = (active: IconName, inactive: IconName) =>
     tabIcon(active, inactive, C.brand, C.muted);

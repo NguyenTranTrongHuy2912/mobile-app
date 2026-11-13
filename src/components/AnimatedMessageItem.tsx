@@ -8,7 +8,7 @@ interface AnimatedMessageItemProps {
 
 /**
  * Component tạo hiệu ứng FadeInUp nhẹ nhàng khi tin nhắn xuất hiện
- * Đáp ứng tiêu chí "Animation basic" theo yêu cầu của Giảng viên.
+ * Đáp ứng tiêu chí "Animation basic" chuẩn trải nghiệm người dùng.
  */
 export default function AnimatedMessageItem({ style, children }: AnimatedMessageItemProps) {
   const opacity = useRef(new Animated.Value(0)).current;

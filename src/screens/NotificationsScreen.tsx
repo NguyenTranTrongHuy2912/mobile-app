@@ -15,7 +15,7 @@ import {
   useGetFriendRequestsQuery,
   useGetFriendsQuery,
   useRespondFriendRequestMutation,
-  useSearchUsersQuery,
+  useGetSuggestedUsersQuery,
   useSendFriendRequestMutation,
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
@@ -29,9 +29,9 @@ export default function NotificationsScreen() {
   const [respond, { isLoading: isResponding }] = useRespondFriendRequestMutation();
   const [actionId, setActionId] = useState<string | null>(null);
 
-  // Gợi ý kết bạn ("Những người bạn có thể biết")
+  // Gợi ý kết bạn ("Những người bạn có thể biết") - Lấy danh sách an toàn, không chứa tài khoản Admin
   const { data: friends = [] } = useGetFriendsQuery();
-  const { data: searchResults = [] } = useSearchUsersQuery('a');
+  const { data: suggestedList = [] } = useGetSuggestedUsersQuery();
   const [sendFriendRequest, { isLoading: isSendingReq }] = useSendFriendRequestMutation();
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
 
@@ -39,7 +39,7 @@ export default function NotificationsScreen() {
   const suggestedUsers = useMemo(() => {
     const friendIdSet = new Set(friends.map((f) => f.userId));
     const reqSenderSet = new Set(requests.map((r) => r.senderId));
-    return searchResults
+    return suggestedList
       .filter(
         (u) =>
           u.userId !== currentUserId &&
@@ -47,7 +47,7 @@ export default function NotificationsScreen() {
           !reqSenderSet.has(u.userId)
       )
       .slice(0, 5);
-  }, [searchResults, friends, requests, currentUserId]);
+  }, [suggestedList, friends, requests, currentUserId]);
 
   const handleRespond = async (requestId: string, accept: boolean) => {
     setActionId(requestId);

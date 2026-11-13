@@ -28,6 +28,22 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const showPrivacyPolicy = () => {
+    Alert.alert(
+      'Chính sách quyền riêng tư',
+      'HQ ChatApp cam kết bảo vệ dữ liệu cá nhân của bạn theo chuẩn mã hóa đường truyền an toàn (TLS 1.3) và bộ lọc bảo vệ quyền riêng tư PII. Tin nhắn của bạn luôn được bảo mật tuyệt đối.',
+      [{ text: 'Đã hiểu' }]
+    );
+  };
+
+  const showTerms = () => {
+    Alert.alert(
+      'Điều khoản dịch vụ',
+      'Chào mừng bạn đến với HQ ChatApp. Việc sử dụng dịch vụ đồng nghĩa bạn tuân thủ các quy tắc ứng xử văn minh, tôn trọng bản quyền và không phát tán nội dung độc hại.',
+      [{ text: 'Đã hiểu' }]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* 1. Nhóm Giao diện */}
@@ -40,7 +56,7 @@ export default function SettingsScreen() {
           <View style={styles.rowInfo}>
             <Text style={styles.rowTitle}>Chế độ nền tối (Dark Mode)</Text>
             <Text style={styles.rowSubtitle}>
-              {isDark ? 'Đang bật nền đen Messenger' : 'Đang sử dụng nền sáng chuẩn'}
+              {isDark ? 'Đang bật nền tối sang trọng' : 'Đang sử dụng nền sáng chuẩn'}
             </Text>
           </View>
           <Switch
@@ -80,15 +96,15 @@ export default function SettingsScreen() {
             <Ionicons name="sparkles" size={18} color={C.brand} />
           </View>
           <View style={styles.rowInfo}>
-            <Text style={styles.rowTitle}>Trợ lý AI (Google Gemini)</Text>
-            <Text style={styles.rowSubtitle}>Trò chuyện và tóm tắt cuộc trò chuyện thông minh</Text>
+            <Text style={styles.rowTitle}>Trợ lý HQ AI</Text>
+            <Text style={styles.rowSubtitle}>Trò chuyện, phân tích và tóm tắt cuộc trò chuyện thông minh</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </ScalePressable>
       </View>
 
-      {/* 4. Thông tin Đồ án & Giảng viên */}
-      <Text style={styles.sectionHeader}>THÔNG TIN ĐỒ ÁN</Text>
+      {/* 4. Thông tin Nền tảng HQ ChatApp */}
+      <Text style={styles.sectionHeader}>VỀ HQ CHATAPP</Text>
       <View style={styles.card}>
         <View style={{ ...styles.infoRow, ...styles.rowBorder }}>
           <Text style={styles.infoLabel}>Tên đề tài</Text>
@@ -102,10 +118,28 @@ export default function SettingsScreen() {
           <Text style={styles.infoLabel}>Trợ lý AI</Text>
           <Text style={styles.infoValue}>Google Gemini 1.5 Flash</Text>
         </View>
-        <View style={styles.infoRow}>
+        <View style={[styles.infoRow, styles.rowBorder]}>
           <Text style={styles.infoLabel}>Phiên bản</Text>
-          <Text style={styles.infoValue}>1.0.0 (Production)</Text>
+          <Text style={styles.infoValue}>2.4.0 (Enterprise Pro)</Text>
         </View>
+        <ScalePressable style={[styles.pressableRow, styles.rowBorder]} onPress={showPrivacyPolicy}>
+          <View style={[styles.iconWrap, { backgroundColor: '#E0F2FE' }]}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#0284C7" />
+          </View>
+          <View style={styles.rowInfo}>
+            <Text style={styles.rowTitle}>Chính sách quyền riêng tư</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#8A8D91" />
+        </ScalePressable>
+        <ScalePressable style={styles.pressableRow} onPress={showTerms}>
+          <View style={[styles.iconWrap, { backgroundColor: '#F3F4F6' }]}>
+            <Ionicons name="document-text-outline" size={18} color="#4B5563" />
+          </View>
+          <View style={styles.rowInfo}>
+            <Text style={styles.rowTitle}>Điều khoản dịch vụ</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#8A8D91" />
+        </ScalePressable>
       </View>
 
       {/* Đăng xuất */}

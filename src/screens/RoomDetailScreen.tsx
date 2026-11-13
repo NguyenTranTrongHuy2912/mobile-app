@@ -7,6 +7,7 @@ import {
   useCreateRoomMutation,
   useGetRoomsQuery,
   useSummarizeRoomMutation,
+  useLeaveRoomMutation,
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
 import MemberItem from '../components/MemberItem';
@@ -17,7 +18,7 @@ import { useScreenColors, type ScreenColors } from '../features/theme/useScreenC
 
 /**
  * Màn hình Chi tiết phòng chat / Quản lý nhóm
- * Đáp ứng tiêu chí "10-15 màn hình" và "Quản lý nhóm" theo yêu cầu của Giảng viên.
+ * Đáp ứng tiêu chí "10-15 màn hình" và "Quản lý nhóm" chuẩn trải nghiệm người dùng.
  */
 export default function RoomDetailScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -81,18 +82,25 @@ export default function RoomDetailScreen() {
     }
   };
 
+  const [leaveRoomMutation] = useLeaveRoomMutation();
+
   const handleLeaveGroup = () => {
     Alert.alert(
       'Rời nhóm',
-      'Bạn có chắc chắn muốn rời khỏi nhóm này không?',
+      'Bạn có chắc chắn muốn rời khỏi nhóm này không? Bạn sẽ không nhận được tin nhắn mới từ nhóm nữa.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Rời nhóm',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Thông báo', 'Bạn đã rời nhóm thành công.');
-            router.replace('/(app)/(tabs)/rooms');
+          onPress: async () => {
+            try {
+              await leaveRoomMutation(roomId).unwrap();
+              Alert.alert('Thông báo', 'Bạn đã rời nhóm thành công.');
+              router.replace('/(app)/(tabs)/rooms');
+            } catch (e) {
+              Alert.alert('Lỗi', 'Không thể rời nhóm lúc này. Vui lòng thử lại sau.');
+            }
           },
         },
       ]
@@ -138,7 +146,7 @@ export default function RoomDetailScreen() {
               <ScalePressable style={styles.actionCircle} onPress={handleOpenAiSummarize}>
                 <Ionicons name="sparkles" size={20} color={C.brand} />
               </ScalePressable>
-              <Text style={styles.actionLabel}>AI Tóm tắt</Text>
+              <Text style={styles.actionLabel}>HQ AI Tóm tắt</Text>
             </View>
           )}
 
