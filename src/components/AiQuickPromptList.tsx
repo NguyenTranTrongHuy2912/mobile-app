@@ -12,7 +12,8 @@ const QUICK_PROMPTS = [
   { id: '4', title: '📝 Email xin nghỉ học', prompt: 'Soạn giúp tôi một mẫu email xin phép nghỉ ốm gửi Thầy/Cô giảng viên' },
   { id: '5', title: '🎉 Lời chúc sinh nhật', prompt: 'Viết cho tôi một lời chúc sinh nhật bạn bè hài hước và ý nghĩa' },
   { id: '6', title: '🌌 Khoa học: Bầu trời', prompt: 'Giải thích tại sao bầu trời có màu xanh lam theo cách dễ hiểu nhất' },
-  { id: '7', title: '🌐 Dịch thuật Anh - Việt', prompt: 'Dịch sang tiếng Anh tự nhiên: Cảm ơn bạn đã luôn đồng hành và hỗ trợ tôi' },
+  { id: '7', title: '🇻🇳 Lịch sử: Bác Hồ', prompt: 'Bác Hồ sinh năm bao nhiêu và quê ở đâu?' },
+  { id: '8', title: '🌐 Dịch thuật Anh - Việt', prompt: 'Dịch sang tiếng Anh tự nhiên: Cảm ơn bạn đã luôn đồng hành và hỗ trợ tôi' },
 ];
 
 const SOFT_BG = '#EEF4FF';
