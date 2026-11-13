@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
-  Pressable,
   StyleSheet,
-  Text,
   TextInput,
-  View,
 } from 'react-native';
+import { Spinner, Text, View, useTheme } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -41,6 +38,24 @@ import ChatImage from '../components/ChatImage';
 import ChatVideo from '../components/ChatVideo';
 import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
+
+// Bảng màu của màn hình, lấy từ theme Tamagui (tamagui.config.ts) nên tự đổi theo chế độ sáng/tối
+type ChatColors = {
+  screen: string; // nền màn hình
+  card: string; // bong bóng người khác, thanh nhập, thanh emoji
+  ink: string; // chữ chính
+  muted: string; // chữ phụ, icon phụ
+  line: string; // đường kẻ
+  brand: string; // màu nhấn (bong bóng của mình, icon)
+  brandSoft: string; // nền nút Tóm tắt
+  brandSoftText: string;
+  danger: string;
+  inputBg: string; // nền ô nhập
+  chip: string; // nền nút "Tải tin nhắn cũ hơn"
+};
+
+const themeValue = (v: { val: unknown } | undefined, fallback: string): string =>
+  typeof v?.val === 'string' ? v.val : fallback;
 
 const MAX_IMAGES_PER_PICK = 5;
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
@@ -71,6 +86,34 @@ export default function ChatRoomScreen() {
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');
 
+  const isDark = useAppSelector((s) => s.theme.isDark);
+  const theme = useTheme();
+  const bg = themeValue(theme.background, isDark ? '#18191A' : '#FFFFFF');
+  const surface = themeValue(theme.surface, isDark ? '#242526' : '#F5F7FA');
+  const ink = themeValue(theme.ink, isDark ? '#E4E6EB' : '#050505');
+  const muted = themeValue(theme.muted, isDark ? '#B0B3B8' : '#65676B');
+  const line = themeValue(theme.line, isDark ? '#3E4042' : '#CED0D4');
+  const brand = themeValue(theme.brand, '#2F6BFF');
+  const danger = themeValue(theme.danger, isDark ? '#FA383E' : '#E41E3F');
+  const C = useMemo<ChatColors>(
+    () => ({
+      // Sáng: nền xám nhạt + bong bóng trắng. Tối: nền đen + bong bóng xám đậm
+      screen: isDark ? bg : surface,
+      card: isDark ? surface : bg,
+      ink,
+      muted,
+      line,
+      brand,
+      danger,
+      brandSoft: isDark ? '#1E2A4A' : '#E6EEFF',
+      brandSoftText: isDark ? '#8AB0FF' : brand,
+      inputBg: isDark ? '#3A3B3C' : '#F0F2F5',
+      chip: isDark ? '#3A3B3C' : '#E4E6EB',
+    }),
+    [isDark, bg, surface, ink, muted, line, brand, danger],
+  );
+  const styles = useMemo(() => makeStyles(C), [C]);
+
   const { data, isLoading } = useGetMessagesQuery(roomId, {
     pollingInterval: 15000, // Realtime qua WebSocket cập nhật tức thì, polling chỉ là fallback
   });
@@ -84,6 +127,36 @@ export default function ChatRoomScreen() {
   const listRef = useRef<FlatList<Message>>(null);
   const prevMessagesRef = useRef<Message[]>([]);
   const isInitialLoadRef = useRef(true);
+
+  // "Ghim đáy": FlatList chỉ vẽ một phần tin lúc đầu và chưa biết chiều cao thật của phần còn lại
+  // (ảnh, ngày phân cách...), nên một lần scrollToEnd duy nhất sẽ dừng ở giữa. Trong lúc ghim, mỗi khi
+  // nội dung đổi kích thước ta cuộn xuống đáy lại. Ghim tự thả sau một lúc, hoặc ngay khi người dùng kéo.
+  const stickToBottomRef = useRef(true);
+  const stickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pinToBottom = useCallback((ms: number) => {
+    stickToBottomRef.current = true;
+    if (stickTimerRef.current) clearTimeout(stickTimerRef.current);
+    stickTimerRef.current = setTimeout(() => {
+      stickToBottomRef.current = false;
+    }, ms);
+  }, []);
+
+  const handleContentSizeChange = useCallback(() => {
+    if (stickToBottomRef.current) listRef.current?.scrollToEnd({ animated: false });
+  }, []);
+
+  const handleScrollBeginDrag = useCallback(() => {
+    // Người dùng tự cuộn: không kéo họ về đáy nữa (cũng tránh giật khi tải tin cũ ở đầu danh sách)
+    stickToBottomRef.current = false;
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (stickTimerRef.current) clearTimeout(stickTimerRef.current);
+    },
+    [],
+  );
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
@@ -153,8 +226,10 @@ export default function ChatRoomScreen() {
 
   useEffect(() => {
     navigation.setOptions({
+      headerStyle: { backgroundColor: C.card },
+      headerTintColor: C.ink,
       headerTitle: () => (
-        <Pressable
+        <View
           style={styles.headerContainer}
           onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
         >
@@ -173,7 +248,7 @@ export default function ChatRoomScreen() {
               {headerTitle}
             </Text>
             {isDirect ? (
-              <Text style={[styles.headerSubtitleText, isOtherOnline && styles.headerActiveText]}>
+              <Text style={{ ...styles.headerSubtitleText, ...(isOtherOnline ? styles.headerActiveText : null) }}>
                 {isOtherOnline ? 'Đang hoạt động' : 'Hoạt động gần đây'}
               </Text>
             ) : currentRoom?.members.length ? (
@@ -182,7 +257,7 @@ export default function ChatRoomScreen() {
               </Text>
             ) : null}
           </View>
-        </Pressable>
+        </View>
       ),
       headerRight: () => (
         <View style={styles.headerRightActions}>
@@ -191,46 +266,49 @@ export default function ChatRoomScreen() {
               style={styles.summarizeHeaderBtn}
               onPress={handleOpenAiSummarize}
             >
-              <Ionicons name="sparkles" size={15} color="#0084FF" />
+              <Ionicons name="sparkles" size={15} color={C.brand} />
               <Text style={styles.summarizeHeaderBtnText}>Tóm tắt</Text>
             </ScalePressable>
           )}
-                    <Pressable
+                    <View
             onPress={() => setShowSearchModal(true)}
             hitSlop={8}
             style={{ padding: 4 }}
           >
-            <Ionicons name="search-outline" size={22} color="#0084FF" />
-          </Pressable>
-          <Pressable
+            <Ionicons name="search-outline" size={22} color={C.brand} />
+          </View>
+          <View
             onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
             hitSlop={8}
             style={{ padding: 4 }}
           >
-            <Ionicons name="information-circle-outline" size={24} color="#0084FF" />
-          </Pressable>
+            <Ionicons name="information-circle-outline" size={24} color={C.brand} />
+          </View>
         </View>
       ),
     });
-  }, [navigation, headerTitle, isDirect, isOtherOnline, currentRoom?.members.length]);
+  }, [navigation, headerTitle, isDirect, isOtherOnline, currentRoom?.members.length, C, styles]);
 
   // Cuộn thông minh: chỉ tự cuộn xuống cuối khi vào phòng lần đầu hoặc có tin mới ở cuối
   useEffect(() => {
     if (messages.length > 0) {
       if (isInitialLoadRef.current) {
         isInitialLoadRef.current = false;
+        pinToBottom(1500);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
       } else {
         const prev = prevMessagesRef.current;
         const lastOld = prev[prev.length - 1];
         const lastNew = messages[messages.length - 1];
         if (!lastOld || lastNew?.id !== lastOld?.id) {
+          // Tin mới (nhất là ảnh) có thể đổi chiều cao sau khi vẽ: ghim đáy thêm một lúc
+          pinToBottom(800);
           listRef.current?.scrollToEnd({ animated: true });
         }
       }
       prevMessagesRef.current = messages;
     }
-  }, [messages]);
+  }, [messages, pinToBottom]);
 
   const handleLoadEarlier = useCallback(async () => {
     if (isLoadingEarlier || !hasMore || messages.length === 0) return;
@@ -370,21 +448,18 @@ export default function ChatRoomScreen() {
       <View style={styles.loadEarlierContainer}>
         {isLoadingEarlier ? (
           <View style={styles.loadEarlierLoading}>
-            <ActivityIndicator size="small" color="#0084FF" />
+            <Spinner size="small" color="$brand" />
             <Text style={styles.loadEarlierText}>Đang tải tin nhắn cũ hơn...</Text>
           </View>
         ) : (
-          <Pressable
-            style={({ pressed }) => [
-              styles.loadEarlierBtn,
-              pressed && styles.loadEarlierBtnPressed,
-            ]}
+          <View
+            style={styles.loadEarlierBtn}
             onPress={handleLoadEarlier}
             hitSlop={8}
           >
-            <Ionicons name="time-outline" size={16} color="#0084FF" style={{ marginRight: 6 }} />
+            <Ionicons name="time-outline" size={16} color={C.brand} style={{ marginRight: 6 }} />
             <Text style={styles.loadEarlierBtnText}>Tải tin nhắn cũ hơn</Text>
-          </Pressable>
+          </View>
         )}
       </View>
     );
@@ -415,17 +490,17 @@ export default function ChatRoomScreen() {
           </View>
         )}
         <AnimatedMessageItem style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
-          <Pressable
+          <View
             onPress={() => setSelectedMsgId(isSelected ? null : item.id)}
-            style={[
-              styles.bubble,
-              mine ? styles.bubbleMine : styles.bubbleOther,
-              isMedia && styles.bubbleImage,
-              isBigEmoji && styles.bubbleBigEmoji,
-            ]}
+            style={{
+              ...styles.bubble,
+              ...(mine ? styles.bubbleMine : styles.bubbleOther),
+              ...(isMedia ? styles.bubbleImage : null),
+              ...(isBigEmoji ? styles.bubbleBigEmoji : null),
+            }}
           >
             {!mine && (
-              <Text style={[styles.sender, (isMedia || isBigEmoji) && styles.imagePad]}>
+              <Text style={{ ...styles.sender, ...(isMedia || isBigEmoji ? styles.imagePad : null) }}>
                 {names.get(item.senderId) ?? 'Người dùng'}
               </Text>
             )}
@@ -444,12 +519,12 @@ export default function ChatRoomScreen() {
 
             {isSelected && (
               <Text
-                style={[
-                  styles.meta,
-                  mine ? styles.metaMine : styles.metaOther,
-                  (isMedia || isBigEmoji) && styles.imagePad,
-                  isBigEmoji && styles.metaBigEmoji,
-                ]}
+                style={{
+                  ...styles.meta,
+                  ...(mine ? styles.metaMine : styles.metaOther),
+                  ...(isMedia || isBigEmoji ? styles.imagePad : null),
+                  ...(isBigEmoji ? styles.metaBigEmoji : null),
+                }}
               >
                 {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
               </Text>
@@ -457,14 +532,14 @@ export default function ChatRoomScreen() {
             {mine && item.status === 'sending' && (
               <Text style={styles.sendingMeta}>Đang gửi…</Text>
             )}
-          </Pressable>
+          </View>
           {mine && item.status === 'failed' && (
-            <Pressable
+            <View
               onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
               hitSlop={8}
             >
               <Text style={styles.failed}>Gửi lỗi · Thử lại</Text>
-            </Pressable>
+            </View>
           )}
         </AnimatedMessageItem>
       </View>
@@ -474,7 +549,7 @@ export default function ChatRoomScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <Spinner />
       </View>
     );
   }
@@ -488,6 +563,9 @@ export default function ChatRoomScreen() {
       <FlatList
         ref={listRef}
         data={messages}
+        onContentSizeChange={handleContentSizeChange}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        initialNumToRender={30}
         keyExtractor={(m) => m.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
@@ -504,14 +582,14 @@ export default function ChatRoomScreen() {
       {showEmojiPicker && (
         <View style={styles.emojiPickerBar}>
           {QUICK_EMOJIS.map((emoji) => (
-            <Pressable
+            <View
               key={emoji}
               onPress={() => handlePickEmoji(emoji)}
               style={styles.emojiItem}
               hitSlop={4}
             >
               <Text style={styles.emojiText}>{emoji}</Text>
-            </Pressable>
+            </View>
           ))}
         </View>
       )}
@@ -519,35 +597,35 @@ export default function ChatRoomScreen() {
       <View style={styles.inputBar}>
         {/* Nút chuyển đổi '>' hoặc hàng nút tính năng (Camera, Ảnh, Mic, Thêm) */}
         {isCollapsed ? (
-          <Pressable onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
-            <Ionicons name="chevron-forward" size={26} color="#0084FF" />
-          </Pressable>
+          <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
+            <Ionicons name="chevron-forward" size={26} color={C.brand} />
+          </View>
         ) : (
           <View style={styles.actionButtonsRow}>
-            <Pressable
+            <View
               onPress={() => setShowMediaModal(true)}
               hitSlop={6}
               style={styles.iconButton}
             >
-              <Ionicons name="add-circle" size={26} color="#0084FF" />
-            </Pressable>
-            <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
-              <Ionicons name="camera" size={24} color="#0084FF" />
-            </Pressable>
-            <Pressable onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
-              <Ionicons name="image" size={24} color="#0084FF" />
-            </Pressable>
-            <Pressable
+              <Ionicons name="add-circle" size={26} color={C.brand} />
+            </View>
+            <View onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
+              <Ionicons name="camera" size={24} color={C.brand} />
+            </View>
+            <View onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
+              <Ionicons name="image" size={24} color={C.brand} />
+            </View>
+            <View
               onPress={() => Alert.alert('Ghi âm', 'Tính năng tin nhắn thoại đang sẵn sàng!')}
               hitSlop={6}
               style={styles.iconButton}
             >
-              <Ionicons name="mic" size={24} color="#0084FF" />
-            </Pressable>
+              <Ionicons name="mic" size={24} color={C.brand} />
+            </View>
             {draft.trim().length > 0 && (
-              <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
-                <Ionicons name="chevron-back" size={22} color="#8A8D91" />
-              </Pressable>
+              <View onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
+                <Ionicons name="chevron-back" size={22} color={C.muted} />
+              </View>
             )}
           </View>
         )}
@@ -557,12 +635,13 @@ export default function ChatRoomScreen() {
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn..."
-            placeholderTextColor="#8A8D91"
+            placeholderTextColor={C.muted}
+            keyboardAppearance={isDark ? 'dark' : 'light'}
             value={draft}
             onChangeText={handleTextChange}
             multiline
           />
-          <Pressable
+          <View
             onPress={() => setShowEmojiPicker((prev) => !prev)}
             hitSlop={6}
             style={styles.innerEmojiButton}
@@ -570,9 +649,9 @@ export default function ChatRoomScreen() {
             <Ionicons
               name={showEmojiPicker ? 'happy' : 'happy-outline'}
               size={22}
-              color="#0084FF"
+              color={C.brand}
             />
-          </Pressable>
+          </View>
         </View>
 
         {draft.trim() ? (
@@ -585,7 +664,7 @@ export default function ChatRoomScreen() {
             onPress={() => send('👍')}
             hitSlop={6}
           >
-            <Ionicons name="thumbs-up" size={24} color="#0084FF" />
+            <Ionicons name="thumbs-up" size={24} color={C.brand} />
           </ScalePressable>
         )}
       </View>
@@ -615,7 +694,8 @@ export default function ChatRoomScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ChatColors) =>
+  StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -625,7 +705,7 @@ const styles = StyleSheet.create({
   summarizeHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E7F3FF',
+    backgroundColor: C.brandSoft,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 14,
@@ -633,20 +713,20 @@ const styles = StyleSheet.create({
   summarizeHeaderBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0064D1',
+    color: C.brandSoftText,
     marginLeft: 4,
   },
 
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: C.screen },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.screen },
   list: { padding: 12, flexGrow: 1 },
-  empty: { textAlign: 'center', color: '#8A8D91', marginTop: 40 },
+  empty: { textAlign: 'center', color: C.muted, marginTop: 40 },
   bubbleRow: { marginBottom: 8, maxWidth: '80%' },
   rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   rowOther: { alignSelf: 'flex-start' },
   bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18 },
-  bubbleMine: { backgroundColor: '#0084FF', borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: '#fff', borderBottomLeftRadius: 4 },
+  bubbleMine: { backgroundColor: C.brand, borderBottomRightRadius: 4 },
+  bubbleOther: { backgroundColor: C.card, borderBottomLeftRadius: 4 },
   bubbleImage: { padding: 4 },
   bubbleBigEmoji: {
     backgroundColor: 'transparent',
@@ -657,22 +737,21 @@ const styles = StyleSheet.create({
   },
   textBigEmoji: {
     fontSize: 42,
-    lineHeight: 48,
     textAlign: 'center',
   },
   metaBigEmoji: {
-    color: '#8A8D91',
+    color: C.muted,
     textAlign: 'center',
     fontSize: 10,
     marginTop: 2,
   },
   imagePad: { paddingHorizontal: 8 },
-  sender: { fontSize: 12, fontWeight: '600', color: '#0084FF', marginBottom: 2 },
+  sender: { fontSize: 12, fontWeight: '600', color: C.brand, marginBottom: 2 },
   textMine: { color: '#fff', fontSize: 16 },
-  textOther: { color: '#050505', fontSize: 16 },
+  textOther: { color: C.ink, fontSize: 16 },
   meta: { fontSize: 11, marginTop: 2 },
   metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-  metaOther: { color: '#8A8D91' },
+  metaOther: { color: C.muted },
   loadEarlierContainer: {
     alignItems: 'center',
     marginVertical: 10,
@@ -684,42 +763,39 @@ const styles = StyleSheet.create({
   },
   loadEarlierText: {
     fontSize: 13,
-    color: '#65676B',
+    color: C.muted,
     marginLeft: 6,
   },
   loadEarlierBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E4E6EB',
+    backgroundColor: C.chip,
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 16,
   },
-  loadEarlierBtnPressed: {
-    backgroundColor: '#D8DADF',
-  },
   loadEarlierBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0084FF',
+    color: C.brand,
   },
-  failed: { color: '#FA383E', fontSize: 12, marginTop: 2 },
+  failed: { color: C.danger, fontSize: 12, marginTop: 2 },
   notice: {
     textAlign: 'center',
-    color: '#FA383E',
+    color: C.danger,
     fontSize: 13,
     paddingVertical: 6,
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
   },
   emojiPickerBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     paddingVertical: 8,
     paddingHorizontal: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E4E6EB',
+    borderTopColor: C.line,
   },
   emojiItem: {
     padding: 6,
@@ -735,9 +811,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 12 : 8,
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E4E6EB',
+    borderTopColor: C.line,
   },
   actionButtonsRow: {
     flexDirection: 'row',
@@ -755,7 +831,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F2F5',
+    backgroundColor: C.inputBg,
     borderRadius: 20,
     paddingHorizontal: 12,
     marginHorizontal: 4,
@@ -766,7 +842,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     fontSize: 15,
-    color: '#050505',
+    color: C.ink,
     paddingRight: 6,
   },
   innerEmojiButton: {
@@ -775,7 +851,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButton: {
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     borderRadius: 20,
     width: 36,
     height: 36,
@@ -805,7 +881,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -820,11 +896,11 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#050505',
+    color: C.ink,
   },
   headerSubtitleText: {
     fontSize: 11,
-    color: '#65676B',
+    color: C.muted,
     marginTop: 1,
   },
   headerActiveText: {
@@ -838,7 +914,7 @@ const styles = StyleSheet.create({
   dateDividerText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#65676B',
+    color: C.muted,
     letterSpacing: 0.3,
   },
   sendingMeta: {

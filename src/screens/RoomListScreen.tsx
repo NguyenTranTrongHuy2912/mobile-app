@@ -1,14 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Spinner, Text, View } from 'tamagui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,6 +10,7 @@ import {
   useGetRoomsQuery,
 } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { ActiveBadge } from '../components/ActiveBadge';
 import ScalePressable from '../components/ScalePressable';
 import FloatingAiButton from '../components/FloatingAiButton';
@@ -48,6 +41,8 @@ export default function RoomListScreen() {
   const myId = useAppSelector((s) => s.session.userId);
   const myName = useAppSelector((s) => s.session.displayName) || 'Tôi';
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const C = useScreenColors();
+  const styles = useMemo(() => makeStyles(C), [C]);
 
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,7 +135,7 @@ export default function RoomListScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0084FF" />
+        <Spinner size="large" color="$brand" />
       </View>
     );
   }
@@ -149,9 +144,9 @@ export default function RoomListScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Không tải được danh sách phòng.</Text>
-        <Pressable onPress={() => refetch()} style={styles.retryButton}>
+        <View onPress={() => refetch()} style={styles.retryButton}>
           <Text style={styles.retryText}>Thử lại</Text>
-        </Pressable>
+        </View>
       </View>
     );
   }
@@ -161,26 +156,26 @@ export default function RoomListScreen() {
     <View style={styles.listHeaderContainer}>
       {/* 1. Search Bar */}
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color="#65676B" style={styles.searchIcon} />
+        <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Hỏi Meta AI hoặc tìm kiếm..."
-          placeholderTextColor="#8A8D91"
+          placeholderTextColor={C.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
-          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color="#8A8D91" />
-          </Pressable>
+          <View onPress={() => setSearchQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={C.muted} />
+          </View>
         ) : (
-          <Pressable
+          <View
             onPress={() => router.push('/(app)/ai-assistant')}
             hitSlop={8}
             style={{ padding: 4 }}
           >
-            <Ionicons name="sparkles" size={18} color="#0084FF" />
-          </Pressable>
+            <Ionicons name="sparkles" size={18} color={C.brand} />
+          </View>
         )}
       </View>
 
@@ -191,7 +186,7 @@ export default function RoomListScreen() {
         contentContainerStyle={styles.activeBarScroll}
       >
         {/* Ghi chú suy nghĩ của tôi (Thought Note) */}
-        <Pressable style={styles.activeItem} onPress={() => setShowNoteModal(true)}>
+        <View style={styles.activeItem} onPress={() => setShowNoteModal(true)}>
           <View style={styles.myAvatarWrap}>
             {/* Bong bóng suy nghĩ nổi trên avatar */}
             <View style={styles.thoughtBadge}>
@@ -208,13 +203,13 @@ export default function RoomListScreen() {
           <Text style={styles.activeName} numberOfLines={1}>
             {shortMyName}
           </Text>
-        </Pressable>
+        </View>
 
         {/* Danh sách bạn bè Online */}
         {onlineFriends.map((f) => {
           const shortName = f.displayName.trim().split(' ').slice(-1)[0] || f.displayName;
           return (
-            <Pressable
+            <View
               key={f.userId}
               style={styles.activeItem}
               onPress={() => handleOpenDirectChat(f.userId, f.displayName)}
@@ -230,39 +225,39 @@ export default function RoomListScreen() {
               <Text style={styles.activeName} numberOfLines={1}>
                 {shortName}
               </Text>
-            </Pressable>
+            </View>
           );
         })}
       </ScrollView>
 
       {/* 3. Filter Pills (Tất cả | Chưa đọc | Nhóm) */}
       <View style={styles.pillsRow}>
-        <Pressable
-          style={[styles.pill, filter === 'all' && styles.pillActive]}
+        <View
+          style={{ ...styles.pill, ...(filter === 'all' ? styles.pillActive : null) }}
           onPress={() => setFilter('all')}
         >
-          <Text style={[styles.pillText, filter === 'all' && styles.pillTextActive]}>
+          <Text style={{ ...styles.pillText, ...(filter === 'all' ? styles.pillTextActive : null) }}>
             Tất cả
           </Text>
-        </Pressable>
+        </View>
 
-        <Pressable
-          style={[styles.pill, filter === 'unread' && styles.pillActive]}
+        <View
+          style={{ ...styles.pill, ...(filter === 'unread' ? styles.pillActive : null) }}
           onPress={() => setFilter('unread')}
         >
-          <Text style={[styles.pillText, filter === 'unread' && styles.pillTextActive]}>
+          <Text style={{ ...styles.pillText, ...(filter === 'unread' ? styles.pillTextActive : null) }}>
             Chưa đọc{unreadTotal > 0 ? ` (${unreadTotal})` : ''}
           </Text>
-        </Pressable>
+        </View>
 
-        <Pressable
-          style={[styles.pill, filter === 'group' && styles.pillActive]}
+        <View
+          style={{ ...styles.pill, ...(filter === 'group' ? styles.pillActive : null) }}
           onPress={() => setFilter('group')}
         >
-          <Text style={[styles.pillText, filter === 'group' && styles.pillTextActive]}>
+          <Text style={{ ...styles.pillText, ...(filter === 'group' ? styles.pillTextActive : null) }}>
             Nhóm
           </Text>
-        </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -274,7 +269,7 @@ export default function RoomListScreen() {
     const isOnline = otherUserId ? !!onlineUserIds[otherUserId] : false;
 
     return (
-      <Pressable
+      <View
         style={styles.row}
         onPress={() =>
           router.push({
@@ -283,18 +278,18 @@ export default function RoomListScreen() {
           })
         }
       >
-        <View style={[styles.avatar, item.type === 'group' && styles.avatarGroup]}>
+        <View style={{ ...styles.avatar, ...(item.type === 'group' ? styles.avatarGroup : null) }}>
           <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
           {isDirect && isOnline ? <ActiveBadge size={14} /> : null}
         </View>
 
         <View style={styles.rowBody}>
           <View style={styles.rowTop}>
-            <Text style={[styles.roomName, unread && styles.bold]} numberOfLines={1}>
+            <Text style={{ ...styles.roomName, ...(unread ? styles.bold : null) }} numberOfLines={1}>
               {item.name}
             </Text>
             {item.lastMessageAt ? (
-              <Text style={[styles.time, unread && styles.timeUnread]}>
+              <Text style={{ ...styles.time, ...(unread ? styles.timeUnread : null) }}>
                 {formatRoomListTime(item.lastMessageAt)}
               </Text>
             ) : null}
@@ -302,7 +297,7 @@ export default function RoomListScreen() {
 
           <View style={styles.rowBottom}>
             <Text
-              style={[styles.preview, unread && styles.previewUnread]}
+              style={{ ...styles.preview, ...(unread ? styles.previewUnread : null) }}
               numberOfLines={1}
             >
               {previewOf(item, myId)}
@@ -311,7 +306,7 @@ export default function RoomListScreen() {
             {unread ? <View style={styles.unreadBlueDot} /> : null}
           </View>
         </View>
-      </Pressable>
+      </View>
     );
   };
 
@@ -352,14 +347,15 @@ export default function RoomListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ScreenColors) =>
+  StyleSheet.create({
   floatingAiBtn: {
     position: 'absolute',
     bottom: 24,
     right: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 24,
@@ -369,13 +365,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
     borderWidth: 1,
-    borderColor: '#E4E6EB',
+    borderColor: C.line,
   },
   floatingAiIcon: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -383,27 +379,27 @@ const styles = StyleSheet.create({
   floatingAiText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#050505',
+    color: C.ink,
   },
 
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: C.page },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  errorText: { color: '#65676B', marginBottom: 12 },
-  retryButton: { backgroundColor: '#0084FF', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
+  errorText: { color: C.muted, marginBottom: 12 },
+  retryButton: { backgroundColor: C.brand, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
   retryText: { color: '#fff', fontWeight: '600' },
-  list: { flexGrow: 1, backgroundColor: '#fff', paddingBottom: 16 },
-  empty: { textAlign: 'center', color: '#8A8D91', marginTop: 40, paddingHorizontal: 24, fontSize: 14 },
+  list: { flexGrow: 1, backgroundColor: C.page, paddingBottom: 16 },
+  empty: { textAlign: 'center', color: C.muted, marginTop: 40, paddingHorizontal: 24, fontSize: 14 },
 
   // List Header Styles
   listHeaderContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: C.page,
     paddingTop: 8,
     paddingBottom: 6,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F2F5',
+    backgroundColor: C.inputBg,
     marginHorizontal: 16,
     borderRadius: 20,
     paddingHorizontal: 12,
@@ -414,7 +410,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#050505',
+    color: C.ink,
     paddingVertical: 0,
   },
 
@@ -433,9 +429,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   thoughtBadge: {
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderWidth: 1.2,
-    borderColor: '#E2E8F0',
+    borderColor: C.line,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -451,14 +447,14 @@ const styles = StyleSheet.create({
   thoughtBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#334155',
+    color: C.ink,
     textAlign: 'center',
   },
   thoughtTailDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#94A3B8',
+    backgroundColor: C.muted,
     alignSelf: 'center',
     marginBottom: 2,
   },
@@ -466,22 +462,22 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: C.isDark ? '#2A2D4A' : '#EEF2FF',
     borderWidth: 2.5,
-    borderColor: '#4F46E5',
+    borderColor: C.isDark ? '#8B8CFF' : '#4F46E5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   storyAvatarTextMe: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: C.isDark ? '#8B8CFF' : '#4F46E5',
   },
   storyAvatar: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -493,7 +489,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#1877F2',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -506,14 +502,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     width: 20,
     height: 20,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: C.card,
   },
   activeBadgePos: {
     bottom: 0,
@@ -521,7 +517,7 @@ const styles = StyleSheet.create({
   },
   activeName: {
     fontSize: 12,
-    color: '#050505',
+    color: C.ink,
     textAlign: 'center',
     width: 60,
   },
@@ -537,18 +533,18 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: 18,
-    backgroundColor: '#F0F2F5',
+    backgroundColor: C.inputBg,
   },
   pillActive: {
-    backgroundColor: '#E7F3FF',
+    backgroundColor: C.brandSoft,
   },
   pillText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#050505',
+    color: C.ink,
   },
   pillTextActive: {
-    color: '#0064D1',
+    color: C.brandSoftText,
     fontWeight: '700',
   },
 
@@ -558,29 +554,29 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     position: 'relative',
   },
-  avatarGroup: { backgroundColor: '#31A24C' },
+  avatarGroup: { backgroundColor: C.success },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   rowBody: { flex: 1 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rowBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
-  roomName: { flex: 1, fontSize: 16, fontWeight: '500', color: '#050505', marginRight: 8 },
+  roomName: { flex: 1, fontSize: 16, fontWeight: '500', color: C.ink, marginRight: 8 },
   bold: { fontWeight: '700' },
-  time: { fontSize: 12, color: '#65676B' },
-  timeUnread: { color: '#0084FF', fontWeight: '700' },
-  preview: { flex: 1, fontSize: 14, color: '#65676B' },
-  previewUnread: { color: '#050505', fontWeight: '700' },
+  time: { fontSize: 12, color: C.muted },
+  timeUnread: { color: C.brand, fontWeight: '700' },
+  preview: { flex: 1, fontSize: 14, color: C.muted },
+  previewUnread: { color: C.ink, fontWeight: '700' },
   unreadBlueDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     marginLeft: 8,
   },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#E4E6EB', marginLeft: 80 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: C.line, marginLeft: 80 },
 });

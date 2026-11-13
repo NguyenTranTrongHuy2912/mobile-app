@@ -1,10 +1,20 @@
 import { Stack } from 'expo-router';
+import { useScreenColors } from '../../src/features/theme/useScreenColors';
 
 export const unstable_settings = { anchor: '(tabs)' };
 
 export default function AppLayout() {
+  const C = useScreenColors();
+
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: C.card },
+        headerTintColor: C.ink,
+        headerTitleStyle: { color: C.ink },
+        contentStyle: { backgroundColor: C.screen },
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="chat/[roomId]"

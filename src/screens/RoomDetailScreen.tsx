@@ -1,15 +1,8 @@
-import React, { useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import {
   useCreateRoomMutation,
   useGetRoomsQuery,
@@ -20,6 +13,7 @@ import MemberItem from '../components/MemberItem';
 import ScalePressable from '../components/ScalePressable';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 
 /**
  * Màn hình Chi tiết phòng chat / Quản lý nhóm
@@ -30,6 +24,17 @@ export default function RoomDetailScreen() {
   const router = useRouter();
   const currentUserId = useAppSelector((s) => s.session.userId);
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const navigation = useNavigation();
+  const C = useScreenColors();
+  const styles = useMemo(() => makeStyles(C), [C]);
+
+  // Header điều hướng cũng đổi theo sáng/tối
+  useEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: C.card },
+      headerTintColor: C.ink,
+    });
+  }, [navigation, C.card, C.ink]);
 
   const { data: rooms = [] } = useGetRoomsQuery();
   const room = rooms.find((r) => r.id === roomId);
@@ -106,7 +111,7 @@ export default function RoomDetailScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* 1. Header Avatar & Tên phòng */}
       <View style={styles.headerCard}>
-        <View style={[styles.avatarBig, isGroup && styles.avatarGroup]}>
+        <View style={{ ...styles.avatarBig, ...(isGroup ? styles.avatarGroup : null) }}>
           <Text style={styles.avatarBigText}>{room.name.charAt(0).toUpperCase()}</Text>
         </View>
         <Text style={styles.roomTitle} numberOfLines={2}>
@@ -123,7 +128,7 @@ export default function RoomDetailScreen() {
               style={styles.actionCircle}
               onPress={() => Alert.alert('Thông báo', 'Đã bật chế độ im lặng cho phòng chat.')}
             >
-              <Ionicons name="notifications-off-outline" size={20} color="#050505" />
+              <Ionicons name="notifications-off-outline" size={20} color={C.ink} />
             </ScalePressable>
             <Text style={styles.actionLabel}>Tắt thông báo</Text>
           </View>
@@ -131,7 +136,7 @@ export default function RoomDetailScreen() {
           {isGroup && (
             <View style={styles.actionItem}>
               <ScalePressable style={styles.actionCircle} onPress={handleOpenAiSummarize}>
-                <Ionicons name="sparkles" size={20} color="#0084FF" />
+                <Ionicons name="sparkles" size={20} color={C.brand} />
               </ScalePressable>
               <Text style={styles.actionLabel}>AI Tóm tắt</Text>
             </View>
@@ -142,7 +147,7 @@ export default function RoomDetailScreen() {
               style={styles.actionCircle}
               onPress={() => setShowSearchModal(true)}
             >
-              <Ionicons name="search-outline" size={20} color="#050505" />
+              <Ionicons name="search-outline" size={20} color={C.ink} />
             </ScalePressable>
             <Text style={styles.actionLabel}>Tìm kiếm</Text>
           </View>
@@ -182,28 +187,28 @@ export default function RoomDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>TÙY CHỌN</Text>
         <View style={styles.optionsCard}>
-          <Pressable
+          <View
             style={styles.optionRow}
             onPress={() => Alert.alert('Quyền riêng tư', 'Cuộc trò chuyện này được mã hóa và bảo mật qua hệ thống gRPC Token.')}
           >
-            <View style={[styles.optionIconWrap, { backgroundColor: '#E7F3FF' }]}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#0084FF" />
+            <View style={{ ...styles.optionIconWrap, backgroundColor: C.brandSoft }}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={C.brand} />
             </View>
             <Text style={styles.optionText}>Quyền riêng tư & Bảo mật</Text>
-            <Ionicons name="chevron-forward" size={18} color="#8A8D91" />
-          </Pressable>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </View>
 
           {isGroup && (
-            <Pressable
-              style={[styles.optionRow, styles.optionBorder]}
+            <View
+              style={{ ...styles.optionRow, ...styles.optionBorder }}
               onPress={handleLeaveGroup}
             >
-              <View style={[styles.optionIconWrap, { backgroundColor: '#FFEBEE' }]}>
-                <Ionicons name="log-out-outline" size={20} color="#FA383E" />
+              <View style={{ ...styles.optionIconWrap, backgroundColor: C.dangerSoft }}>
+                <Ionicons name="log-out-outline" size={20} color={C.danger} />
               </View>
-              <Text style={[styles.optionText, styles.dangerText]}>Rời khỏi nhóm</Text>
-              <Ionicons name="chevron-forward" size={18} color="#8A8D91" />
-            </Pressable>
+              <Text style={{ ...styles.optionText, ...styles.dangerText }}>Rời khỏi nhóm</Text>
+              <Ionicons name="chevron-forward" size={18} color={C.muted} />
+            </View>
           )}
         </View>
       </View>
@@ -228,34 +233,35 @@ export default function RoomDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F2F5' },
+const makeStyles = (C: ScreenColors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.screen },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  notFoundText: { fontSize: 16, color: '#65676B' },
+  notFoundText: { fontSize: 16, color: C.muted },
   content: { paddingBottom: 40 },
 
   // Header Card
   headerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     alignItems: 'center',
     paddingVertical: 24,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E6EB',
+    borderBottomColor: C.line,
   },
   avatarBig: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  avatarGroup: { backgroundColor: '#31A24C' },
+  avatarGroup: { backgroundColor: C.success },
   avatarBigText: { fontSize: 32, fontWeight: '700', color: '#fff' },
-  roomTitle: { fontSize: 20, fontWeight: '700', color: '#050505', textAlign: 'center' },
-  roomSubtitle: { fontSize: 13, color: '#65676B', marginTop: 4, textAlign: 'center' },
+  roomTitle: { fontSize: 20, fontWeight: '700', color: C.ink, textAlign: 'center' },
+  roomSubtitle: { fontSize: 13, color: C.muted, marginTop: 4, textAlign: 'center' },
 
   actionRow: {
     flexDirection: 'row',
@@ -268,12 +274,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F0F2F5',
+    backgroundColor: C.inputBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
   },
-  actionLabel: { fontSize: 12, color: '#050505', fontWeight: '500' },
+  actionLabel: { fontSize: 12, color: C.ink, fontWeight: '500' },
 
   // Sections
   section: { marginTop: 20, paddingHorizontal: 16 },
@@ -286,17 +292,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#65676B',
+    color: C.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   memberCard: {
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderRadius: 14,
     overflow: 'hidden',
   },
   optionsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderRadius: 14,
     overflow: 'hidden',
     marginTop: 8,
@@ -309,7 +315,7 @@ const styles = StyleSheet.create({
   },
   optionBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E4E6EB',
+    borderTopColor: C.line,
   },
   optionIconWrap: {
     width: 36,
@@ -319,6 +325,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  optionText: { flex: 1, fontSize: 15, fontWeight: '500', color: '#050505' },
-  dangerText: { color: '#FA383E', fontWeight: '600' },
+  optionText: { flex: 1, fontSize: 15, fontWeight: '500', color: C.ink },
+  dangerText: { color: C.danger, fontWeight: '600' },
 });

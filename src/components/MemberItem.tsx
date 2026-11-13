@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, Image } from 'react-native'; // Đổi sang thẻ Image của React Native
+import { StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, useTheme, View, XStack, YStack } from 'tamagui';
+import { Text, View, XStack, YStack } from 'tamagui';
 import { ActiveBadge } from './ActiveBadge';
+import { useScreenColors } from '../features/theme/useScreenColors';
 
 interface MemberItemProps {
   userId: string;
@@ -14,10 +15,6 @@ interface MemberItemProps {
   onDirectChat?: () => void;
 }
 
-const ROLE_BG = '#E7F3FF';
-const ROLE_TEXT = '#0064D1';
-const ONLINE = '#31A24C';
-
 const AVATAR = 44;
 
 export default function MemberItem({
@@ -28,16 +25,16 @@ export default function MemberItem({
   isSelf = false,
   onDirectChat,
 }: MemberItemProps) {
-  const theme = useTheme();
+  const C = useScreenColors();
 
   return (
     <XStack
-      borderBottomColor="line"
       style={{
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: C.line,
       }}
     >
       <View style={{ position: 'relative', marginRight: 12 }}>
@@ -48,13 +45,13 @@ export default function MemberItem({
           />
         ) : (
           <YStack
-            backgroundColor="brand"
             style={{
               width: AVATAR,
               height: AVATAR,
               borderRadius: AVATAR / 2,
               justifyContent: 'center',
               alignItems: 'center',
+              backgroundColor: C.brand,
             }}
           >
             <Text color="#fff" fontSize={18} fontWeight="700">
@@ -67,19 +64,24 @@ export default function MemberItem({
 
       <YStack style={{ flex: 1 }}>
         <XStack style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-          <Text color="ink" fontSize={15} fontWeight="600" numberOfLines={1}>
+          <Text
+            fontSize={15}
+            fontWeight="600"
+            numberOfLines={1}
+            style={{ color: C.ink }}
+          >
             {isSelf ? `${displayName} (Bạn)` : displayName}
           </Text>
           {isCreator ? (
             <View
               style={{
-                backgroundColor: ROLE_BG,
+                backgroundColor: C.brandSoft,
                 paddingHorizontal: 6,
                 paddingVertical: 2,
                 borderRadius: 4,
               }}
             >
-              <Text style={{ color: ROLE_TEXT }} fontSize={11} fontWeight="600">
+              <Text fontSize={11} fontWeight="600" style={{ color: C.brandSoftText }}>
                 Trưởng nhóm
               </Text>
             </View>
@@ -88,7 +90,7 @@ export default function MemberItem({
         <Text
           fontSize={12}
           style={{
-            color: isOnline ? ONLINE : (theme.muted.get() as string),
+            color: isOnline ? C.success : C.muted,
             fontWeight: isOnline ? '500' : '400',
             marginTop: 2,
           }}
@@ -99,7 +101,6 @@ export default function MemberItem({
 
       {!isSelf && onDirectChat ? (
         <View
-          backgroundColor="surface"
           style={{
             width: 36,
             height: 36,
@@ -107,17 +108,13 @@ export default function MemberItem({
             justifyContent: 'center',
             alignItems: 'center',
             marginLeft: 8,
+            backgroundColor: C.chip,
           }}
-          scale={"1 press:0.92" as any}
           onPress={onDirectChat}
           role="button"
           aria-label="Nhắn tin"
         >
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={18}
-            color={theme.brand.get() as string}
-          />
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={C.brand} />
         </View>
       ) : null}
     </XStack>
