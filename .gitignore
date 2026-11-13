@@ -2,6 +2,9 @@
 
 .env 
 
+# codegraph
+.codegraph/
+
 # dependencies
 node_modules/
 
