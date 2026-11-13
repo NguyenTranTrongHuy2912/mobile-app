@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Keyboard,
@@ -7,10 +8,11 @@ import {
   LayoutAnimation,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
 } from 'react-native';
-import { Spinner, Text, View, useTheme } from 'tamagui';
+import { Spinner, Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -37,28 +39,11 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { newId } from '../utils/newId';
 import { useSendImage, type PickedImage } from '../features/chat/useSendImage';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import ChatImage from '../components/ChatImage';
 import ChatVideo from '../components/ChatVideo';
 import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
-
-// Bảng màu của màn hình, lấy từ theme Tamagui (tamagui.config.ts) nên tự đổi theo chế độ sáng/tối
-type ChatColors = {
-  screen: string; // nền màn hình
-  card: string; // bong bóng người khác, thanh nhập, thanh emoji
-  ink: string; // chữ chính
-  muted: string; // chữ phụ, icon phụ
-  line: string; // đường kẻ
-  brand: string; // màu nhấn (bong bóng của mình, icon)
-  brandSoft: string; // nền nút Tóm tắt
-  brandSoftText: string;
-  danger: string;
-  inputBg: string; // nền ô nhập
-  chip: string; // nền nút "Tải tin nhắn cũ hơn"
-};
-
-const themeValue = (v: { val: unknown } | undefined, fallback: string): string =>
-  typeof v?.val === 'string' ? v.val : fallback;
 
 const MAX_IMAGES_PER_PICK = 5;
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
@@ -89,32 +74,8 @@ export default function ChatRoomScreen() {
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');
 
-  const isDark = useAppSelector((s) => s.theme.isDark);
-  const theme = useTheme();
-  const bg = themeValue(theme.background, isDark ? '#18191A' : '#FFFFFF');
-  const surface = themeValue(theme.surface, isDark ? '#242526' : '#F5F7FA');
-  const ink = themeValue(theme.ink, isDark ? '#E4E6EB' : '#050505');
-  const muted = themeValue(theme.muted, isDark ? '#B0B3B8' : '#65676B');
-  const line = themeValue(theme.line, isDark ? '#3E4042' : '#CED0D4');
-  const brand = themeValue(theme.brand, '#2F6BFF');
-  const danger = themeValue(theme.danger, isDark ? '#FA383E' : '#E41E3F');
-  const C = useMemo<ChatColors>(
-    () => ({
-      // Sáng: nền xám nhạt + bong bóng trắng. Tối: nền đen + bong bóng xám đậm
-      screen: isDark ? bg : surface,
-      card: isDark ? surface : bg,
-      ink,
-      muted,
-      line,
-      brand,
-      danger,
-      brandSoft: isDark ? '#1E2A4A' : '#E6EEFF',
-      brandSoftText: isDark ? '#8AB0FF' : brand,
-      inputBg: isDark ? '#3A3B3C' : '#F0F2F5',
-      chip: isDark ? '#3A3B3C' : '#E4E6EB',
-    }),
-    [isDark, bg, surface, ink, muted, line, brand, danger],
-  );
+  const C = useScreenColors();
+  const isDark = C.isDark;
   const styles = useMemo(() => makeStyles(C), [C]);
 
   const { data, isLoading } = useGetMessagesQuery(roomId, {
@@ -182,7 +143,6 @@ export default function ChatRoomScreen() {
     }
   };
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const isDark = useAppSelector((s) => s.theme.isDark);
   const [reactions, setReactions] = useState<Record<string, string>>({});
   const [reactionTargetMsg, setReactionTargetMsg] = useState<Message | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
@@ -374,13 +334,10 @@ export default function ChatRoomScreen() {
     return () => clearTimeout(t);
   }, [notice]);
 
-  // Tra tên người gửi từ danh sách thành viên của phòng (đã có trong cache danh sách phòng)
-  const { room } = useGetRoomsQuery(undefined, {
-    selectFromResult: ({ data }) => ({ room: data?.find((r) => r.id === roomId) }),
-  });
+  // Tra tên người gửi từ danh sách thành viên của phòng
   const names = useMemo(
-    () => new Map((room?.members ?? []).map((m) => [m.userId, m.displayName] as const)),
-    [room],
+    () => new Map((currentRoom?.members ?? []).map((m) => [m.userId, m.displayName] as const)),
+    [currentRoom],
   );
 
   // Đánh dấu đã đọc khi mở phòng và mỗi khi có tin mới từ người khác
@@ -539,7 +496,7 @@ export default function ChatRoomScreen() {
           </View>
         )}
         <AnimatedMessageItem style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowOther]}>
-          <View
+          <Pressable
             onPress={() => setSelectedMsgId(isSelected ? null : item.id)}
             onLongPress={() => handleLongPress(item)}
             delayLongPress={250}
@@ -557,7 +514,7 @@ export default function ChatRoomScreen() {
                     <Ionicons name="sparkles" size={10} color="#fff" />
                   </View>
                 )}
-                <Text style={{ ...styles.sender, isHqAi && styles.aiSenderText, ...(isMedia || isBigEmoji ? styles.imagePad : null) }}>
+                <Text style={{ ...styles.sender, ...(isHqAi ? styles.aiSenderText : null), ...(isMedia || isBigEmoji ? styles.imagePad : null) }}>
                   {isHqAi ? 'HQ AI 🤖' : (names.get(item.senderId) ?? 'Người dùng')}
                 </Text>
               </View>
@@ -595,7 +552,7 @@ export default function ChatRoomScreen() {
                 <Text style={styles.reactionBadgeText}>{reactions[item.id]}</Text>
               </View>
             ) : null}
-          </View>
+          </Pressable>
           {mine && item.status === 'failed' && (
             <View
               onPress={() => (isMedia ? retryImage(item) : send(item.content, item.id))}
@@ -619,7 +576,7 @@ export default function ChatRoomScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, isDark && { backgroundColor: '#18191A' }] }
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -660,7 +617,7 @@ export default function ChatRoomScreen() {
       {/* Banner gợi ý triệu hồi @HQ AI khi gõ @ (nằm trên inputBar với chiều rộng 100%) */}
       {draft.includes('@') && (
         <Pressable
-          style={[styles.mentionBanner, isDark && { backgroundColor: '#1A2332', borderTopColor: '#2C3E5A' }]}
+          style={styles.mentionBanner}
           onPress={() => {
             const base = draft.replace(/@[^@\s]*$/, '');
             dispatch(setDraft({ roomId, text: (base ? base + ' ' : '') + '@HQ AI ' }));
@@ -669,16 +626,16 @@ export default function ChatRoomScreen() {
           <View style={styles.mentionAvatar}>
             <Ionicons name="sparkles" size={13} color="#fff" />
           </View>
-          <Text style={[styles.mentionText, isDark && { color: '#E4E6EB' }]}>
+          <Text style={styles.mentionText}>
             Nhắc tên <Text style={styles.mentionBold}>@HQ AI</Text> để hỏi đáp hoặc tóm tắt phòng
           </Text>
-          <Ionicons name="arrow-forward-circle" size={18} color="#0084FF" />
+          <Ionicons name="arrow-forward-circle" size={18} color={C.brand} />
         </Pressable>
       )}
 
-      <View style={[styles.inputBar, isDark && { backgroundColor: '#242526', borderTopColor: '#3A3B3C' }]}>
+      <View style={styles.inputBar}>
         {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
-        {isCollapsed || draft.trim().length > 0 ? (
+        {isCollapsed ? (
           <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
             <Ionicons name="chevron-forward" size={24} color={C.brand} />
           </View>
@@ -702,16 +659,14 @@ export default function ChatRoomScreen() {
               hitSlop={6}
               style={styles.iconButton}
             >
-              <Ionicons name="mic" size={24} color="#0084FF" />
-            </Pressable>
-            <Pressable
+              <Ionicons name="mic" size={24} color={C.brand} />
+            </View>
+            <View
               onPress={() => setShowAiToolModal(true)}
               hitSlop={6}
               style={styles.iconButton}
             >
-              <Ionicons name="sparkles" size={24} color="#0084FF" />
-            </Pressable>
-              <Ionicons name="mic" size={24} color={C.brand} />
+              <Ionicons name="sparkles" size={24} color={C.brand} />
             </View>
             {draft.trim().length > 0 && (
               <View onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
@@ -722,7 +677,7 @@ export default function ChatRoomScreen() {
         )}
 
         {/* Khung chứa ô nhập văn bản và nút emoji */}
-        <View style={[styles.inputWrapper, isDark && { backgroundColor: '#3A3B3C' }]}>
+        <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn..."
@@ -793,11 +748,11 @@ export default function ChatRoomScreen() {
           <Pressable style={styles.aiToolCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.aiToolHeader}>
               <View style={styles.aiToolTitleRow}>
-                <Ionicons name="sparkles" size={18} color="#0084FF" style={{ marginRight: 6 }} />
+                <Ionicons name="sparkles" size={18} color={C.brand} style={{ marginRight: 6 }} />
                 <Text style={styles.aiToolTitle}>Công cụ HQ AI</Text>
               </View>
               <Pressable onPress={() => setShowAiToolModal(false)} hitSlop={8}>
-                <Ionicons name="close" size={20} color="#8A8D91" />
+                <Ionicons name="close" size={20} color={C.muted} />
               </Pressable>
             </View>
 
@@ -808,8 +763,8 @@ export default function ChatRoomScreen() {
                 handleOpenAiSummarize();
               }}
             >
-              <View style={[styles.aiToolIconWrap, { backgroundColor: '#E7F3FF' }]}>
-                <Ionicons name="document-text-outline" size={20} color="#0084FF" />
+              <View style={[styles.aiToolIconWrap, { backgroundColor: C.brandSoft }]}>
+                <Ionicons name="document-text-outline" size={20} color={C.brand} />
               </View>
               <View style={styles.aiToolRowText}>
                 <Text style={styles.aiToolRowTitle}>Tóm tắt cuộc trò chuyện này</Text>
@@ -859,7 +814,7 @@ export default function ChatRoomScreen() {
               )}
               {isRewriting && (
                 <View style={styles.rewritingLoading}>
-                  <ActivityIndicator size="small" color="#0084FF" />
+                  <ActivityIndicator size="small" color={C.brand} />
                   <Text style={styles.rewritingText}>HQ AI đang viết lại câu chữ...</Text>
                 </View>
               )}
@@ -874,8 +829,8 @@ export default function ChatRoomScreen() {
                 dispatch(setDraft({ roomId, text: '@HQ AI ' }));
               }}
             >
-              <View style={[styles.aiToolIconWrap, { backgroundColor: '#F0E6FF' }]}>
-                <Ionicons name="chatbubbles-outline" size={20} color="#7F3DFF" />
+              <View style={[styles.aiToolIconWrap, { backgroundColor: C.brandSoft }]}>
+                <Ionicons name="chatbubbles-outline" size={20} color={C.brand} />
               </View>
               <View style={styles.aiToolRowText}>
                 <Text style={styles.aiToolRowTitle}>Hỏi @HQ AI trong phòng</Text>
@@ -894,7 +849,7 @@ export default function ChatRoomScreen() {
         onRequestClose={() => setShowActionModal(false)}
       >
         <Pressable style={styles.reactionModalOverlay} onPress={() => setShowActionModal(false)}>
-          <View style={[styles.reactionCard, isDark && { backgroundColor: '#242526' }]}>
+          <View style={styles.reactionCard}>
             {/* Thanh biểu cảm Reaction */}
             <View style={styles.reactionBar}>
               {['❤️', '👍', '😂', '😮', '😢'].map((emoji) => (
@@ -911,8 +866,8 @@ export default function ChatRoomScreen() {
             {/* Menu hành động */}
             <View style={styles.actionMenuDivider} />
             <Pressable style={styles.actionMenuItem} onPress={handleCopyContent}>
-              <Ionicons name="copy-outline" size={18} color={isDark ? '#E4E6EB' : '#1E293B'} />
-              <Text style={[styles.actionMenuItemText, isDark && { color: '#E4E6EB' }]}>
+              <Ionicons name="copy-outline" size={18} color={C.ink} />
+              <Text style={styles.actionMenuItemText}>
                 Sao chép văn bản
               </Text>
             </Pressable>
@@ -923,7 +878,7 @@ export default function ChatRoomScreen() {
   );
 }
 
-const makeStyles = (C: ChatColors) =>
+const makeStyles = (C: ScreenColors) =>
   StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
@@ -1133,7 +1088,7 @@ const makeStyles = (C: ChatColors) =>
     marginTop: 1,
   },
   headerActiveText: {
-    color: '#31A24C',
+    color: C.success,
     fontWeight: '600',
   },
   dateDividerWrap: {
@@ -1154,13 +1109,13 @@ const makeStyles = (C: ChatColors) =>
   },
   // --- HQ AI In-Chat Styles ---
   bubbleAi: {
-    backgroundColor: '#F5F8FF',
+    backgroundColor: C.brandSoft,
     borderWidth: 1,
-    borderColor: '#D0D9FF',
+    borderColor: C.line,
     borderBottomLeftRadius: 4,
   },
   textAi: {
-    color: '#050505',
+    color: C.ink,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -1173,29 +1128,29 @@ const makeStyles = (C: ChatColors) =>
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 4,
   },
   aiSenderText: {
-    color: '#0064D1',
+    color: C.brandSoftText,
     fontWeight: '700',
   },
   mentionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF4FF',
+    backgroundColor: C.brandSoft,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#D0D9FF',
+    borderTopColor: C.line,
   },
   mentionAvatar: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#0084FF',
+    backgroundColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -1203,11 +1158,11 @@ const makeStyles = (C: ChatColors) =>
   mentionText: {
     flex: 1,
     fontSize: 13,
-    color: '#050505',
+    color: C.ink,
   },
   mentionBold: {
     fontWeight: '700',
-    color: '#0064D1',
+    color: C.brandSoftText,
   },
   modalOverlay: {
     flex: 1,
@@ -1218,7 +1173,7 @@ const makeStyles = (C: ChatColors) =>
   aiToolCard: {
     width: '90%',
     maxWidth: 420,
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderRadius: 20,
     padding: 18,
     shadowColor: '#000',
@@ -1240,7 +1195,7 @@ const makeStyles = (C: ChatColors) =>
   aiToolTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#050505',
+    color: C.ink,
   },
   aiToolRow: {
     flexDirection: 'row',
@@ -1261,16 +1216,16 @@ const makeStyles = (C: ChatColors) =>
   aiToolRowTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#050505',
+    color: C.ink,
   },
   aiToolRowDesc: {
     fontSize: 12,
-    color: '#65676B',
+    color: C.muted,
     marginTop: 2,
   },
   aiToolDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E4E6EB',
+    backgroundColor: C.line,
     marginVertical: 10,
   },
   aiRewriteSection: {
@@ -1279,7 +1234,7 @@ const makeStyles = (C: ChatColors) =>
   aiSectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#65676B',
+    color: C.muted,
     marginBottom: 8,
   },
   tonePillsRow: {
@@ -1288,21 +1243,21 @@ const makeStyles = (C: ChatColors) =>
     gap: 8,
   },
   tonePill: {
-    backgroundColor: '#F0F2F5',
+    backgroundColor: C.inputBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4E6EB',
+    borderColor: C.line,
   },
   tonePillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#050505',
+    color: C.ink,
   },
   aiHintText: {
     fontSize: 12,
-    color: '#8A8D91',
+    color: C.muted,
     fontStyle: 'italic',
   },
   rewritingLoading: {
@@ -1312,18 +1267,18 @@ const makeStyles = (C: ChatColors) =>
   },
   rewritingText: {
     fontSize: 13,
-    color: '#0084FF',
+    color: C.brand,
     marginLeft: 6,
   },
   reactionBadge: {
     position: 'absolute',
     bottom: -8,
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderRadius: 12,
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: C.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -1347,7 +1302,7 @@ const makeStyles = (C: ChatColors) =>
     padding: 24,
   },
   reactionCard: {
-    backgroundColor: '#fff',
+    backgroundColor: C.card,
     borderRadius: 16,
     padding: 14,
     width: '100%',
@@ -1371,7 +1326,7 @@ const makeStyles = (C: ChatColors) =>
   },
   actionMenuDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: C.line,
     marginVertical: 10,
   },
   actionMenuItem: {
@@ -1385,6 +1340,6 @@ const makeStyles = (C: ChatColors) =>
   actionMenuItemText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: C.ink,
   },
 });

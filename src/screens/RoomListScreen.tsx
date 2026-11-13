@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Spinner, Text, View } from 'tamagui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,12 +12,10 @@ import {
 import { useAppSelector } from '../store/hooks';
 import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { ActiveBadge } from '../components/ActiveBadge';
-import ScalePressable from '../components/ScalePressable';
 import FloatingAiButton from '../components/FloatingAiButton';
 import UserNoteModal from '../components/UserNoteModal';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
-import { colors } from '../theme';
 
 const POLL_MS = 20000;
 
@@ -161,7 +159,7 @@ export default function RoomListScreen() {
         <TextInput
           style={styles.searchInput}
           placeholder="Hỏi Meta AI hoặc tìm kiếm..."
-          placeholderTextColor="#8A8D91"
+          placeholderTextColor={C.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -312,7 +310,7 @@ export default function RoomListScreen() {
   };
 
   return (
-    <View style={[styles.container, isDark && { backgroundColor: '#18191A' }]}>
+    <View style={styles.container}>
       <FlatList
         data={filteredRooms}
         keyExtractor={(r) => r.id}
@@ -321,14 +319,14 @@ export default function RoomListScreen() {
         refreshing={refreshing}
         onRefresh={onRefresh}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={[styles.list, isDark && { backgroundColor: '#18191A' }]}
+        contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconCircle}>
               <Ionicons
                 name={filter === 'unread' ? 'checkmark-done-circle' : filter === 'group' ? 'people' : 'chatbubbles'}
                 size={40}
-                color={colors.primary}
+                color={C.brand}
               />
             </View>
             <Text style={styles.emptyTitle}>
@@ -380,46 +378,36 @@ export default function RoomListScreen() {
 
 const makeStyles = (C: ScreenColors) =>
   StyleSheet.create({
-  floatingAiBtn: {
-    position: 'absolute',
-    bottom: 24,
-    right: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  floatingAiIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  floatingAiText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: C.ink,
-  },
 
   container: { flex: 1, backgroundColor: C.page },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   errorText: { color: C.muted, marginBottom: 12 },
   retryButton: { backgroundColor: C.brand, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
   retryText: { color: '#fff', fontWeight: '600' },
-  list: { flexGrow: 1, backgroundColor: '#fff', paddingBottom: 16 },
-  empty: { textAlign: 'center', color: '#8A8D91', marginTop: 40, paddingHorizontal: 24, fontSize: 14 },
+  list: { flexGrow: 1, backgroundColor: C.page, paddingBottom: 16 },
+
+  // Trạng thái rỗng (danh sách phòng trống)
+  emptyCard: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 48 },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: C.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.ink, marginBottom: 6, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.brand,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+  },
+  emptyCtaText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   // List Header Styles
   listHeaderContainer: {
@@ -493,24 +481,16 @@ const makeStyles = (C: ScreenColors) =>
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: C.isDark ? '#2A2D4A' : '#EEF2FF',
+    backgroundColor: C.brandSoft,
     borderWidth: 2.5,
-    borderColor: C.isDark ? '#8B8CFF' : '#4F46E5',
+    borderColor: C.brand,
     justifyContent: 'center',
     alignItems: 'center',
   },
   storyAvatarTextMe: {
     fontSize: 20,
     fontWeight: '700',
-    color: C.isDark ? '#8B8CFF' : '#4F46E5',
-  },
-  storyAvatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: C.brandSoftText,
   },
   friendAvatarWrap: {
     position: 'relative',
@@ -528,19 +508,6 @@ const makeStyles = (C: ScreenColors) =>
     fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-  },
-  addStoryPlus: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: C.brand,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: C.card,
   },
   activeBadgePos: {
     bottom: 0,
