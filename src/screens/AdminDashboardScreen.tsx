@@ -121,15 +121,8 @@ export default function AdminDashboardScreen() {
       });
       if (usersRes.ok) {
         const usersData = await usersRes.json();
-        // Luôn đảm bảo tài khoản nguyenvanquoclt1@gmail.com có role USER
         const rawUsers: AdminUserItem[] = usersData.users || [];
-        const normalizedUsers = rawUsers.map((u) => {
-          if (u.account?.toLowerCase() === 'nguyenvanquoclt1@gmail.com') {
-            return { ...u, role: 'USER' as const };
-          }
-          return u;
-        });
-        setUsers(normalizedUsers);
+        setUsers(rawUsers);
       }
     } catch (e) {
       console.error('Lỗi tải dữ liệu quản trị:', e);
