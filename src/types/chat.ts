@@ -4,6 +4,7 @@ export type RoomType = 'direct' | 'group';
 export interface RoomMember {
   userId: string;
   displayName: string;
+  avatarUrl?: string;
 }
 
 export interface Room {

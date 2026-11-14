@@ -29,6 +29,7 @@ import SemanticSearchModal from '../components/SemanticSearchModal';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
+  useGetFriendsQuery,
   useLoadEarlierMessagesMutation,
   useMarkRoomReadMutation,
   useSendMessageMutation,
@@ -39,6 +40,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
 import { startOutgoingCall } from '../features/call/callSlice';
 import { sendCallSignal } from '../features/call/callSignalEmitter';
+import { webrtcService } from '../services/webrtcService';
 import { newId } from '../utils/newId';
 import { useSendImage, type PickedImage } from '../features/chat/useSendImage';
 import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
@@ -225,12 +227,15 @@ export default function ChatRoomScreen() {
 
   const navigation = useNavigation();
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const { data: friends = [] } = useGetFriendsQuery();
   const { data: rooms } = useGetRoomsQuery();
   const currentRoom = rooms?.find((r) => r.id === roomId);
   const isDirect = currentRoom?.type === 'direct';
   const otherMember = isDirect ? currentRoom?.members.find((m) => m.userId !== userId) : undefined;
   const otherUserId = otherMember?.userId;
-  const isOtherOnline = otherUserId ? !!onlineUserIds[otherUserId] : false;
+  // Trạng thái hoạt động: Chỉ hiển thị chính xác cho người dùng ĐÃ KẾT BẠN
+  const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
+  const isOtherOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
   const headerTitle = currentRoom?.name || 'Chat';
 
   useEffect(() => {
@@ -248,7 +253,7 @@ export default function ChatRoomScreen() {
                 {headerTitle.charAt(0).toUpperCase()}
               </Text>
             </View>
-            {isDirect && isOtherOnline ? (
+            {isDirect && isFriend && isOtherOnline ? (
               <ActiveBadge size={12} style={{ bottom: -2, right: -2 }} />
             ) : null}
           </View>
@@ -257,9 +262,11 @@ export default function ChatRoomScreen() {
               {headerTitle}
             </Text>
             {isDirect ? (
-              <Text style={{ ...styles.headerSubtitleText, ...(isOtherOnline ? styles.headerActiveText : null) }}>
-                {isOtherOnline ? 'Đang hoạt động' : 'Hoạt động gần đây'}
-              </Text>
+              isFriend ? (
+                <Text style={{ ...styles.headerSubtitleText, ...(isOtherOnline ? styles.headerActiveText : null) }}>
+                  {isOtherOnline ? 'Đang hoạt động' : 'Hoạt động gần đây'}
+                </Text>
+              ) : null
             ) : currentRoom?.members.length ? (
               <Text style={styles.headerSubtitleText}>
                 {currentRoom.members.length} thành viên · Chi tiết
@@ -270,9 +277,9 @@ export default function ChatRoomScreen() {
       ),
       headerRight: () => (
         <View style={styles.headerRightActions}>
-          {isDirect && (
+          {otherMember?.userId !== 'hq_ai_bot' && (
             <>
-              {/* Nút Gọi Thoại (Audio Call) */}
+              {/* Nút Gọi Thoại (Audio Call 2 chiều / Nhóm) */}
               <Pressable
                 onPress={() => handleStartCall('audio')}
                 hitSlop={8}
@@ -281,7 +288,7 @@ export default function ChatRoomScreen() {
                 <Ionicons name="call" size={21} color="#0084FF" />
               </Pressable>
 
-              {/* Nút Gọi Video (Video Call) */}
+              {/* Nút Gọi Video (Video Call 2 chiều / Nhóm) */}
               <Pressable
                 onPress={() => handleStartCall('video')}
                 hitSlop={8}
@@ -366,41 +373,85 @@ export default function ChatRoomScreen() {
 
   const myDisplayName = useAppSelector((s) => s.session.displayName) || 'Tôi';
 
-  const handleStartCall = (type: 'audio' | 'video') => {
-    if (!isDirect) {
-      Alert.alert('Thông báo', 'Tính năng gọi nhóm đang được phát triển. Vui lòng gọi trong cuộc trò chuyện 1-1.');
-      return;
-    }
-    if (!otherMember) {
-      Alert.alert('Lỗi', 'Không tìm thấy thông tin người nhận cuộc gọi.');
-      return;
-    }
-    if (otherMember.userId === 'hq_ai_bot') {
-      Alert.alert('Thông báo', 'Không thể gọi điện cho Trợ lý ảo HQ AI.');
-      return;
-    }
+  const myAvatar = useAppSelector((s) => s.session.avatarUrl);
 
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    dispatch(
-      startOutgoingCall({
-        callId,
+  const handleStartCall = (type: 'audio' | 'video') => {
+    if (isDirect) {
+      if (!otherMember) {
+        Alert.alert('Lỗi', 'Không tìm thấy thông tin người nhận cuộc gọi.');
+        return;
+      }
+      if (otherMember.userId === 'hq_ai_bot') {
+        Alert.alert('Thông báo', 'Không thể gọi điện cho Trợ lý ảo HQ AI.');
+        return;
+      }
+
+      const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      dispatch(
+        startOutgoingCall({
+          callId,
+          roomId,
+          receiverId: otherMember.userId,
+          receiverName: otherMember.displayName,
+          callerId: userId,
+          callerName: myDisplayName,
+          callerAvatar: myAvatar,
+          callType: type,
+          isGroup: false,
+        }),
+      );
+      webrtcService.createPeerConnection(otherMember.userId, true, type).then(() => {
+        webrtcService.makeOffer(otherMember.userId, callId, roomId, type, {
+          caller_name: myDisplayName,
+          caller_avatar: myAvatar,
+        });
+      });
+    } else {
+      // Gọi nhóm (Group Calling qua WebRTC Mesh)
+      const groupMembers = (currentRoom?.members || []).filter(
+        (m) => m.userId !== userId && m.userId !== 'hq_ai_bot'
+      );
+      if (groupMembers.length === 0) {
+        Alert.alert('Thông báo', 'Phòng nhóm chưa có thành viên nào khác để thực hiện cuộc gọi.');
+        return;
+      }
+
+      const callId = `call_grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const participants = groupMembers.map((m) => ({
+        userId: m.userId,
+        displayName: m.displayName,
+        avatar: m.avatarUrl,
+        isMuted: false,
+        isVideoOff: false,
+        isSpeaking: false,
+      }));
+
+      dispatch(
+        startOutgoingCall({
+          callId,
+          roomId,
+          receiverId: groupMembers[0].userId,
+          receiverName: currentRoom?.name || 'Nhóm chat',
+          callerId: userId,
+          callerName: myDisplayName,
+          callerAvatar: myAvatar,
+          callType: type,
+          isGroup: true,
+          groupName: currentRoom?.name || 'Cuộc gọi nhóm',
+          participants,
+        }),
+      );
+
+      webrtcService.startGroupCall(
         roomId,
-        receiverId: otherMember.userId,
-        receiverName: otherMember.displayName,
-        callerId: userId,
-        callerName: myDisplayName,
-        callType: type,
-      }),
-    );
-    sendCallSignal({
-      type: 'CALL_OFFER',
-      call_id: callId,
-      room_id: roomId,
-      caller_id: userId,
-      caller_name: myDisplayName,
-      receiver_id: otherMember.userId,
-      call_type: type,
-    });
+        callId,
+        type,
+        groupMembers,
+        userId,
+        myDisplayName,
+        currentRoom?.name || 'Cuộc gọi nhóm'
+      );
+    }
   };
 
   // Đánh dấu đã đọc khi mở phòng và mỗi khi có tin mới từ người khác

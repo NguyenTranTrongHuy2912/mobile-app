@@ -20,6 +20,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { API_URL } from '../config';
 import { logout } from '../features/session/sessionSlice';
+import { useRouter } from 'expo-router';
 
 interface AdminStats {
   database: string;
@@ -48,6 +49,7 @@ type FilterType = 'all' | 'admin' | 'user' | 'active' | 'suspended';
 
 export default function AdminDashboardScreen() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 860;
@@ -55,6 +57,18 @@ export default function AdminDashboardScreen() {
   const token = useSelector((state: RootState) => state.session.token);
   const myName = useSelector((state: RootState) => state.session.displayName) || 'Administrator';
   const myAccount = useSelector((state: RootState) => state.session.userId);
+  const myRole = useSelector((state: RootState) => state.session.role);
+
+  // Bảo mật tuyệt đối: Chỉ có Quản trị viên (ADMIN) mới được truy cập Bảng điều khiển
+  useEffect(() => {
+    if (myRole !== 'ADMIN') {
+      Alert.alert(
+        'Từ chối truy cập',
+        'Khu vực này chỉ dành riêng cho Quản trị viên hệ thống. Người dùng không có quyền truy cập.'
+      );
+      router.replace('/(app)/(tabs)/rooms');
+    }
+  }, [myRole, router]);
 
   // Tính toán top padding an toàn tránh thanh trạng thái / tai thỏ
   const topSafePadding = Math.max(
@@ -501,6 +515,14 @@ export default function AdminDashboardScreen() {
       </View>
     </View>
   );
+
+  if (myRole !== 'ADMIN') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.rootContainer}>

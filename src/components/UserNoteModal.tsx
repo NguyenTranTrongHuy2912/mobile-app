@@ -161,12 +161,24 @@ export default function UserNoteModal({
             </View>
           )}
 
-          {/* Ghi chú thông báo phía dưới */}
+          {/* Ghi chú thông báo phía dưới & Xóa ghi chú */}
           <View style={styles.footerNoteWrap}>
             <RNText style={styles.footerNoteText}>
-              Bạn bè có thể xem ghi chú của bạn trong 24 giờ.{' '}
-              <RNText style={styles.changeLink}>Thay đổi</RNText>
+              Chỉ những người đã kết bạn mới có thể xem ghi chú của bạn trong 24 giờ.
             </RNText>
+            {currentNote ? (
+              <ScalePressable
+                onPress={() => {
+                  onSave('');
+                  onClose();
+                }}
+                style={{ marginTop: 10, paddingVertical: 6, paddingHorizontal: 14 }}
+              >
+                <Text style={{ color: '#E53E3E', fontSize: 13, fontWeight: '600' }}>
+                  Xóa ghi chú hiện tại
+                </Text>
+              </ScalePressable>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

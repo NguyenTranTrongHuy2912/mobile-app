@@ -18,6 +18,7 @@ import { chatApi } from '../../api/chatApi';
 import { setInitialPresence, setUserPresence } from '../presence/presenceSlice';
 import { logout } from '../session/sessionSlice';
 import type { Message } from '../../types/chat';
+import { webrtcService } from '../../services/webrtcService';
 
 interface WsMessagePayload {
   message_id: string;
@@ -245,10 +246,12 @@ export function useRealtime() {
                   callId: offer.call_id,
                   roomId: offer.room_id,
                   callerId: offer.caller_id,
-                  callerName: offer.caller_name || 'Người dùng',
+                  callerName: offer.caller_name || (offer.is_group ? offer.group_name : 'Người dùng'),
                   callerAvatar: offer.caller_avatar,
-                  receiverId: offer.receiver_id,
+                  receiverId: offer.receiver_id || userId,
                   callType: offer.call_type || 'audio',
+                  isGroup: !!offer.is_group,
+                  groupName: offer.group_name,
                 })
               );
             } else if (data.type === 'CALL_ANSWER') {
@@ -256,17 +259,28 @@ export function useRealtime() {
               if (ans.accepted) {
                 Vibration.cancel();
                 dispatch(callConnected());
+                if (ans.sdp) {
+                  webrtcService.handleAnswer(ans.responder_id || ans.caller_id, ans.sdp);
+                }
+              }
+            } else if (data.type === 'ICE_CANDIDATE') {
+              const cand = data as any;
+              if (cand.candidate) {
+                webrtcService.handleIceCandidate(cand.sender_id, cand.candidate);
               }
             } else if (data.type === 'CALL_HANGUP') {
               Vibration.cancel();
+              webrtcService.endAll();
               const hang = data as any;
               dispatch(setCallEnded({ reason: hang.message || 'Cuộc gọi đã kết thúc' }));
             } else if (data.type === 'CALL_UNAVAILABLE') {
               Vibration.cancel();
+              webrtcService.endAll();
               const un = data as any;
               dispatch(setCallEnded({ reason: un.message || 'Người dùng hiện không trực tuyến' }));
             } else if (data.type === 'CALL_BUSY') {
               Vibration.cancel();
+              webrtcService.endAll();
               const b = data as any;
               dispatch(setCallEnded({ reason: b.message || 'Người dùng đang bận' }));
             }

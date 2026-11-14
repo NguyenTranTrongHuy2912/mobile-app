@@ -16,6 +16,13 @@ import FloatingAiButton from '../components/FloatingAiButton';
 import UserNoteModal from '../components/UserNoteModal';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
+import { sendCallSignal } from '../features/call/callSignalEmitter';
+
+export interface ThoughtNoteData {
+  text: string;
+  createdAt: number;
+  expiresAt: number;
+}
 
 const POLL_MS = 20000;
 
@@ -48,20 +55,66 @@ export default function RoomListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [userNote, setUserNote] = useState('');
+  const [friendsNotes, setFriendsNotes] = useState<Record<string, ThoughtNoteData>>({});
 
-  // Tải ghi chú suy nghĩ đã lưu
+  // Tải ghi chú suy nghĩ đã lưu (kiểm tra hạn 24 giờ tự động hết hạn)
   useEffect(() => {
     if (myId) {
       AsyncStorage.getItem(`@user_thought_note_${myId}`).then((saved) => {
-        if (saved) setUserNote(saved);
+        if (saved) {
+          try {
+            const parsed: ThoughtNoteData = JSON.parse(saved);
+            if (parsed.expiresAt && Date.now() < parsed.expiresAt) {
+              setUserNote(parsed.text);
+            } else {
+              // Ghi chú đã quá 24h -> biến mất
+              setUserNote('');
+              AsyncStorage.removeItem(`@user_thought_note_${myId}`);
+            }
+          } catch {
+            setUserNote(saved);
+          }
+        }
+      });
+      // Tải ghi chú của bạn bè đã lưu trong cache
+      AsyncStorage.getItem(`@friends_thought_notes_${myId}`).then((saved) => {
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setFriendsNotes(parsed);
+          } catch {}
+        }
       });
     }
   }, [myId]);
 
   const handleSaveNote = async (newNote: string) => {
-    setUserNote(newNote);
+    const trimmed = newNote.trim();
+    if (!trimmed) {
+      setUserNote('');
+      if (myId) {
+        await AsyncStorage.removeItem(`@user_thought_note_${myId}`);
+      }
+      return;
+    }
+    const now = Date.now();
+    const noteData: ThoughtNoteData = {
+      text: trimmed,
+      createdAt: now,
+      expiresAt: now + 24 * 60 * 60 * 1000, // Đúng 24 tiếng
+    };
+    setUserNote(trimmed);
     if (myId) {
-      await AsyncStorage.setItem(`@user_thought_note_${myId}`, newNote);
+      await AsyncStorage.setItem(`@user_thought_note_${myId}`, JSON.stringify(noteData));
+      // Phát tín hiệu chia sẻ ghi chú tới tất cả bạn bè kết nối qua WebSocket
+      sendCallSignal({
+        type: 'USER_NOTE_BROADCAST',
+        user_id: myId,
+        display_name: myName,
+        note: trimmed,
+        created_at: now,
+        expires_at: noteData.expiresAt,
+      });
     }
   };
 
@@ -207,6 +260,13 @@ export default function RoomListScreen() {
         {/* Danh sách bạn bè Online */}
         {onlineFriends.map((f) => {
           const shortName = f.displayName.trim().split(' ').slice(-1)[0] || f.displayName;
+          const friendNote = friendsNotes[f.userId];
+          const hasFriendNote =
+            friendNote &&
+            friendNote.expiresAt &&
+            Date.now() < friendNote.expiresAt &&
+            !!friendNote.text;
+
           return (
             <View
               key={f.userId}
@@ -214,6 +274,16 @@ export default function RoomListScreen() {
               onPress={() => handleOpenDirectChat(f.userId, f.displayName)}
             >
               <View style={styles.friendAvatarWrap}>
+                {hasFriendNote ? (
+                  <>
+                    <View style={styles.thoughtBadge}>
+                      <Text style={styles.thoughtBadgeText} numberOfLines={1}>
+                        {friendNote.text}
+                      </Text>
+                    </View>
+                    <View style={styles.thoughtTailDot} />
+                  </>
+                ) : null}
                 <View style={styles.storyAvatarFriend}>
                   <Text style={styles.storyAvatarText}>
                     {f.displayName.charAt(0).toUpperCase()}
@@ -265,7 +335,9 @@ export default function RoomListScreen() {
     const unread = item.unreadCount > 0;
     const isDirect = item.type === 'direct';
     const otherUserId = isDirect ? item.memberIds.find((id) => id !== myId) : undefined;
-    const isOnline = otherUserId ? !!onlineUserIds[otherUserId] : false;
+    // Trạng thái hoạt động: Chỉ hiển thị chính xác cho người dùng ĐÃ KẾT BẠN
+    const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
+    const isOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
 
     return (
       <View
