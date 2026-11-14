@@ -173,6 +173,7 @@ export function useRealtime() {
                 videoDurationMs: kind === 'video' ? msg.media_duration_ms : undefined,
                 imageWidth: msg.media_width,
                 imageHeight: msg.media_height,
+                isForwarded: msg.is_forwarded,
                 replyTo: msg.reply_to
                   ? {
                       messageId: msg.reply_to.message_id,

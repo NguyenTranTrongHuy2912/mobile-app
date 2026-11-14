@@ -18,6 +18,7 @@ import type {
   SearchUsersResponse,
   SendMessageRequest,
   SendMessageResponse,
+  StarredMessageItem,
   UploadSignature,
   UserSummary,
 } from '../types/chat';
@@ -41,6 +42,8 @@ const toMessage = (m: HistoryItem): Message => ({
   videoDurationMs: m.media_duration_ms || undefined,
   isRevoked: m.is_revoked,
   reactions: m.reactions,
+  isForwarded: m.is_forwarded,
+  isStarred: m.is_starred,
   replyTo: m.reply_to
     ? {
         messageId: m.reply_to.message_id,
@@ -227,6 +230,7 @@ export const chatApi = createApi({
         imageWidth?: number;
         imageHeight?: number;
         durationMs?: number;
+        isForwarded?: boolean;
         replyTo?: {
           messageId: string;
           senderName: string;
@@ -234,7 +238,7 @@ export const chatApi = createApi({
         } | null;
       }
     >({
-      query: ({ roomId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, replyTo }) => {
+      query: ({ roomId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, isForwarded, replyTo }) => {
         // senderId chỉ dùng để hiện tin tạm trong cache; gateway lấy người gửi từ token
         const body: SendMessageRequest = {
           room_id: roomId,
@@ -258,6 +262,9 @@ export const chatApi = createApi({
           body.file_name = fileName;
           body.file_size = fileSize;
         }
+        if (isForwarded) {
+          body.is_forwarded = true;
+        }
         if (replyTo) {
           body.reply_to = {
             message_id: replyTo.messageId,
@@ -272,7 +279,7 @@ export const chatApi = createApi({
 
       // Optimistic update: hiện tin nhắn ngay, sau đó cập nhật trạng thái theo kết quả server.
       async onQueryStarted(
-        { roomId, senderId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, replyTo },
+        { roomId, senderId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, isForwarded, replyTo },
         { dispatch, queryFulfilled },
       ) {
         dispatch(
@@ -297,6 +304,7 @@ export const chatApi = createApi({
                 imageWidth,
                 imageHeight,
                 videoDurationMs: durationMs,
+                isForwarded,
                 replyTo,
               });
             }
@@ -570,6 +578,40 @@ export const chatApi = createApi({
       }),
       invalidatesTags: ['Room'],
     }),
+
+    toggleStarMessage: build.mutation<
+      { ok: boolean; message_id: string; starred: boolean },
+      { messageId: string; roomId?: string }
+    >({
+      query: ({ messageId }) => ({
+        url: `/api/v1/chat/messages/${messageId}/star`,
+        method: 'POST',
+      }),
+      async onQueryStarted({ messageId, roomId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (roomId) {
+            dispatch(
+              chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+                const m = draft.messages.find((item) => item.id === messageId);
+                if (m) {
+                  m.isStarred = data.starred;
+                }
+              }),
+            );
+          }
+        } catch {}
+      },
+    }),
+
+    getStarredMessages: build.query<StarredMessageItem[], { roomId?: string } | void>({
+      query: (arg) => ({
+        url: '/api/v1/chat/starred',
+        params: arg && typeof arg === 'object' && arg.roomId ? { room_id: arg.roomId } : undefined,
+      }),
+      transformResponse: (res: { messages: StarredMessageItem[] }) => res.messages || [],
+      providesTags: ['Message'],
+    }),
   }),
 });
 
@@ -601,4 +643,6 @@ export const {
   useReactMessageMutation,
   usePinMessageMutation,
   useUnpinMessageMutation,
+  useToggleStarMessageMutation,
+  useGetStarredMessagesQuery,
 } = chatApi;

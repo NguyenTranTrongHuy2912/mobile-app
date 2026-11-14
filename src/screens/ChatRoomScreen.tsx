@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
 } from 'react-native';
@@ -27,6 +28,8 @@ import ScalePressable from '../components/ScalePressable';
 import * as Clipboard from 'expo-clipboard';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
+import ForwardMessageModal from '../components/ForwardMessageModal';
+import SavedMessagesModal from '../components/SavedMessagesModal';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
@@ -40,6 +43,7 @@ import {
   useReactMessageMutation,
   usePinMessageMutation,
   useUnpinMessageMutation,
+  useToggleStarMessageMutation,
 } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
@@ -129,6 +133,10 @@ export default function ChatRoomScreen() {
   const [reactMessage] = useReactMessageMutation();
   const [pinMessage] = usePinMessageMutation();
   const [unpinMessage] = useUnpinMessageMutation();
+  const [toggleStarMessage] = useToggleStarMessageMutation();
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardTargetMsg, setForwardTargetMsg] = useState<Message | null>(null);
+  const [showSavedModal, setShowSavedModal] = useState(false);
 
   const listRef = useRef<FlatList<Message>>(null);
   const prevMessagesRef = useRef<Message[]>([]);
@@ -256,6 +264,19 @@ export default function ChatRoomScreen() {
     );
   };
 
+  const navigation = useNavigation();
+  const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
+  const { data: friends = [] } = useGetFriendsQuery();
+  const { data: rooms } = useGetRoomsQuery();
+  const currentRoom = rooms?.find((r) => r.id === roomId);
+  const isDirect = currentRoom?.type === 'direct';
+  const otherMember = isDirect ? currentRoom?.members.find((m) => m.userId !== userId) : undefined;
+  const otherUserId = otherMember?.userId;
+  // Trạng thái hoạt động: Chỉ hiển thị chính xác cho người dùng ĐÃ KẾT BẠN
+  const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
+  const isOtherOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
+  const headerTitle = currentRoom?.name || 'Chat';
+
   const handleTogglePinMessage = async () => {
     if (!reactionTargetMsg) return;
     const msg = reactionTargetMsg;
@@ -283,6 +304,73 @@ export default function ChatRoomScreen() {
     }
     setShowActionModal(false);
     setReactionTargetMsg(null);
+  };
+
+  const handleToggleStar = async () => {
+    if (!reactionTargetMsg) return;
+    const msg = reactionTargetMsg;
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+    try {
+      const res = await toggleStarMessage({ messageId: msg.id, roomId }).unwrap();
+      Alert.alert('Thành công', res.starred ? 'Đã lưu tin nhắn vào mục Đã lưu ⭐' : 'Đã bỏ lưu tin nhắn.');
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.data?.detail || 'Thao tác lưu thất bại.');
+    }
+  };
+
+  const handleStartForward = () => {
+    if (!reactionTargetMsg) return;
+    setForwardTargetMsg(reactionTargetMsg);
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+    setShowForwardModal(true);
+  };
+
+  const handleForwardToRoom = async (targetRoomId: string) => {
+    if (!forwardTargetMsg) return;
+    await sendMessage({
+      roomId: targetRoomId,
+      senderId: userId,
+      content: forwardTargetMsg.content,
+      localId: newId(),
+      type: forwardTargetMsg.type,
+      imageUrl: forwardTargetMsg.imageUrl,
+      videoUrl: forwardTargetMsg.videoUrl,
+      fileUrl: forwardTargetMsg.fileUrl,
+      fileName: forwardTargetMsg.fileName,
+      fileSize: forwardTargetMsg.fileSize,
+      imageWidth: forwardTargetMsg.imageWidth,
+      imageHeight: forwardTargetMsg.imageHeight,
+      durationMs: forwardTargetMsg.videoDurationMs,
+      isForwarded: true,
+    }).unwrap();
+  };
+
+  // Trích xuất từ khóa mention khi người dùng gõ @
+  const mentionQuery = useMemo(() => {
+    const match = draft.match(/@([^\s@]*)$/);
+    return match ? match[1].toLowerCase() : null;
+  }, [draft]);
+
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const list: { id: string; name: string; isAi?: boolean }[] = [];
+    if ('hq ai'.includes(mentionQuery) || 'ai'.includes(mentionQuery) || mentionQuery === '') {
+      list.push({ id: 'hq_ai_bot', name: 'HQ AI', isAi: true });
+    }
+    const members = currentRoom?.members ?? [];
+    for (const m of members) {
+      if (m.userId !== userId && m.displayName.toLowerCase().includes(mentionQuery)) {
+        list.push({ id: m.userId, name: m.displayName, isAi: false });
+      }
+    }
+    return list;
+  }, [mentionQuery, currentRoom, userId]);
+
+  const handleSelectMention = (name: string) => {
+    const base = draft.replace(/@[^\s@]*$/, '');
+    dispatch(setDraft({ roomId, text: (base ? base + ' ' : '') + `@${name} ` }));
   };
 
   const handleTextChange = (text: string) => {
@@ -314,19 +402,6 @@ export default function ChatRoomScreen() {
       });
     }
   };
-
-  const navigation = useNavigation();
-  const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
-  const { data: friends = [] } = useGetFriendsQuery();
-  const { data: rooms } = useGetRoomsQuery();
-  const currentRoom = rooms?.find((r) => r.id === roomId);
-  const isDirect = currentRoom?.type === 'direct';
-  const otherMember = isDirect ? currentRoom?.members.find((m) => m.userId !== userId) : undefined;
-  const otherUserId = otherMember?.userId;
-  // Trạng thái hoạt động: Chỉ hiển thị chính xác cho người dùng ĐÃ KẾT BẠN
-  const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
-  const isOtherOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
-  const headerTitle = currentRoom?.name || 'Chat';
 
   useEffect(() => {
     navigation.setOptions({
@@ -398,20 +473,27 @@ export default function ChatRoomScreen() {
               <Text style={styles.summarizeHeaderBtnText}>Tóm tắt</Text>
             </ScalePressable>
           )}
-                    <View
+                    <Pressable
             onPress={() => setShowSearchModal(true)}
             hitSlop={8}
             style={{ padding: 4 }}
           >
             <Ionicons name="search-outline" size={22} color={C.brand} />
-          </View>
-          <View
+          </Pressable>
+          <Pressable
+            onPress={() => setShowSavedModal(true)}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="star-outline" size={22} color={C.brand} />
+          </Pressable>
+          <Pressable
             onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
             hitSlop={8}
             style={{ padding: 4 }}
           >
             <Ionicons name="information-circle-outline" size={24} color={C.brand} />
-          </View>
+          </Pressable>
         </View>
       ),
     });
@@ -784,6 +866,21 @@ export default function ChatRoomScreen() {
               </View>
             )}
 
+            {/* Huy hiệu tin nhắn chuyển tiếp (Forwarded) */}
+            {item.isForwarded && (
+              <View style={styles.forwardedBadge}>
+                <Ionicons
+                  name="arrow-redo"
+                  size={12}
+                  color={mine ? 'rgba(255,255,255,0.75)' : C.muted}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.forwardedText, mine && { color: 'rgba(255,255,255,0.85)' }]}>
+                  Được chuyển tiếp
+                </Text>
+              </View>
+            )}
+
             {/* Trích dẫn tin nhắn đã trả lời (Quote Block) */}
             {item.replyTo && (
               <Pressable
@@ -864,7 +961,24 @@ export default function ChatRoomScreen() {
                 )}
               </View>
             ) : (
-              <Text style={mine ? styles.textMine : isHqAi ? styles.textAi : styles.textOther}>{displayContent}</Text>
+              <Text style={mine ? styles.textMine : isHqAi ? styles.textAi : styles.textOther}>
+                {displayContent.split(/(@[^\s@]+)/g).map((part, i) => {
+                  if (part.startsWith('@')) {
+                    return (
+                      <Text
+                        key={i}
+                        style={{
+                          fontWeight: '700',
+                          color: mine ? '#FFE082' : C.brand,
+                        }}
+                      >
+                        {part}
+                      </Text>
+                    );
+                  }
+                  return part;
+                })}
+              </Text>
             )}
 
             {isSelected && (
@@ -878,6 +992,11 @@ export default function ChatRoomScreen() {
               >
                 {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
               </Text>
+            )}
+            {item.isStarred && (
+              <View style={[styles.starBadge, mine ? styles.starBadgeMine : styles.starBadgeOther]}>
+                <Ionicons name="star" size={11} color="#F59E0B" />
+              </View>
             )}
             {mine && item.status === 'sending' && (
               <Text style={styles.sendingMeta}>Đang gửi…</Text>
@@ -1007,23 +1126,35 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
-      {/* Banner gợi ý triệu hồi @HQ AI khi gõ @ (nằm trên inputBar với chiều rộng 100%) */}
-      {draft.includes('@') && (
-        <Pressable
-          style={styles.mentionBanner}
-          onPress={() => {
-            const base = draft.replace(/@[^@\s]*$/, '');
-            dispatch(setDraft({ roomId, text: (base ? base + ' ' : '') + '@HQ AI ' }));
-          }}
-        >
-          <View style={styles.mentionAvatar}>
-            <Ionicons name="sparkles" size={13} color="#fff" />
-          </View>
-          <Text style={styles.mentionText}>
-            Nhắc tên <Text style={styles.mentionBold}>@HQ AI</Text> để hỏi đáp hoặc tóm tắt phòng
-          </Text>
-          <Ionicons name="arrow-forward-circle" size={18} color={C.brand} />
-        </Pressable>
+      {/* Banner / Danh sách gợi ý Tag tên (@Mention Suggestions) */}
+      {mentionCandidates.length > 0 && (
+        <View style={styles.mentionPopupWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.mentionListContent}
+          >
+            {mentionCandidates.map((c) => (
+              <Pressable
+                key={c.id}
+                style={styles.mentionChip}
+                onPress={() => handleSelectMention(c.name)}
+              >
+                <View style={[styles.mentionChipAvatar, c.isAi && styles.mentionChipAi]}>
+                  {c.isAi ? (
+                    <Ionicons name="sparkles" size={12} color="#fff" />
+                  ) : (
+                    <Text style={styles.mentionChipAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
+                  )}
+                </View>
+                <Text style={styles.mentionChipName}>
+                  @{c.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* Banner Trả lời tin nhắn (Reply Preview) */}
@@ -1304,6 +1435,26 @@ export default function ChatRoomScreen() {
               </Text>
             </Pressable>
 
+            {/* Chuyển tiếp tin nhắn */}
+            <Pressable style={styles.actionMenuItem} onPress={handleStartForward}>
+              <Ionicons name="arrow-redo-outline" size={18} color={C.brand} />
+              <Text style={[styles.actionMenuItemText, { color: C.brand, fontWeight: '600' }]}>
+                Chuyển tiếp tin nhắn
+              </Text>
+            </Pressable>
+
+            {/* Lưu / Bỏ lưu tin nhắn ⭐ */}
+            <Pressable style={styles.actionMenuItem} onPress={handleToggleStar}>
+              <Ionicons
+                name={reactionTargetMsg?.isStarred ? 'star' : 'star-outline'}
+                size={18}
+                color="#F59E0B"
+              />
+              <Text style={styles.actionMenuItemText}>
+                {reactionTargetMsg?.isStarred ? 'Bỏ lưu tin nhắn' : 'Lưu tin nhắn ⭐'}
+              </Text>
+            </Pressable>
+
             <Pressable style={styles.actionMenuItem} onPress={handleCopyContent}>
               <Ionicons name="copy-outline" size={18} color={C.ink} />
               <Text style={styles.actionMenuItemText}>
@@ -1338,6 +1489,35 @@ export default function ChatRoomScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Modal Chuyển tiếp tin nhắn */}
+      <ForwardMessageModal
+        visible={showForwardModal}
+        currentRoomId={roomId}
+        message={forwardTargetMsg}
+        onClose={() => {
+          setShowForwardModal(false);
+          setForwardTargetMsg(null);
+        }}
+        onForward={handleForwardToRoom}
+      />
+
+      {/* Modal Danh sách tin nhắn đã lưu ⭐ */}
+      <SavedMessagesModal
+        visible={showSavedModal}
+        onClose={() => setShowSavedModal(false)}
+        onSelectMessage={(messageId: string, msgRoomId: string) => {
+          if (msgRoomId === roomId) {
+            setSelectedMsgId(messageId);
+            const idx = messages.findIndex((m) => m.id === messageId);
+            if (idx >= 0) {
+              listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+            }
+          } else {
+            router.push({ pathname: '/(app)/chat/[roomId]', params: { roomId: msgRoomId } });
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -2013,5 +2193,81 @@ const makeStyles = (C: ScreenColors) =>
     fontSize: 11,
     color: C.muted,
     marginTop: 2,
+  },
+  forwardedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  forwardedText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: C.muted,
+    fontWeight: '500',
+  },
+  starBadge: {
+    position: 'absolute',
+    bottom: -6,
+    backgroundColor: C.card,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  starBadgeMine: {
+    right: 4,
+  },
+  starBadgeOther: {
+    left: 4,
+  },
+  mentionPopupWrap: {
+    backgroundColor: C.card,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.line,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  mentionListContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mentionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.inputBg,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  mentionChipAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  mentionChipAi: {
+    backgroundColor: '#7C3AED',
+  },
+  mentionChipAvatarText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  mentionChipName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.ink,
   },
 });

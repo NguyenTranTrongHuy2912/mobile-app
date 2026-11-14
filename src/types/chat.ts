@@ -66,6 +66,9 @@ export interface Message {
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;
+  // --- Giai đoạn 2 ---
+  isForwarded?: boolean;
+  isStarred?: boolean;
 }
 
 // ---- Khớp với gateway ----
@@ -121,6 +124,7 @@ export interface SendMessageRequest {
   };
   file_name?: string;
   file_size?: number;
+  is_forwarded?: boolean;
 }
 
 export interface SendMessageResponse {
@@ -151,6 +155,22 @@ export interface HistoryItem {
   };
   file_name?: string;
   file_size?: number;
+  is_forwarded?: boolean;
+  is_starred?: boolean;
+}
+
+export interface StarredMessageItem {
+  message_id: string;
+  room_id: string;
+  sender_id: string;
+  sender_name: string;
+  content: string;
+  type?: string;
+  media_url?: string;
+  file_name?: string;
+  file_size?: number;
+  timestamp: number;
+  starred_at: number;
 }
 
 export interface HistoryResponse {
