@@ -219,7 +219,7 @@ export function useRealtime() {
                   { roomId: msg.room_id }
                 );
               }
-            } else if (data.type === 'ROOM_UPDATED') {
+            } else if (data.type === 'ROOM_UPDATED' || data.type === 'READ_RECEIPT') {
               dispatch(chatApi.util.invalidateTags(['Room']));
             } else if (data.type === 'FRIEND_REQUEST') {
               dispatch(chatApi.util.invalidateTags(['FriendRequest']));
