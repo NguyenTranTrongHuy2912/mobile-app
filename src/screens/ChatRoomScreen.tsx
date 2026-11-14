@@ -16,6 +16,7 @@ import { Spinner, Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Linking from 'expo-linking';
 import MediaPickerModal from '../components/MediaPickerModal';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ActiveBadge } from '../components/ActiveBadge';
@@ -75,6 +76,35 @@ const toPicked = (a: ImagePicker.ImagePickerAsset): PickedImage => ({
   mimeType: a.mimeType,
   duration: a.duration ? Math.round(a.duration * 1000) : undefined,
 });
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return 'Tệp đính kèm';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileIcon(fileName?: string): keyof typeof Ionicons.glyphMap {
+  if (!fileName) return 'document-attach';
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'document-text';
+  if (lower.endsWith('.doc') || lower.endsWith('.docx')) return 'document';
+  if (lower.endsWith('.xls') || lower.endsWith('.xlsx') || lower.endsWith('.csv')) return 'grid';
+  if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) return 'easel';
+  if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z') || lower.endsWith('.tar')) return 'archive';
+  return 'document-attach';
+}
+
+function getFileColor(fileName?: string): string {
+  if (!fileName) return '#64748B';
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return '#EF4444';
+  if (lower.endsWith('.doc') || lower.endsWith('.docx')) return '#2563EB';
+  if (lower.endsWith('.xls') || lower.endsWith('.xlsx') || lower.endsWith('.csv')) return '#10B981';
+  if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) return '#F59E0B';
+  if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z')) return '#8B5CF6';
+  return '#64748B';
+}
 
 export default function ChatRoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -414,9 +444,10 @@ export default function ChatRoomScreen() {
     await loadEarlier({ roomId, beforeTimestamp: oldestTimestamp });
   }, [isLoadingEarlier, hasMore, messages, loadEarlier, roomId]);
 
-  const { sendImages, retryImage } = useSendImage(roomId);
+  const { sendImages, sendDocument, retryImage } = useSendImage(roomId);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
 
   // Thông báo ngắn (ví dụ chưa cấp quyền camera) tự ẩn sau vài giây
   useEffect(() => {
@@ -526,18 +557,56 @@ export default function ChatRoomScreen() {
     if (lastIncomingId) markRoomRead(roomId);
   }, [roomId, lastIncomingId, markRoomRead]);
 
+  const handleScrollToMessage = useCallback(
+    (targetId?: string) => {
+      if (!targetId) return;
+      const targetIndex = messages.findIndex((m) => m.id === targetId);
+      if (targetIndex >= 0) {
+        listRef.current?.scrollToIndex({
+          index: targetIndex,
+          animated: true,
+          viewPosition: 0.5,
+        });
+        setSelectedMsgId(targetId);
+      } else {
+        Alert.alert('Thông báo', 'Tin nhắn gốc ở xa hơn trong lịch sử trò chuyện.');
+      }
+    },
+    [messages],
+  );
+
   const send = useCallback(
     (content: string, localId?: string) => {
       const text = content.trim();
       if (!text) return;
+      const replyData = replyingToMessage
+        ? {
+            messageId: replyingToMessage.id,
+            senderName:
+              replyingToMessage.senderId === userId
+                ? 'Bạn'
+                : (names.get(replyingToMessage.senderId) ?? 'Thành viên'),
+            content:
+              replyingToMessage.content ||
+              (replyingToMessage.type === 'image'
+                ? '[Hình ảnh]'
+                : replyingToMessage.type === 'video'
+                  ? '[Video]'
+                  : replyingToMessage.type === 'file'
+                    ? `[Tài liệu] ${replyingToMessage.fileName || ''}`
+                    : ''),
+          }
+        : undefined;
       sendMessage({
         roomId,
         senderId: userId,
         content: text,
         localId: localId ?? newId(),
+        replyTo: replyData,
       });
+      setReplyingToMessage(null);
     },
-    [roomId, sendMessage, userId],
+    [names, replyingToMessage, roomId, sendMessage, userId],
   );
 
   const onPressSend = () => {
@@ -620,6 +689,26 @@ export default function ChatRoomScreen() {
     }
   };
 
+  // Chọn và gửi tài liệu đa định dạng (PDF, Word, Excel, ZIP...)
+  const pickDocument = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets || res.assets.length === 0) return;
+      const file = res.assets[0];
+      await sendDocument({
+        uri: file.uri,
+        name: file.name,
+        size: file.size ?? undefined,
+        mimeType: file.mimeType ?? undefined,
+      });
+    } catch (e) {
+      console.warn('[Picker] Error picking document:', e);
+    }
+  };
+
   const renderHeader = () => {
     if (!hasMore) return null;
     return (
@@ -648,8 +737,9 @@ export default function ChatRoomScreen() {
     const mine = !isHqAi && item.senderId === userId;
     const isImage = item.type === 'image';
     const isVideo = item.type === 'video';
+    const isFile = item.type === 'file';
     const isMedia = isImage || isVideo;
-    const isBigEmoji = !isMedia && isOnlyEmoji(item.content);
+    const isBigEmoji = !isMedia && !isFile && isOnlyEmoji(item.content);
     const isSelected = selectedMsgId === item.id;
     const displayContent = isHqAi ? item.content.replace(/^🤖\s*\[HQ AI\]:\s*/, '') : item.content;
 
@@ -693,6 +783,25 @@ export default function ChatRoomScreen() {
                 </Text>
               </View>
             )}
+
+            {/* Trích dẫn tin nhắn đã trả lời (Quote Block) */}
+            {item.replyTo && (
+              <Pressable
+                style={[styles.quoteContainer, mine ? styles.quoteMine : styles.quoteOther]}
+                onPress={() => handleScrollToMessage(item.replyTo?.messageId)}
+              >
+                <View style={[styles.quoteBar, mine ? styles.quoteBarMine : styles.quoteBarOther]} />
+                <View style={styles.quoteBody}>
+                  <Text style={[styles.quoteAuthor, mine && styles.quoteAuthorMine]} numberOfLines={1}>
+                    {item.replyTo.senderName}
+                  </Text>
+                  <Text style={[styles.quoteText, mine && styles.quoteTextMine]} numberOfLines={2}>
+                    {item.replyTo.content}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+
             {item.isRevoked || item.content === 'Tin nhắn đã được thu hồi' ? (
               <View style={styles.revokedBubbleContent}>
                 <Ionicons name="ban-outline" size={14} color={mine ? 'rgba(255,255,255,0.7)' : C.muted} style={{ marginRight: 6 }} />
@@ -707,6 +816,24 @@ export default function ChatRoomScreen() {
               />
             ) : isVideo ? (
               <ChatVideo message={item} />
+            ) : isFile ? (
+              <Pressable
+                style={styles.fileCard}
+                onPress={() => item.fileUrl && Linking.openURL(item.fileUrl)}
+              >
+                <View style={[styles.fileIconWrap, { backgroundColor: getFileColor(item.fileName) }]}>
+                  <Ionicons name={getFileIcon(item.fileName)} size={22} color="#fff" />
+                </View>
+                <View style={styles.fileInfoWrap}>
+                  <Text style={[styles.fileNameText, mine && { color: '#fff' }]} numberOfLines={1}>
+                    {item.fileName || item.content.replace('[Tài liệu] ', '') || 'Tệp tin'}
+                  </Text>
+                  <Text style={[styles.fileSizeText, mine && { color: 'rgba(255,255,255,0.75)' }]}>
+                    {formatFileSize(item.fileSize)}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-down-circle" size={24} color={mine ? '#fff' : C.brand} />
+              </Pressable>
             ) : isBigEmoji ? (
               <Text style={styles.textBigEmoji}>{item.content}</Text>
             ) : item.content.startsWith('📞') || item.content.startsWith('📹') || item.content.startsWith('❌') || item.content.startsWith('🚫') ? (
@@ -899,6 +1026,35 @@ export default function ChatRoomScreen() {
         </Pressable>
       )}
 
+      {/* Banner Trả lời tin nhắn (Reply Preview) */}
+      {replyingToMessage && (
+        <View style={styles.replyBanner}>
+          <View style={styles.replyBannerBar} />
+          <View style={styles.replyBannerContent}>
+            <Text style={styles.replyBannerAuthor} numberOfLines={1}>
+              Đang trả lời {replyingToMessage.senderId === userId ? 'chính bạn' : (names.get(replyingToMessage.senderId) ?? 'Thành viên')}
+            </Text>
+            <Text style={styles.replyBannerText} numberOfLines={1}>
+              {replyingToMessage.content ||
+                (replyingToMessage.type === 'image'
+                  ? '[Hình ảnh]'
+                  : replyingToMessage.type === 'video'
+                    ? '[Video]'
+                    : replyingToMessage.type === 'file'
+                      ? `[Tài liệu] ${replyingToMessage.fileName || ''}`
+                      : '[Tin nhắn]')}
+            </Text>
+          </View>
+          <Pressable
+            style={styles.replyBannerCloseBtn}
+            onPress={() => setReplyingToMessage(null)}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={18} color={C.muted} />
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.inputBar}>
         {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
         {isCollapsed ? (
@@ -994,6 +1150,7 @@ export default function ChatRoomScreen() {
         onClose={() => setShowMediaModal(false)}
         onPickGallery={pickFromLibrary}
         onPickFolder={pickFromFolder}
+        onPickDocument={pickDocument}
         onTakePhoto={takePhoto}
       />
       <SemanticSearchModal
@@ -1131,6 +1288,22 @@ export default function ChatRoomScreen() {
 
             {/* Menu hành động */}
             <View style={styles.actionMenuDivider} />
+            <Pressable
+              style={styles.actionMenuItem}
+              onPress={() => {
+                if (reactionTargetMsg) {
+                  setReplyingToMessage(reactionTargetMsg);
+                  setShowActionModal(false);
+                  setReactionTargetMsg(null);
+                }
+              }}
+            >
+              <Ionicons name="arrow-undo-outline" size={18} color={C.brand} />
+              <Text style={[styles.actionMenuItemText, { color: C.brand, fontWeight: '600' }]}>
+                Trả lời tin nhắn
+              </Text>
+            </Pressable>
+
             <Pressable style={styles.actionMenuItem} onPress={handleCopyContent}>
               <Ionicons name="copy-outline" size={18} color={C.ink} />
               <Text style={styles.actionMenuItemText}>
@@ -1734,5 +1907,111 @@ const makeStyles = (C: ScreenColors) =>
   reactionMiniText: {
     fontSize: 11,
     color: C.ink,
+  },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.line,
+  },
+  replyBannerBar: {
+    width: 3,
+    height: '100%',
+    backgroundColor: C.brand,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  replyBannerContent: {
+    flex: 1,
+  },
+  replyBannerAuthor: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.brand,
+  },
+  replyBannerText: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 2,
+  },
+  replyBannerCloseBtn: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  quoteContainer: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    padding: 6,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  quoteMine: {
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  quoteOther: {
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  quoteBar: {
+    width: 3,
+    borderRadius: 2,
+    marginRight: 6,
+  },
+  quoteBarMine: {
+    backgroundColor: '#fff',
+  },
+  quoteBarOther: {
+    backgroundColor: C.brand,
+  },
+  quoteBody: {
+    flex: 1,
+  },
+  quoteAuthor: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.brand,
+  },
+  quoteAuthorMine: {
+    color: '#fff',
+  },
+  quoteText: {
+    fontSize: 12,
+    color: C.ink,
+    marginTop: 1,
+  },
+  quoteTextMine: {
+    color: 'rgba(255,255,255,0.9)',
+  },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 10,
+    minWidth: 200,
+    maxWidth: 280,
+  },
+  fileIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  fileInfoWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  fileNameText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.ink,
+  },
+  fileSizeText: {
+    fontSize: 11,
+    color: C.muted,
+    marginTop: 2,
   },
 });

@@ -10,20 +10,23 @@ interface MediaPickerModalProps {
   onClose: () => void;
   onPickGallery: () => void;
   onPickFolder: () => void;
+  onPickDocument?: () => void;
   onTakePhoto: () => void;
 }
 
 /**
  * Modal lựa chọn nguồn tải ảnh chuẩn Messenger:
  * 1. Thư viện ảnh & Album thiết bị
- * 2. Duyệt tìm trong thư mục tệp máy (File Manager / Folders)
- * 3. Chụp ảnh nhanh từ Camera trước (Front Camera)
+ * 2. Tài liệu & Tệp tin (PDF, Word, Excel, ZIP...)
+ * 3. Duyệt tìm trong thư mục tệp máy (File Manager / Folders)
+ * 4. Chụp ảnh nhanh từ Camera trước (Front Camera)
  */
 export default function MediaPickerModal({
   visible,
   onClose,
   onPickGallery,
   onPickFolder,
+  onPickDocument,
   onTakePhoto,
 }: MediaPickerModalProps) {
   const C = useScreenColors();
@@ -31,9 +34,11 @@ export default function MediaPickerModal({
 
   // Nền icon: sáng dùng màu pastel, tối dùng nền nhạt tối hơn
   const galleryBg = C.isDark ? C.brandSoft : '#E7F3FF';
+  const docBg = C.isDark ? '#2E1E4A' : '#F3E8FF';
   const folderBg = C.isDark ? C.brandSoft : '#EBF5FB';
   const cameraBg = C.isDark ? '#1E3A28' : '#E8F5E9';
   const galleryIcon = C.isDark ? '#4DA3FF' : '#0084FF';
+  const docIcon = C.isDark ? '#A78BFA' : '#8B5CF6';
   const folderIcon = C.isDark ? '#4DA3FF' : '#007AFF';
   const cameraIcon = C.isDark ? '#66BB6A' : '#2E7D32';
 
@@ -45,7 +50,7 @@ export default function MediaPickerModal({
           {/* Header Bar */}
           <View style={styles.handle} />
           <Text style={styles.title}>Chọn hình ảnh & tệp</Text>
-          <Text style={styles.subtitle}>Gửi hình ảnh hoặc duyệt tìm từ thư mục của bạn</Text>
+          <Text style={styles.subtitle}>Gửi hình ảnh, tài liệu hoặc duyệt tìm từ thiết bị</Text>
 
           {/* Option 1: Thư viện ảnh / Album */}
           <ScalePressable
@@ -65,7 +70,27 @@ export default function MediaPickerModal({
             <Ionicons name="chevron-forward" size={18} color={C.muted} />
           </ScalePressable>
 
-          {/* Option 2: Duyệt thư mục tệp (Folder / Files) */}
+          {/* Option 2: Gửi tài liệu (Document / PDF / Office / ZIP) */}
+          {onPickDocument && (
+            <ScalePressable
+              style={styles.optionRow}
+              onPress={() => {
+                onClose();
+                onPickDocument();
+              }}
+            >
+              <View style={{ ...styles.iconWrap, backgroundColor: docBg }}>
+                <Ionicons name="document-text" size={24} color={docIcon} />
+              </View>
+              <View style={styles.textWrap}>
+                <Text style={styles.optionTitle}>Tài liệu & Tệp tin (Document)</Text>
+                <Text style={styles.optionDesc}>Gửi tài liệu PDF, Word, Excel, PowerPoint, ZIP...</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={C.muted} />
+            </ScalePressable>
+          )}
+
+          {/* Option 3: Duyệt thư mục tệp (Folder / Files) */}
           <ScalePressable
             style={styles.optionRow}
             onPress={() => {
@@ -83,7 +108,7 @@ export default function MediaPickerModal({
             <Ionicons name="chevron-forward" size={18} color={C.muted} />
           </ScalePressable>
 
-          {/* Option 3: Camera trước (Selfie) */}
+          {/* Option 4: Camera trước (Selfie) */}
           <ScalePressable
             style={styles.optionRow}
             onPress={() => {

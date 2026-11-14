@@ -13,11 +13,12 @@ export interface UploadResult {
 // Cố ý dùng axios riêng, không gắn JWT vào request gửi cho bên thứ ba.
 export async function uploadMedia(
   sig: UploadSignature,
-  file: { uri: string; mimeType?: string },
+  file: { uri: string; name?: string; mimeType?: string },
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
   const isVideo = file.mimeType?.startsWith('video/') || sig.upload_url.includes('/video/');
-  const fileName = isVideo ? 'video.mp4' : 'photo.jpg';
+  const isRaw = sig.upload_url.includes('/raw/') || (!isVideo && !file.mimeType?.startsWith('image/'));
+  const fileName = file.name || (isVideo ? 'video.mp4' : isRaw ? 'document.bin' : 'photo.jpg');
 
   const form = new FormData();
   if (Platform.OS === 'web') {
@@ -29,7 +30,7 @@ export async function uploadMedia(
     form.append('file', {
       uri: file.uri,
       name: fileName,
-      type: file.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+      type: file.mimeType ?? (isVideo ? 'video/mp4' : isRaw ? 'application/octet-stream' : 'image/jpeg'),
     } as unknown as Blob);
   }
   form.append('api_key', sig.api_key);

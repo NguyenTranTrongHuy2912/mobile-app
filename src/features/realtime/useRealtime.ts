@@ -154,9 +154,9 @@ export function useRealtime() {
           try {
             const data: WsEvent = JSON.parse(event.data);
             if (data.type === 'NEW_MESSAGE' && data.message) {
-              const msg = data.message;
+              const msg = data.message as any;
               const kind: Message['type'] =
-                msg.type === 'IMAGE' ? 'image' : msg.type === 'VIDEO' ? 'video' : 'text';
+                msg.type === 'IMAGE' ? 'image' : msg.type === 'VIDEO' ? 'video' : msg.type === 'FILE' ? 'file' : 'text';
               const formatted: Message = {
                 id: msg.message_id,
                 roomId: msg.room_id,
@@ -167,13 +167,23 @@ export function useRealtime() {
                 status: 'sent',
                 imageUrl: kind === 'image' ? msg.media_url : undefined,
                 videoUrl: kind === 'video' ? msg.media_url : undefined,
+                fileUrl: kind === 'file' ? msg.media_url : undefined,
+                fileName: msg.file_name,
+                fileSize: msg.file_size,
                 videoDurationMs: kind === 'video' ? msg.media_duration_ms : undefined,
                 imageWidth: msg.media_width,
                 imageHeight: msg.media_height,
+                replyTo: msg.reply_to
+                  ? {
+                      messageId: msg.reply_to.message_id,
+                      senderName: msg.reply_to.sender_name,
+                      content: msg.reply_to.content,
+                    }
+                  : null,
               };
               const preview =
                 msg.content ||
-                (msg.type === 'IMAGE' ? 'Đã gửi một ảnh' : msg.type === 'VIDEO' ? 'Đã gửi một video' : '');
+                (msg.type === 'IMAGE' ? 'Đã gửi một ảnh' : msg.type === 'VIDEO' ? 'Đã gửi một video' : msg.type === 'FILE' ? `📎 [Tài liệu] ${msg.file_name || 'Tệp tin'}` : '');
 
               // 1. Cập nhật cache của getMessages nếu phòng đó đang mở / có trong cache
               dispatch(
@@ -215,7 +225,9 @@ export function useRealtime() {
                       ? 'Đã gửi một hình ảnh'
                       : msg.type === 'VIDEO'
                         ? 'Đã gửi một video'
-                        : 'Bạn có tin nhắn mới'),
+                        : msg.type === 'FILE'
+                          ? `Đã gửi một tài liệu: ${msg.file_name || 'Tệp tin'}`
+                          : 'Bạn có tin nhắn mới'),
                   { roomId: msg.room_id }
                 );
               }

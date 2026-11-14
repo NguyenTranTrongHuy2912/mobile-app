@@ -33,15 +33,21 @@ export interface UserSummary {
   email: string;
 }
 
+export interface ReplyToInfo {
+  messageId: string;
+  senderName: string;
+  content: string;
+}
+
 export type MessageStatus = 'sending' | 'sent' | 'failed';
-export type MessageType = 'text' | 'image' | 'video';
+export type MessageType = 'text' | 'image' | 'video' | 'file';
 
 export interface Message {
   id: string;
   roomId: string;
   senderId: string;
   type: MessageType;
-  content: string; // image: để trống
+  content: string; // image/file: có thể để trống hoặc tên/caption
   timestamp: number; // epoch milliseconds
   status: MessageStatus;
   // --- dùng cho image / video ---
@@ -54,6 +60,12 @@ export interface Message {
   videoDurationMs?: number;
   isRevoked?: boolean;
   reactions?: Record<string, string[]>;
+  // --- Trả lời / Trích dẫn tin nhắn ---
+  replyTo?: ReplyToInfo | null;
+  // --- Gửi tài liệu (Document / File) ---
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
 }
 
 // ---- Khớp với gateway ----
@@ -97,11 +109,18 @@ export interface SendMessageRequest {
   room_id: string;
   content: string;
   message_id?: string;
-  type?: 'TEXT' | 'IMAGE' | 'VIDEO';
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE';
   media_url?: string;
   media_width?: number;
   media_height?: number;
   media_duration_ms?: number;
+  reply_to?: {
+    message_id: string;
+    sender_name: string;
+    content: string;
+  };
+  file_name?: string;
+  file_size?: number;
 }
 
 export interface SendMessageResponse {
@@ -118,13 +137,20 @@ export interface HistoryItem {
   sender_id: string;
   content: string;
   timestamp: number;
-  type?: 'TEXT' | 'IMAGE' | 'VIDEO';
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE';
   media_url?: string;
   media_width?: number;
   media_height?: number;
   media_duration_ms?: number;
   is_revoked?: boolean;
   reactions?: Record<string, string[]>;
+  reply_to?: {
+    message_id: string;
+    sender_name: string;
+    content: string;
+  };
+  file_name?: string;
+  file_size?: number;
 }
 
 export interface HistoryResponse {

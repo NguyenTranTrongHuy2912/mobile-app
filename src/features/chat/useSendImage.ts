@@ -20,6 +20,13 @@ export interface PickedMedia {
 
 export type PickedImage = PickedMedia;
 
+export interface PickedDocument {
+  uri: string;
+  name: string;
+  size?: number;
+  mimeType?: string;
+}
+
 // Gửi ảnh / video: hiện ngay bằng file trên máy -> xin chữ ký -> upload Cloudinary -> gửi tin nhắn kèm URL.
 export function useSendImage(roomId: string) {
   const dispatch = useAppDispatch();
@@ -157,5 +164,66 @@ export function useSendImage(roomId: string) {
     [process],
   );
 
-  return { sendImages, sendMedia: sendImages, retryImage: retryMedia, retryMedia };
+  const sendDocument = useCallback(
+    async (doc: PickedDocument) => {
+      const localId = newId();
+      dispatch(
+        chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+          draft.messages.push({
+            id: localId,
+            roomId,
+            senderId: userId,
+            type: 'file',
+            content: `[Tài liệu] ${doc.name}`,
+            timestamp: Date.now(),
+            status: 'sending',
+            localUri: doc.uri,
+            fileName: doc.name,
+            fileSize: doc.size,
+            uploadProgress: 0,
+          });
+        }),
+      );
+
+      patch(localId, (m) => {
+        m.status = 'sending';
+      });
+
+      try {
+        const sig = await getSignature({ resourceType: 'raw' }).unwrap();
+        const up = await uploadMedia(
+          sig,
+          { uri: doc.uri, name: doc.name, mimeType: doc.mimeType || 'application/octet-stream' },
+          (p) =>
+            patch(localId, (m) => {
+              m.uploadProgress = p;
+            }),
+        );
+
+        patch(localId, (m) => {
+          m.fileUrl = up.url;
+          m.uploadProgress = 100;
+        });
+
+        await sendMessage({
+          roomId,
+          senderId: userId,
+          type: 'file',
+          content: `[Tài liệu] ${doc.name}`,
+          localId,
+          fileUrl: up.url,
+          fileName: doc.name,
+          fileSize: doc.size,
+        }).unwrap();
+      } catch (e) {
+        console.warn('[SendDocument] Gửi tài liệu thất bại:', e);
+        patch(localId, (m) => {
+          m.status = 'failed';
+        });
+      }
+    },
+    [dispatch, getSignature, patch, roomId, sendMessage, userId],
+  );
+
+  return { sendImages, sendMedia: sendImages, sendDocument, retryImage: retryMedia, retryMedia };
 }

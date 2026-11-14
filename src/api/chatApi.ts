@@ -27,17 +27,27 @@ const toMessage = (m: HistoryItem): Message => ({
   id: m.message_id,
   roomId: m.room_id,
   senderId: m.sender_id,
-  type: m.type === 'IMAGE' ? ('image' as const) : m.type === 'VIDEO' ? ('video' as const) : ('text' as const),
+  type: m.type === 'IMAGE' ? ('image' as const) : m.type === 'VIDEO' ? ('video' as const) : m.type === 'FILE' ? ('file' as const) : ('text' as const),
   content: m.content,
   timestamp: m.timestamp,
   status: 'sent' as const,
   imageUrl: m.type === 'IMAGE' ? (m.media_url || undefined) : undefined,
   videoUrl: m.type === 'VIDEO' ? (m.media_url || undefined) : undefined,
+  fileUrl: m.type === 'FILE' ? (m.media_url || undefined) : undefined,
+  fileName: m.file_name,
+  fileSize: m.file_size,
   imageWidth: m.media_width || undefined,
   imageHeight: m.media_height || undefined,
   videoDurationMs: m.media_duration_ms || undefined,
   isRevoked: m.is_revoked,
   reactions: m.reactions,
+  replyTo: m.reply_to
+    ? {
+        messageId: m.reply_to.message_id,
+        senderName: m.reply_to.sender_name,
+        content: m.reply_to.content,
+      }
+    : null,
 });
 
 const toRoom = (d: RoomDto): Room => ({
@@ -192,8 +202,8 @@ export const chatApi = createApi({
       },
     }),
 
-    // Xin chữ ký để upload ảnh/video thẳng lên Cloudinary
-    getUploadSignature: build.mutation<UploadSignature, { resourceType?: 'image' | 'video' } | void>({
+    // Xin chữ ký để upload ảnh/video/tài liệu thẳng lên Cloudinary
+    getUploadSignature: build.mutation<UploadSignature, { resourceType?: 'image' | 'video' | 'raw' } | void>({
       query: (arg) => ({
         url: '/api/v1/uploads/sign',
         method: 'POST',
@@ -211,12 +221,20 @@ export const chatApi = createApi({
         type?: MessageType;
         imageUrl?: string;
         videoUrl?: string;
+        fileUrl?: string;
+        fileName?: string;
+        fileSize?: number;
         imageWidth?: number;
         imageHeight?: number;
         durationMs?: number;
+        replyTo?: {
+          messageId: string;
+          senderName: string;
+          content: string;
+        } | null;
       }
     >({
-      query: ({ roomId, content, localId, type, imageUrl, videoUrl, imageWidth, imageHeight, durationMs }) => {
+      query: ({ roomId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, replyTo }) => {
         // senderId chỉ dùng để hiện tin tạm trong cache; gateway lấy người gửi từ token
         const body: SendMessageRequest = {
           room_id: roomId,
@@ -234,6 +252,18 @@ export const chatApi = createApi({
           body.media_width = imageWidth ?? 0;
           body.media_height = imageHeight ?? 0;
           body.media_duration_ms = durationMs ?? 0;
+        } else if (type === 'file') {
+          body.type = 'FILE';
+          body.media_url = fileUrl;
+          body.file_name = fileName;
+          body.file_size = fileSize;
+        }
+        if (replyTo) {
+          body.reply_to = {
+            message_id: replyTo.messageId,
+            sender_name: replyTo.senderName,
+            content: replyTo.content,
+          };
         }
         return { url: '/api/v1/chat/send', method: 'POST', body };
       },
@@ -242,7 +272,7 @@ export const chatApi = createApi({
 
       // Optimistic update: hiện tin nhắn ngay, sau đó cập nhật trạng thái theo kết quả server.
       async onQueryStarted(
-        { roomId, senderId, content, localId, type, imageUrl, videoUrl, imageWidth, imageHeight, durationMs },
+        { roomId, senderId, content, localId, type, imageUrl, videoUrl, fileUrl, fileName, fileSize, imageWidth, imageHeight, durationMs, replyTo },
         { dispatch, queryFulfilled },
       ) {
         dispatch(
@@ -261,9 +291,13 @@ export const chatApi = createApi({
                 status: 'sending',
                 imageUrl,
                 videoUrl,
+                fileUrl,
+                fileName,
+                fileSize,
                 imageWidth,
                 imageHeight,
                 videoDurationMs: durationMs,
+                replyTo,
               });
             }
           }),
