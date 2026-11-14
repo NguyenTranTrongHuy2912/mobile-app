@@ -35,6 +35,10 @@ import {
   useSendMessageMutation,
   useSummarizeRoomMutation,
   useRewriteTextMutation,
+  useRevokeMessageMutation,
+  useReactMessageMutation,
+  usePinMessageMutation,
+  useUnpinMessageMutation,
 } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
@@ -91,6 +95,10 @@ export default function ChatRoomScreen() {
   const [sendMessage] = useSendMessageMutation();
   const [markRoomRead] = useMarkRoomReadMutation();
   const [loadEarlier, { isLoading: isLoadingEarlier }] = useLoadEarlierMessagesMutation();
+  const [revokeMessage] = useRevokeMessageMutation();
+  const [reactMessage] = useReactMessageMutation();
+  const [pinMessage] = usePinMessageMutation();
+  const [unpinMessage] = useUnpinMessageMutation();
 
   const listRef = useRef<FlatList<Message>>(null);
   const prevMessagesRef = useRef<Message[]>([]);
@@ -175,15 +183,67 @@ export default function ChatRoomScreen() {
     setShowActionModal(true);
   };
 
-  const handleSelectReaction = (emoji: string) => {
+  const handleSelectReaction = async (emoji: string) => {
     if (reactionTargetMsg) {
+      const msgId = reactionTargetMsg.id;
       setReactions((prev) => ({
         ...prev,
-        [reactionTargetMsg.id]: prev[reactionTargetMsg.id] === emoji ? '' : emoji,
+        [msgId]: prev[msgId] === emoji ? '' : emoji,
       }));
+      try {
+        await reactMessage({ roomId, messageId: msgId, emoji }).unwrap();
+      } catch (e) {
+        console.warn('React message error:', e);
+      }
     }
     setShowActionModal(false);
     setReactionTargetMsg(null);
+  };
+
+  const handleRevokeMessage = () => {
+    if (!reactionTargetMsg) return;
+    const msg = reactionTargetMsg;
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+
+    Alert.alert(
+      'Thu hồi tin nhắn',
+      'Bạn có chắc chắn muốn thu hồi tin nhắn này ở cả 2 phía không?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Thu hồi',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await revokeMessage({ roomId, messageId: msg.id }).unwrap();
+            } catch (err: any) {
+              Alert.alert('Không thể thu hồi', err?.data?.detail || 'Đã có lỗi xảy ra hoặc tin nhắn đã quá 30 phút.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleTogglePinMessage = async () => {
+    if (!reactionTargetMsg) return;
+    const msg = reactionTargetMsg;
+    const isCurrentlyPinned = currentRoom?.pinnedMessage?.id === msg.id;
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+
+    try {
+      if (isCurrentlyPinned) {
+        await unpinMessage({ roomId }).unwrap();
+        Alert.alert('Thành công', 'Đã bỏ ghim tin nhắn.');
+      } else {
+        await pinMessage({ roomId, messageId: msg.id }).unwrap();
+        Alert.alert('Thành công', 'Đã ghim tin nhắn lên đầu nhóm.');
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.data?.detail || 'Thao tác ghim thất bại.');
+    }
   };
 
   const handleCopyContent = async () => {
@@ -633,7 +693,14 @@ export default function ChatRoomScreen() {
                 </Text>
               </View>
             )}
-            {isImage ? (
+            {item.isRevoked || item.content === 'Tin nhắn đã được thu hồi' ? (
+              <View style={styles.revokedBubbleContent}>
+                <Ionicons name="ban-outline" size={14} color={mine ? 'rgba(255,255,255,0.7)' : C.muted} style={{ marginRight: 6 }} />
+                <Text style={[styles.revokedText, mine && { color: 'rgba(255,255,255,0.85)' }]}>
+                  Tin nhắn đã được thu hồi
+                </Text>
+              </View>
+            ) : isImage ? (
               <ChatImage
                 message={item}
                 onPress={() => setViewerUri(item.imageUrl ?? item.localUri ?? null)}
@@ -688,7 +755,26 @@ export default function ChatRoomScreen() {
             {mine && item.status === 'sending' && (
               <Text style={styles.sendingMeta}>Đang gửi…</Text>
             )}
-            {reactions[item.id] ? (
+            {item.reactions && Object.keys(item.reactions).length > 0 ? (
+              <View style={[styles.reactionBadgeList, mine ? styles.reactionBadgeMine : styles.reactionBadgeOther]}>
+                {Object.entries(item.reactions).map(([emoji, users]) =>
+                  users.length > 0 ? (
+                    <Pressable
+                      key={emoji}
+                      style={[
+                        styles.reactionMiniPill,
+                        users.includes(userId) && styles.reactionMiniPillActive,
+                      ]}
+                      onPress={() => handleSelectReaction(emoji)}
+                    >
+                      <Text style={styles.reactionMiniText}>
+                        {emoji} {users.length}
+                      </Text>
+                    </Pressable>
+                  ) : null
+                )}
+              </View>
+            ) : reactions[item.id] ? (
               <View style={[styles.reactionBadge, mine ? styles.reactionBadgeMine : styles.reactionBadgeOther]}>
                 <Text style={styles.reactionBadgeText}>{reactions[item.id]}</Text>
               </View>
@@ -721,6 +807,45 @@ export default function ChatRoomScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* Thanh thông báo tin nhắn đã ghim (Pinned Message Banner) */}
+      {currentRoom?.pinnedMessage && (
+        <View style={styles.pinnedBanner}>
+          <View style={styles.pinnedIconWrap}>
+            <Ionicons name="pin" size={16} color={C.brand} />
+          </View>
+          <Pressable
+            style={styles.pinnedContentWrap}
+            onPress={() => {
+              if (currentRoom?.pinnedMessage?.id) {
+                setSelectedMsgId(currentRoom.pinnedMessage.id);
+                const idx = messages.findIndex((m) => m.id === currentRoom.pinnedMessage!.id);
+                if (idx >= 0) {
+                  listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+                }
+              }
+            }}
+          >
+            <Text style={styles.pinnedTitle} numberOfLines={1}>
+              Tin nhắn đã ghim {currentRoom.pinnedMessage.senderName ? `· ${currentRoom.pinnedMessage.senderName}` : ''}
+            </Text>
+            <Text style={styles.pinnedText} numberOfLines={1}>
+              {currentRoom.pinnedMessage.content}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.pinnedCloseBtn}
+            hitSlop={8}
+            onPress={async () => {
+              try {
+                await unpinMessage({ roomId }).unwrap();
+              } catch {}
+            }}
+          >
+            <Ionicons name="close" size={18} color={C.muted} />
+          </Pressable>
+        </View>
+      )}
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -1012,6 +1137,31 @@ export default function ChatRoomScreen() {
                 Sao chép văn bản
               </Text>
             </Pressable>
+
+            {/* Ghim / Bỏ ghim tin nhắn */}
+            <Pressable style={styles.actionMenuItem} onPress={handleTogglePinMessage}>
+              <Ionicons
+                name={currentRoom?.pinnedMessage?.id === reactionTargetMsg?.id ? 'pin-outline' : 'pin'}
+                size={18}
+                color={C.ink}
+              />
+              <Text style={styles.actionMenuItemText}>
+                {currentRoom?.pinnedMessage?.id === reactionTargetMsg?.id ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
+              </Text>
+            </Pressable>
+
+            {/* Thu hồi tin nhắn 2 phía */}
+            {reactionTargetMsg?.senderId === userId &&
+              Date.now() - (reactionTargetMsg?.timestamp || 0) <= 30 * 60 * 1000 &&
+              !reactionTargetMsg?.isRevoked &&
+              reactionTargetMsg?.content !== 'Tin nhắn đã được thu hồi' && (
+                <Pressable style={styles.actionMenuItem} onPress={handleRevokeMessage}>
+                  <Ionicons name="arrow-undo-outline" size={18} color="#EF4444" />
+                  <Text style={[styles.actionMenuItemText, { color: '#EF4444' }]}>
+                    Thu hồi tin nhắn (2 phía)
+                  </Text>
+                </Pressable>
+              )}
           </View>
         </Pressable>
       </Modal>
@@ -1520,6 +1670,69 @@ const makeStyles = (C: ScreenColors) =>
   actionMenuItemText: {
     fontSize: 14,
     fontWeight: '600',
+    color: C.ink,
+  },
+  pinnedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.line,
+  },
+  pinnedIconWrap: {
+    marginRight: 8,
+  },
+  pinnedContentWrap: {
+    flex: 1,
+  },
+  pinnedTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.brand,
+  },
+  pinnedText: {
+    fontSize: 13,
+    color: C.ink,
+    marginTop: 1,
+  },
+  pinnedCloseBtn: {
+    padding: 4,
+    marginLeft: 6,
+  },
+  revokedBubbleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  revokedText: {
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: C.muted,
+  },
+  reactionBadgeList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  reactionMiniPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  reactionMiniPillActive: {
+    borderColor: C.brand,
+    backgroundColor: C.brandSoft,
+  },
+  reactionMiniText: {
+    fontSize: 11,
     color: C.ink,
   },
 });

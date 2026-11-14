@@ -219,6 +219,45 @@ export function useRealtime() {
                   { roomId: msg.room_id }
                 );
               }
+            } else if (data.type === 'MESSAGE_REVOKED') {
+              const rev = data as any;
+              dispatch(
+                chatApi.util.updateQueryData('getMessages', rev.room_id, (draft) => {
+                  const m = draft.messages.find((item) => item.id === rev.message_id);
+                  if (m) {
+                    m.content = rev.content || 'Tin nhắn đã được thu hồi';
+                    m.isRevoked = true;
+                  }
+                }),
+              );
+              dispatch(
+                chatApi.util.updateQueryData('getRooms', undefined, (draft) => {
+                  const r = draft.find((item) => item.id === rev.room_id);
+                  if (r && r.lastMessage) {
+                    r.lastMessage = 'Tin nhắn đã được thu hồi';
+                  }
+                }),
+              );
+            } else if (data.type === 'MESSAGE_REACTION') {
+              const rx = data as any;
+              dispatch(
+                chatApi.util.updateQueryData('getMessages', rx.room_id, (draft) => {
+                  const m = draft.messages.find((item) => item.id === rx.message_id);
+                  if (m) {
+                    m.reactions = rx.reactions || {};
+                  }
+                }),
+              );
+            } else if (data.type === 'ROOM_PINNED_MESSAGE') {
+              const pin = data as any;
+              dispatch(
+                chatApi.util.updateQueryData('getRooms', undefined, (draft) => {
+                  const r = draft.find((item) => item.id === pin.room_id);
+                  if (r) {
+                    r.pinnedMessage = pin.pinned_message;
+                  }
+                }),
+              );
             } else if (data.type === 'ROOM_UPDATED' || data.type === 'READ_RECEIPT') {
               dispatch(chatApi.util.invalidateTags(['Room']));
             } else if (data.type === 'FRIEND_REQUEST') {

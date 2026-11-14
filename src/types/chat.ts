@@ -17,6 +17,13 @@ export interface Room {
   lastMessageSenderId?: string;
   lastMessageAt?: number;
   unreadCount: number;
+  pinnedMessage?: {
+    id: string;
+    content: string;
+    senderId: string;
+    senderName?: string;
+    timestamp: number;
+  } | null;
 }
 
 // Kết quả tìm người (tên + email để hiển thị ở dòng dưới)
@@ -45,6 +52,8 @@ export interface Message {
   uploadProgress?: number; // 0-100, chỉ có khi đang upload
   videoUrl?: string;
   videoDurationMs?: number;
+  isRevoked?: boolean;
+  reactions?: Record<string, string[]>;
 }
 
 // ---- Khớp với gateway ----
@@ -58,6 +67,13 @@ export interface RoomDto {
   members: { user_id: string; display_name: string }[];
   last_message: { content: string; sender_id: string; timestamp: number } | null;
   unread_count: number;
+  pinned_message?: {
+    id: string;
+    content: string;
+    sender_id: string;
+    sender_name?: string;
+    timestamp: number;
+  } | null;
 }
 
 export interface RoomsResponse {
@@ -107,6 +123,8 @@ export interface HistoryItem {
   media_width?: number;
   media_height?: number;
   media_duration_ms?: number;
+  is_revoked?: boolean;
+  reactions?: Record<string, string[]>;
 }
 
 export interface HistoryResponse {

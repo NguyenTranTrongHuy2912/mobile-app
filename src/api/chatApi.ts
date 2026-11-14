@@ -36,6 +36,8 @@ const toMessage = (m: HistoryItem): Message => ({
   imageWidth: m.media_width || undefined,
   imageHeight: m.media_height || undefined,
   videoDurationMs: m.media_duration_ms || undefined,
+  isRevoked: m.is_revoked,
+  reactions: m.reactions,
 });
 
 const toRoom = (d: RoomDto): Room => ({
@@ -48,6 +50,15 @@ const toRoom = (d: RoomDto): Room => ({
   lastMessageSenderId: d.last_message?.sender_id,
   lastMessageAt: d.last_message?.timestamp,
   unreadCount: d.unread_count,
+  pinnedMessage: d.pinned_message
+    ? {
+        id: d.pinned_message.id,
+        content: d.pinned_message.content,
+        senderId: d.pinned_message.sender_id,
+        senderName: d.pinned_message.sender_name,
+        timestamp: d.pinned_message.timestamp,
+      }
+    : null,
 });
 
 export const chatApi = createApi({
@@ -457,6 +468,74 @@ export const chatApi = createApi({
         body: { room_id: body.roomId, question: body.question },
       }),
     }),
+
+    revokeMessage: build.mutation<
+      { ok: boolean; message_id: string; content: string },
+      { roomId: string; messageId: string }
+    >({
+      query: ({ roomId, messageId }) => ({
+        url: `/api/v1/rooms/${roomId}/messages/${messageId}/revoke`,
+        method: 'POST',
+      }),
+      async onQueryStarted({ roomId, messageId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+              const m = draft.messages.find((item) => item.id === messageId);
+              if (m) {
+                m.content = data.content || 'Tin nhắn đã được thu hồi';
+                m.isRevoked = true;
+              }
+            }),
+          );
+        } catch {}
+      },
+    }),
+
+    reactMessage: build.mutation<
+      { ok: boolean; message_id: string; reactions: Record<string, string[]> },
+      { roomId: string; messageId: string; emoji: string }
+    >({
+      query: ({ roomId, messageId, emoji }) => ({
+        url: `/api/v1/rooms/${roomId}/messages/${messageId}/react`,
+        method: 'POST',
+        body: { emoji },
+      }),
+      async onQueryStarted({ roomId, messageId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+              const m = draft.messages.find((item) => item.id === messageId);
+              if (m) {
+                m.reactions = data.reactions;
+              }
+            }),
+          );
+        } catch {}
+      },
+    }),
+
+    pinMessage: build.mutation<
+      { ok: boolean; room_id: string; pinned_message: any },
+      { roomId: string; messageId: string }
+    >({
+      query: ({ roomId, messageId }) => ({
+        url: `/api/v1/rooms/${roomId}/pin`,
+        method: 'POST',
+        body: { message_id: messageId },
+      }),
+      invalidatesTags: ['Room'],
+    }),
+
+    unpinMessage: build.mutation<{ ok: boolean; room_id: string }, { roomId: string }>({
+      query: ({ roomId }) => ({
+        url: `/api/v1/rooms/${roomId}/pin`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Room'],
+    }),
   }),
 });
 
@@ -484,4 +563,8 @@ export const {
   useSummarizeRoomMutation,
   useSemanticSearchMutation,
   useRagChatMutation,
+  useRevokeMessageMutation,
+  useReactMessageMutation,
+  usePinMessageMutation,
+  useUnpinMessageMutation,
 } = chatApi;
