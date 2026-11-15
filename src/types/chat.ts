@@ -40,7 +40,7 @@ export interface ReplyToInfo {
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'failed';
-export type MessageType = 'text' | 'image' | 'video' | 'file';
+export type MessageType = 'text' | 'image' | 'video' | 'file' | 'poll';
 
 export interface Message {
   id: string;
@@ -69,6 +69,10 @@ export interface Message {
   // --- Giai đoạn 2 ---
   isForwarded?: boolean;
   isStarred?: boolean;
+  // --- Giai đoạn 3 ---
+  isEdited?: boolean;
+  editedAt?: number;
+  pollId?: string;
 }
 
 // ---- Khớp với gateway ----
@@ -141,7 +145,7 @@ export interface HistoryItem {
   sender_id: string;
   content: string;
   timestamp: number;
-  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE';
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'POLL';
   media_url?: string;
   media_width?: number;
   media_height?: number;
@@ -157,6 +161,9 @@ export interface HistoryItem {
   file_size?: number;
   is_forwarded?: boolean;
   is_starred?: boolean;
+  is_edited?: boolean;
+  edited_at?: number;
+  poll_id?: string;
 }
 
 export interface StarredMessageItem {
@@ -206,4 +213,60 @@ export interface FriendRequest {
   senderName: string;
   senderEmail: string;
   createdAt: number;
+}
+
+// ---- Cuộc bình chọn nhóm (Group Poll) ----
+export interface PollOption {
+  id: string;
+  text: string;
+  voter_ids: string[];
+  vote_count?: number;
+  percentage?: number;
+}
+
+export interface Poll {
+  id: string;
+  room_id: string;
+  message_id: string;
+  creator_id: string;
+  creator_name: string;
+  question: string;
+  options: PollOption[];
+  is_multiple_choice: boolean;
+  is_anonymous: boolean;
+  is_closed: boolean;
+  created_at: number;
+  total_votes: number;
+  total_voters: number;
+}
+
+export interface CreatePollRequest {
+  roomId: string;
+  question: string;
+  options: string[];
+  isMultipleChoice?: boolean;
+  isAnonymous?: boolean;
+}
+
+export interface VotePollRequest {
+  pollId: string;
+  optionId: string;
+}
+
+export interface EditMessageRequest {
+  roomId: string;
+  messageId: string;
+  content: string;
+}
+
+export interface TranslateMessageRequest {
+  text: string;
+  targetLang?: string;
+}
+
+export interface TranslateMessageResponse {
+  ok: boolean;
+  original_text: string;
+  translated_text: string;
+  target_lang: string;
 }

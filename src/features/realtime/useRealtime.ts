@@ -251,6 +251,37 @@ export function useRealtime() {
                   }
                 }),
               );
+            } else if (data.type === 'MESSAGE_EDITED') {
+              const ed = data as any;
+              dispatch(
+                chatApi.util.updateQueryData('getMessages', ed.room_id, (draft) => {
+                  const m = draft.messages.find((item) => item.id === ed.message_id);
+                  if (m) {
+                    m.content = ed.content;
+                    m.isEdited = true;
+                    m.editedAt = ed.edited_at;
+                  }
+                }),
+              );
+              dispatch(
+                chatApi.util.updateQueryData('getRooms', undefined, (draft) => {
+                  const r = draft.find((item) => item.id === ed.room_id);
+                  if (r && r.lastMessage) {
+                    r.lastMessage = ed.content;
+                  }
+                }),
+              );
+            } else if (data.type === 'POLL_CREATED') {
+              dispatch(chatApi.util.invalidateTags(['Message', 'Room']));
+            } else if (data.type === 'POLL_UPDATED') {
+              const pollData = data as any;
+              if (pollData.poll_id && pollData.poll) {
+                dispatch(
+                  chatApi.util.updateQueryData('getPoll', pollData.poll_id, (draft) => {
+                    Object.assign(draft, pollData.poll);
+                  }),
+                );
+              }
             } else if (data.type === 'MESSAGE_REACTION') {
               const rx = data as any;
               dispatch(

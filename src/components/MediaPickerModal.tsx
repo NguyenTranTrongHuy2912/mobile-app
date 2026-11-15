@@ -11,6 +11,7 @@ interface MediaPickerModalProps {
   onPickGallery: () => void;
   onPickFolder: () => void;
   onPickDocument?: () => void;
+  onPickPoll?: () => void;
   onTakePhoto: () => void;
 }
 
@@ -18,8 +19,9 @@ interface MediaPickerModalProps {
  * Modal lựa chọn nguồn tải ảnh chuẩn Messenger:
  * 1. Thư viện ảnh & Album thiết bị
  * 2. Tài liệu & Tệp tin (PDF, Word, Excel, ZIP...)
- * 3. Duyệt tìm trong thư mục tệp máy (File Manager / Folders)
- * 4. Chụp ảnh nhanh từ Camera trước (Front Camera)
+ * 3. Bình chọn nhóm (Group Poll)
+ * 4. Duyệt tìm trong thư mục tệp máy (File Manager / Folders)
+ * 5. Chụp ảnh nhanh từ Camera trước (Front Camera)
  */
 export default function MediaPickerModal({
   visible,
@@ -27,6 +29,7 @@ export default function MediaPickerModal({
   onPickGallery,
   onPickFolder,
   onPickDocument,
+  onPickPoll,
   onTakePhoto,
 }: MediaPickerModalProps) {
   const C = useScreenColors();
@@ -35,10 +38,12 @@ export default function MediaPickerModal({
   // Nền icon: sáng dùng màu pastel, tối dùng nền nhạt tối hơn
   const galleryBg = C.isDark ? C.brandSoft : '#E7F3FF';
   const docBg = C.isDark ? '#2E1E4A' : '#F3E8FF';
+  const pollBg = C.isDark ? '#3D2A14' : '#FEF3C7';
   const folderBg = C.isDark ? C.brandSoft : '#EBF5FB';
   const cameraBg = C.isDark ? '#1E3A28' : '#E8F5E9';
   const galleryIcon = C.isDark ? '#4DA3FF' : '#0084FF';
   const docIcon = C.isDark ? '#A78BFA' : '#8B5CF6';
+  const pollIcon = C.isDark ? '#FBBF24' : '#D97706';
   const folderIcon = C.isDark ? '#4DA3FF' : '#007AFF';
   const cameraIcon = C.isDark ? '#66BB6A' : '#2E7D32';
 
@@ -85,6 +90,26 @@ export default function MediaPickerModal({
               <View style={styles.textWrap}>
                 <Text style={styles.optionTitle}>Tài liệu & Tệp tin (Document)</Text>
                 <Text style={styles.optionDesc}>Gửi tài liệu PDF, Word, Excel, PowerPoint, ZIP...</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={C.muted} />
+            </ScalePressable>
+          )}
+
+          {/* Option 3: Cuộc bình chọn nhóm (Poll) */}
+          {onPickPoll && (
+            <ScalePressable
+              style={styles.optionRow}
+              onPress={() => {
+                onClose();
+                onPickPoll();
+              }}
+            >
+              <View style={{ ...styles.iconWrap, backgroundColor: pollBg }}>
+                <Ionicons name="stats-chart" size={24} color={pollIcon} />
+              </View>
+              <View style={styles.textWrap}>
+                <Text style={styles.optionTitle}>Cuộc bình chọn (Group Poll)</Text>
+                <Text style={styles.optionDesc}>Tạo câu hỏi thăm dò ý kiến các thành viên</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={C.muted} />
             </ScalePressable>

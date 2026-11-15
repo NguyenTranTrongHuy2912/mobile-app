@@ -30,6 +30,8 @@ import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
 import ForwardMessageModal from '../components/ForwardMessageModal';
 import SavedMessagesModal from '../components/SavedMessagesModal';
+import CreatePollModal from '../components/CreatePollModal';
+import PollCard from '../components/PollCard';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
@@ -44,6 +46,8 @@ import {
   usePinMessageMutation,
   useUnpinMessageMutation,
   useToggleStarMessageMutation,
+  useEditMessageMutation,
+  useTranslateMessageMutation,
 } from '../api/chatApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearDraft, setDraft } from '../features/chat/chatSlice';
@@ -134,9 +138,16 @@ export default function ChatRoomScreen() {
   const [pinMessage] = usePinMessageMutation();
   const [unpinMessage] = useUnpinMessageMutation();
   const [toggleStarMessage] = useToggleStarMessageMutation();
+  const [editMessageMutation] = useEditMessageMutation();
+  const [translateMessageMutation, { isLoading: isTranslating }] = useTranslateMessageMutation();
+
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardTargetMsg, setForwardTargetMsg] = useState<Message | null>(null);
   const [showSavedModal, setShowSavedModal] = useState(false);
+  const [showCreatePollModal, setShowCreatePollModal] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translatingMsgId, setTranslatingMsgId] = useState<string | null>(null);
 
   const listRef = useRef<FlatList<Message>>(null);
   const prevMessagesRef = useRef<Message[]>([]);
@@ -345,6 +356,35 @@ export default function ChatRoomScreen() {
       durationMs: forwardTargetMsg.videoDurationMs,
       isForwarded: true,
     }).unwrap();
+  };
+
+  const handleStartEdit = (msg: Message) => {
+    setEditingMessage(msg);
+    dispatch(setDraft({ roomId, text: msg.content }));
+    setShowActionModal(false);
+    setReactionTargetMsg(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    dispatch(clearDraft(roomId));
+  };
+
+  const handleTranslateMessage = async (msg: Message) => {
+    if (!msg.content) return;
+    setTranslatingMsgId(msg.id);
+    try {
+      const res = await translateMessageMutation({ text: msg.content, targetLang: 'vi' }).unwrap();
+      if (res.translated_text) {
+        setTranslations((prev) => ({ ...prev, [msg.id]: res.translated_text }));
+      }
+    } catch {
+      Alert.alert('HQ AI', 'Không thể dịch tin nhắn lúc này.');
+    } finally {
+      setTranslatingMsgId(null);
+      setShowActionModal(false);
+      setReactionTargetMsg(null);
+    }
   };
 
   // Trích xuất từ khóa mention khi người dùng gõ @
@@ -692,6 +732,18 @@ export default function ChatRoomScreen() {
   );
 
   const onPressSend = () => {
+    if (editingMessage) {
+      if (draft.trim()) {
+        editMessageMutation({
+          roomId,
+          messageId: editingMessage.id,
+          content: draft.trim(),
+        });
+      }
+      setEditingMessage(null);
+      dispatch(clearDraft(roomId));
+      return;
+    }
     send(draft);
     dispatch(clearDraft(roomId));
   };
@@ -931,6 +983,8 @@ export default function ChatRoomScreen() {
                 </View>
                 <Ionicons name="arrow-down-circle" size={24} color={mine ? '#fff' : C.brand} />
               </Pressable>
+            ) : item.type === 'poll' && item.pollId ? (
+              <PollCard pollId={item.pollId} currentUserId={userId} mine={mine} />
             ) : isBigEmoji ? (
               <Text style={styles.textBigEmoji}>{item.content}</Text>
             ) : item.content.startsWith('📞') || item.content.startsWith('📹') || item.content.startsWith('❌') || item.content.startsWith('🚫') ? (
@@ -961,24 +1015,53 @@ export default function ChatRoomScreen() {
                 )}
               </View>
             ) : (
-              <Text style={mine ? styles.textMine : isHqAi ? styles.textAi : styles.textOther}>
-                {displayContent.split(/(@[^\s@]+)/g).map((part, i) => {
-                  if (part.startsWith('@')) {
-                    return (
-                      <Text
-                        key={i}
-                        style={{
-                          fontWeight: '700',
-                          color: mine ? '#FFE082' : C.brand,
+              <View>
+                <Text style={mine ? styles.textMine : isHqAi ? styles.textAi : styles.textOther}>
+                  {displayContent.split(/(@[^\s@]+)/g).map((part, i) => {
+                    if (part.startsWith('@')) {
+                      return (
+                        <Text
+                          key={i}
+                          style={{
+                            fontWeight: '700',
+                            color: mine ? '#FFE082' : C.brand,
+                          }}
+                        >
+                          {part}
+                        </Text>
+                      );
+                    }
+                    return part;
+                  })}
+                </Text>
+
+                {/* Bản dịch AI (nếu đã yêu cầu dịch) */}
+                {translations[item.id] && (
+                  <View style={[styles.translationCard, mine ? styles.translationCardMine : styles.translationCardOther]}>
+                    <View style={styles.translationHeader}>
+                      <Ionicons name="language" size={13} color={mine ? 'rgba(255,255,255,0.9)' : C.brand} />
+                      <Text style={[styles.translationLabel, mine && { color: 'rgba(255,255,255,0.9)' }]}>
+                        Bản dịch AI (Tiếng Việt):
+                      </Text>
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => {
+                          setTranslations((prev) => {
+                            const copy = { ...prev };
+                            delete copy[item.id];
+                            return copy;
+                          });
                         }}
                       >
-                        {part}
-                      </Text>
-                    );
-                  }
-                  return part;
-                })}
-              </Text>
+                        <Ionicons name="close" size={14} color={mine ? 'rgba(255,255,255,0.7)' : C.muted} />
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.translationBody, mine && { color: '#fff' }]}>
+                      {translations[item.id]}
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
 
             {isSelected && (
@@ -991,6 +1074,20 @@ export default function ChatRoomScreen() {
                 }}
               >
                 {dayjs(item.timestamp).format('HH:mm · DD/MM/YYYY')}
+                {item.isEdited ? ' · (đã sửa)' : ''}
+              </Text>
+            )}
+            {!isSelected && item.isEdited && (
+              <Text
+                style={{
+                  ...styles.meta,
+                  ...(mine ? styles.metaMine : styles.metaOther),
+                  fontSize: 10,
+                  fontStyle: 'italic',
+                  marginTop: 2,
+                }}
+              >
+                (đã sửa)
               </Text>
             )}
             {item.isStarred && (
@@ -1157,6 +1254,26 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
+      {/* Banner Chỉnh sửa tin nhắn (Edit Message Preview) */}
+      {editingMessage && (
+        <View style={styles.editBanner}>
+          <View style={styles.editBannerBar} />
+          <View style={styles.editBannerContent}>
+            <Text style={styles.editBannerTitle}>Đang chỉnh sửa tin nhắn</Text>
+            <Text style={styles.editBannerText} numberOfLines={1}>
+              {editingMessage.content}
+            </Text>
+          </View>
+          <Pressable
+            style={styles.replyBannerCloseBtn}
+            onPress={handleCancelEdit}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={18} color={C.muted} />
+          </Pressable>
+        </View>
+      )}
+
       {/* Banner Trả lời tin nhắn (Reply Preview) */}
       {replyingToMessage && (
         <View style={styles.replyBanner}>
@@ -1282,6 +1399,7 @@ export default function ChatRoomScreen() {
         onPickGallery={pickFromLibrary}
         onPickFolder={pickFromFolder}
         onPickDocument={pickDocument}
+        onPickPoll={() => setShowCreatePollModal(true)}
         onTakePhoto={takePhoto}
       />
       <SemanticSearchModal
@@ -1435,6 +1553,52 @@ export default function ChatRoomScreen() {
               </Text>
             </Pressable>
 
+            {/* Chỉnh sửa tin nhắn (cho phép trong 30 phút với tin văn bản) */}
+            {reactionTargetMsg?.senderId === userId &&
+              Date.now() - (reactionTargetMsg?.timestamp || 0) <= 30 * 60 * 1000 &&
+              !reactionTargetMsg?.isRevoked &&
+              (!reactionTargetMsg?.type || reactionTargetMsg?.type === 'text') &&
+              reactionTargetMsg?.content !== 'Tin nhắn đã được thu hồi' && (
+                <Pressable
+                  style={styles.actionMenuItem}
+                  onPress={() => {
+                    if (reactionTargetMsg) {
+                      handleStartEdit(reactionTargetMsg);
+                    }
+                  }}
+                >
+                  <Ionicons name="pencil-outline" size={18} color={C.brand} />
+                  <Text style={[styles.actionMenuItemText, { color: C.brand, fontWeight: '600' }]}>
+                    Chỉnh sửa tin nhắn
+                  </Text>
+                </Pressable>
+              )}
+
+            {/* Dịch tin nhắn bằng AI */}
+            {!reactionTargetMsg?.isRevoked &&
+              (!reactionTargetMsg?.type || reactionTargetMsg?.type === 'text') &&
+              !!reactionTargetMsg?.content &&
+              reactionTargetMsg?.content !== 'Tin nhắn đã được thu hồi' && (
+                <Pressable
+                  style={styles.actionMenuItem}
+                  onPress={() => {
+                    if (reactionTargetMsg) {
+                      handleTranslateMessage(reactionTargetMsg);
+                    }
+                  }}
+                  disabled={translatingMsgId === reactionTargetMsg?.id}
+                >
+                  {translatingMsgId === reactionTargetMsg?.id ? (
+                    <ActivityIndicator size="small" color="#8B5CF6" />
+                  ) : (
+                    <Ionicons name="language-outline" size={18} color="#8B5CF6" />
+                  )}
+                  <Text style={[styles.actionMenuItemText, { color: '#8B5CF6', fontWeight: '600' }]}>
+                    Dịch tin nhắn bằng AI 🌐
+                  </Text>
+                </Pressable>
+              )}
+
             {/* Chuyển tiếp tin nhắn */}
             <Pressable style={styles.actionMenuItem} onPress={handleStartForward}>
               <Ionicons name="arrow-redo-outline" size={18} color={C.brand} />
@@ -1517,6 +1681,13 @@ export default function ChatRoomScreen() {
             router.push({ pathname: '/(app)/chat/[roomId]', params: { roomId: msgRoomId } });
           }
         }}
+      />
+
+      {/* Modal Tạo cuộc bình chọn */}
+      <CreatePollModal
+        visible={showCreatePollModal}
+        roomId={roomId}
+        onClose={() => setShowCreatePollModal(false)}
       />
     </KeyboardAvoidingView>
   );
@@ -2269,5 +2440,63 @@ const makeStyles = (C: ScreenColors) =>
     fontSize: 13,
     fontWeight: '600',
     color: C.ink,
+  },
+  editBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.line,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  editBannerBar: {
+    width: 3,
+    height: 28,
+    borderRadius: 2,
+    backgroundColor: C.brand,
+    marginRight: 10,
+  },
+  editBannerContent: {
+    flex: 1,
+  },
+  editBannerTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.brand,
+  },
+  editBannerText: {
+    fontSize: 13,
+    color: C.ink,
+    marginTop: 2,
+  },
+  translationCard: {
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  translationCardMine: {
+    borderTopColor: 'rgba(255,255,255,0.25)',
+  },
+  translationCardOther: {
+    borderTopColor: C.line,
+  },
+  translationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  translationLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.brand,
+    marginLeft: 4,
+  },
+  translationBody: {
+    fontSize: 13,
+    color: C.ink,
+    lineHeight: 18,
   },
 });

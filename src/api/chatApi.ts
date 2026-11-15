@@ -3,7 +3,9 @@ import { API_URL } from '../config';
 import type { RootState } from '../store';
 import { logout } from '../features/session/sessionSlice';
 import type {
+  CreatePollRequest,
   CreateRoomRequest,
+  EditMessageRequest,
   Friend,
   FriendRequest,
   HistoryItem,
@@ -11,6 +13,7 @@ import type {
   Message,
   MessagesState,
   MessageType,
+  Poll,
   Room,
   RoomDto,
   RoomsResponse,
@@ -19,8 +22,11 @@ import type {
   SendMessageRequest,
   SendMessageResponse,
   StarredMessageItem,
+  TranslateMessageRequest,
+  TranslateMessageResponse,
   UploadSignature,
   UserSummary,
+  VotePollRequest,
 } from '../types/chat';
 
 
@@ -28,7 +34,7 @@ const toMessage = (m: HistoryItem): Message => ({
   id: m.message_id,
   roomId: m.room_id,
   senderId: m.sender_id,
-  type: m.type === 'IMAGE' ? ('image' as const) : m.type === 'VIDEO' ? ('video' as const) : m.type === 'FILE' ? ('file' as const) : ('text' as const),
+  type: m.type === 'IMAGE' ? ('image' as const) : m.type === 'VIDEO' ? ('video' as const) : m.type === 'FILE' ? ('file' as const) : m.type === 'POLL' ? ('poll' as const) : ('text' as const),
   content: m.content,
   timestamp: m.timestamp,
   status: 'sent' as const,
@@ -44,6 +50,9 @@ const toMessage = (m: HistoryItem): Message => ({
   reactions: m.reactions,
   isForwarded: m.is_forwarded,
   isStarred: m.is_starred,
+  isEdited: m.is_edited,
+  editedAt: m.edited_at,
+  pollId: m.poll_id,
   replyTo: m.reply_to
     ? {
         messageId: m.reply_to.message_id,
@@ -612,6 +621,80 @@ export const chatApi = createApi({
       transformResponse: (res: { messages: StarredMessageItem[] }) => res.messages || [],
       providesTags: ['Message'],
     }),
+
+    editMessage: build.mutation<
+      { ok: boolean; message_id: string; content: string; is_edited: boolean; edited_at: number },
+      EditMessageRequest
+    >({
+      query: ({ roomId, messageId, content }) => ({
+        url: `/api/v1/rooms/${roomId}/messages/${messageId}`,
+        method: 'PUT',
+        body: { content },
+      }),
+      async onQueryStarted({ roomId, messageId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+              const m = draft.messages.find((item) => item.id === messageId);
+              if (m) {
+                m.content = data.content;
+                m.isEdited = true;
+                m.editedAt = data.edited_at;
+              }
+            }),
+          );
+        } catch {}
+      },
+    }),
+
+    createPoll: build.mutation<
+      { ok: boolean; poll_id: string; message_id: string; poll: Poll },
+      CreatePollRequest
+    >({
+      query: ({ roomId, question, options, isMultipleChoice, isAnonymous }) => ({
+        url: `/api/v1/rooms/${roomId}/polls`,
+        method: 'POST',
+        body: {
+          question,
+          options,
+          is_multiple_choice: !!isMultipleChoice,
+          is_anonymous: !!isAnonymous,
+        },
+      }),
+      invalidatesTags: ['Message', 'Room'],
+    }),
+
+    getPoll: build.query<Poll, string>({
+      query: (pollId) => `/api/v1/chat/polls/${pollId}`,
+      transformResponse: (res: { ok: boolean; poll: Poll }) => res.poll,
+    }),
+
+    votePoll: build.mutation<{ ok: boolean; poll: Poll }, VotePollRequest>({
+      query: ({ pollId, optionId }) => ({
+        url: `/api/v1/chat/polls/${pollId}/vote`,
+        method: 'POST',
+        body: { option_id: optionId },
+      }),
+      async onQueryStarted({ pollId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatApi.util.updateQueryData('getPoll', pollId, (draft) => {
+              Object.assign(draft, data.poll);
+            }),
+          );
+        } catch {}
+      },
+    }),
+
+    translateMessage: build.mutation<TranslateMessageResponse, TranslateMessageRequest>({
+      query: ({ text, targetLang = 'vi' }) => ({
+        url: '/api/v1/ai/translate',
+        method: 'POST',
+        body: { text, target_lang: targetLang },
+      }),
+    }),
   }),
 });
 
@@ -645,4 +728,9 @@ export const {
   useUnpinMessageMutation,
   useToggleStarMessageMutation,
   useGetStarredMessagesQuery,
+  useEditMessageMutation,
+  useCreatePollMutation,
+  useGetPollQuery,
+  useVotePollMutation,
+  useTranslateMessageMutation,
 } = chatApi;
