@@ -20,7 +20,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "iuh.fit.chatapp",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -46,6 +49,16 @@
       ],
       "expo-splash-screen",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "fa5bbc93-1ab3-4684-8bc7-3230b0fad05a"
+      }
+    }
   }
 }
