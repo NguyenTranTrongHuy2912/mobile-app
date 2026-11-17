@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,8 +23,8 @@ import {
 } from '../api/chatApi';
 import { uploadImage } from '../api/uploadApi';
 import { logout, updateUserProfile } from '../features/session/sessionSlice';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { colors } from '../theme';
 import { errorMessage } from '../utils/errorMessage';
 
 function confirmLogout(onConfirm: () => void) {
@@ -42,9 +42,13 @@ function confirmLogout(onConfirm: () => void) {
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const displayName = useAppSelector((s) => s.session.displayName);
+  const C = useScreenColors();
+  const styles = useMemo(() => makeStyles(C), [C]);
+
+  const rawDisplayName = useAppSelector((s) => s.session.displayName);
+  const displayName = (rawDisplayName ?? '').trim() || 'Người dùng';
   const avatarUrl = useAppSelector((s) => s.session.avatarUrl);
-  const userId = useAppSelector((s) => s.session.userId);
+  const userId = useAppSelector((s) => s.session.userId) || 'Chưa xác định';
   const role = useAppSelector((s) => s.session.role) || 'USER';
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
@@ -64,7 +68,6 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   // 1. Chọn và đổi Avatar (Upload Cloudinary)
   const handlePickAvatar = async () => {
@@ -88,19 +91,13 @@ export default function ProfileScreen() {
       const asset = res.assets[0];
       setIsUploadingAvatar(true);
 
-      // Lấy chữ ký từ gateway
       const sig = await getUploadSignature().unwrap();
-
-      // Upload thẳng lên Cloudinary
       const uploaded = await uploadImage(sig, {
         uri: asset.uri,
         mimeType: asset.mimeType ?? 'image/jpeg',
       });
 
-      // Lưu avatar URL mới vào Java gRPC Backend qua gateway
       await updateProfile({ avatarUrl: uploaded.url }).unwrap();
-
-      // Cập nhật Redux store & AsyncStorage
       dispatch(updateUserProfile({ avatarUrl: uploaded.url }));
       Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện thành công!');
     } catch (e) {
@@ -112,7 +109,7 @@ export default function ProfileScreen() {
 
   // 2. Đổi tên hiển thị
   const handleOpenNameModal = () => {
-    setNewName(displayName);
+    setNewName(rawDisplayName ?? '');
     setNameError(null);
     setShowNameModal(true);
   };
@@ -143,7 +140,6 @@ export default function ProfileScreen() {
     setNewPassword('');
     setConfirmPassword('');
     setPasswordError(null);
-    setPasswordSuccess(null);
     setShowPasswordModal(true);
   };
 
@@ -167,11 +163,11 @@ export default function ProfileScreen() {
         newPassword,
       }).unwrap();
 
-      setPasswordSuccess(res.message || 'Đổi mật khẩu thành công!');
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        Alert.alert('Thành công', 'Đổi mật khẩu thành công!');
-      }, 1200);
+      setShowPasswordModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Thành công', res.message || 'Đổi mật khẩu thành công!');
     } catch (e) {
       setPasswordError(errorMessage(e, 'Đổi mật khẩu thất bại. Kiểm tra lại mật khẩu cũ.'));
     }
@@ -179,7 +175,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Profile Facebook Messenger style (Ảnh 5) */}
+      {/* Header Profile */}
       <View style={styles.menuHeaderCard}>
         <View style={styles.avatarContainer}>
           {avatarUrl ? (
@@ -206,95 +202,101 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuHeaderText}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
               {displayName}
             </Text>
-            {role === 'ADMIN' ? (
+            <Pressable onPress={handleOpenNameModal} hitSlop={8} style={styles.editNameBtn}>
+              <Ionicons name="pencil" size={15} color={C.brand} />
+            </Pressable>
+          </View>
+
+          <View style={styles.subRow}>
+            <Text style={styles.subtext} numberOfLines={1}>
+              @{displayName.toLowerCase().replace(/\s+/g, '')}
+            </Text>
+            {role === 'ADMIN' && (
               <View style={styles.adminBadge}>
                 <Ionicons name="shield-checkmark" size={11} color="#fff" />
-                <Text style={styles.adminBadgeText}>Admin</Text>
-              </View>
-            ) : (
-              <View style={styles.userBadge}>
-                <Text style={styles.userBadgeText}>Thành viên</Text>
+                <Text style={styles.adminBadgeText}>ADMIN</Text>
               </View>
             )}
           </View>
-          <Text style={styles.subtext} numberOfLines={1}>
-            Vai trò: {role === 'ADMIN' ? 'Quản trị viên hệ thống' : 'Người dùng tiêu chuẩn'} · @{displayName.toLowerCase().replace(/\s+/g, '')}
-          </Text>
         </View>
       </View>
 
-      {/* Nhóm Menu Messenger (Ảnh 5) */}
+      {/* Danh sách chức năng chính */}
       <View style={styles.card}>
         {role === 'ADMIN' && (
           <Pressable
-            style={[styles.row, styles.rowBorder, { backgroundColor: '#F0F5FF' }]}
+            style={[
+              styles.row,
+              styles.rowBorder,
+              { backgroundColor: C.isDark ? 'rgba(79, 70, 229, 0.16)' : '#F0F5FF' },
+            ]}
             onPress={() => router.push('/(app)/admin' as any)}
           >
             <View style={[styles.iconCircle, { backgroundColor: '#4F46E5' }]}>
               <Ionicons name="shield-checkmark" size={20} color="#fff" />
             </View>
             <View style={styles.rowContent}>
-              <Text style={[styles.rowLabel, { color: '#4F46E5', fontWeight: '700' }]}>
+              <Text style={[styles.rowLabel, { color: C.isDark ? '#818CF8' : '#4F46E5', fontWeight: '700' }]}>
                 Bảng điều khiển Quản trị (Admin)
               </Text>
               <Text style={styles.rowSub}>Thống kê hệ thống, quản lý tài khoản & phân quyền</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#4F46E5" />
+            <Ionicons name="chevron-forward" size={18} color={C.isDark ? '#818CF8' : '#4F46E5'} />
           </Pressable>
         )}
 
         <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/(app)/settings')}>
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="settings-outline" size={20} color="#050505" />
+          <View style={[styles.iconCircle, { backgroundColor: C.inputBg }]}>
+            <Ionicons name="settings-outline" size={20} color={C.ink} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Cài đặt</Text>
-            <Text style={styles.rowSub}>Tên hiển thị: {displayName}</Text>
+            <Text style={styles.rowSub}>Giao diện tối, âm thanh & điều khoản</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </Pressable>
 
         <Pressable
           style={[styles.row, styles.rowBorder]}
           onPress={() => router.push('/(app)/(tabs)/notifications')}
         >
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="people-outline" size={20} color="#050505" />
+          <View style={[styles.iconCircle, { backgroundColor: C.inputBg }]}>
+            <Ionicons name="people-outline" size={20} color={C.ink} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Lời mời kết bạn</Text>
             <Text style={styles.rowSub}>Xem và xác nhận kết nối mới</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </Pressable>
 
         <Pressable
           style={[styles.row, styles.rowBorder]}
           onPress={() => router.push('/(app)/ai-assistant')}
         >
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="sparkles-outline" size={20} color="#0084FF" />
+          <View style={[styles.iconCircle, { backgroundColor: C.brandSoft }]}>
+            <Ionicons name="sparkles-outline" size={20} color={C.brand} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Chat với AI</Text>
             <Text style={styles.rowSub}>Hỏi đáp thông minh cùng AI Assistant</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </Pressable>
 
         <Pressable style={styles.row} onPress={handleOpenPasswordModal}>
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="key-outline" size={20} color="#050505" />
+          <View style={[styles.iconCircle, { backgroundColor: C.inputBg }]}>
+            <Ionicons name="key-outline" size={20} color={C.ink} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Đổi mật khẩu</Text>
             <Text style={styles.rowSub}>Bảo mật tài khoản của bạn</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </Pressable>
       </View>
 
@@ -302,8 +304,8 @@ export default function ProfileScreen() {
       <Text style={styles.sectionHeader}>THÔNG TIN</Text>
       <View style={styles.card}>
         <View style={[styles.row, styles.rowBorder]}>
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="id-card-outline" size={20} color={colors.subtext} />
+          <View style={[styles.iconCircle, { backgroundColor: C.inputBg }]}>
+            <Ionicons name="id-card-outline" size={20} color={C.muted} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Mã người dùng</Text>
@@ -314,8 +316,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.row}>
-          <View style={[styles.iconCircle, { backgroundColor: '#F0F2F5' }]}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.subtext} />
+          <View style={[styles.iconCircle, { backgroundColor: C.inputBg }]}>
+            <Ionicons name="information-circle-outline" size={20} color={C.muted} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Phiên bản ứng dụng</Text>
@@ -331,15 +333,22 @@ export default function ProfileScreen() {
           onPress={() => confirmLogout(() => dispatch(logout()))}
           accessibilityRole="button"
         >
-          <View style={[styles.iconCircle, { backgroundColor: '#FFEBEE' }]}>
-            <Ionicons name="log-out-outline" size={20} color={colors.error} />
+          <View style={[styles.iconCircle, { backgroundColor: C.dangerSoft }]}>
+            <Ionicons name="log-out-outline" size={20} color={C.danger} />
           </View>
           <Text style={[styles.rowLabel, styles.logout]}>Đăng xuất</Text>
         </Pressable>
       </View>
 
       {/* Modal Đổi tên hiển thị */}
-      <Modal visible={showNameModal} transparent animationType="fade">
+      <Modal
+        visible={showNameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+  if (!updatingProfile) setShowNameModal(false);
+}}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Đổi tên hiển thị</Text>
@@ -355,7 +364,7 @@ export default function ProfileScreen() {
                 setNameError(null);
               }}
               placeholder="Nhập tên mới..."
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={C.muted}
               autoFocus
               maxLength={50}
             />
@@ -388,7 +397,14 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Modal Đổi mật khẩu */}
-      <Modal visible={showPasswordModal} transparent animationType="fade">
+      <Modal
+        visible={showPasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+  if (!changingPassword) setShowPasswordModal(false);
+}}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Đổi mật khẩu</Text>
@@ -399,32 +415,40 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.modalInput}
               value={currentPassword}
-              onChangeText={setCurrentPassword}
+              onChangeText={(t) => {
+                setCurrentPassword(t);
+                setPasswordError(null);
+              }}
               placeholder="Mật khẩu hiện tại"
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={C.muted}
               secureTextEntry
             />
 
             <TextInput
               style={[styles.modalInput, { marginTop: 10 }]}
               value={newPassword}
-              onChangeText={setNewPassword}
+              onChangeText={(t) => {
+                setNewPassword(t);
+                setPasswordError(null);
+              }}
               placeholder="Mật khẩu mới (ít nhất 6 ký tự)"
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={C.muted}
               secureTextEntry
             />
 
             <TextInput
               style={[styles.modalInput, { marginTop: 10 }]}
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(t) => {
+                setConfirmPassword(t);
+                setPasswordError(null);
+              }}
               placeholder="Nhập lại mật khẩu mới"
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={C.muted}
               secureTextEntry
             />
 
             {passwordError ? <Text style={styles.modalError}>{passwordError}</Text> : null}
-            {passwordSuccess ? <Text style={styles.modalSuccess}>{passwordSuccess}</Text> : null}
 
             <View style={styles.modalActions}>
               <Pressable
@@ -454,165 +478,179 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.screen },
-  content: { padding: 16, width: '100%', maxWidth: 500, alignSelf: 'center', paddingBottom: 40 },
-  menuHeaderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  menuHeaderText: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  header: { alignItems: 'center', paddingVertical: 20 },
-  avatarContainer: { position: 'relative', marginBottom: 12 },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-  },
-  avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  avatarInitial: { color: '#fff', fontSize: 40, fontWeight: '700' },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-    elevation: 4,
-  },
-  adminBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4F46E5',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    gap: 3,
-  },
-  adminBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  userBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  userBadgeText: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  name: { fontSize: 22, fontWeight: '700', color: colors.text },
-  subtext: { fontSize: 13, color: colors.subtext, marginTop: 4 },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.subtext,
-    marginLeft: 12,
-    marginBottom: 6,
-    marginTop: 18,
-    letterSpacing: 0.5,
-  },
-  card: { backgroundColor: colors.background, borderRadius: 16, overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  rowContent: { flex: 1 },
-  rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowValue: { fontSize: 14, color: colors.primary, marginTop: 2 },
-  rowSub: { fontSize: 13, color: colors.subtext, marginTop: 2 },
-  logout: { color: colors.error, fontWeight: '600', flex: 1, marginLeft: 2 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: colors.background,
-    borderRadius: 18,
-    padding: 22,
-    elevation: 8,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 6 },
-  modalDesc: { fontSize: 13, color: colors.subtext, marginBottom: 16, lineHeight: 18 },
-  modalInput: {
-    backgroundColor: '#F0F2F5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: colors.text,
-  },
-  modalError: { color: colors.error, fontSize: 13, marginTop: 8 },
-  modalSuccess: { color: '#2e7d32', fontSize: 13, marginTop: 8, fontWeight: '600' },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 20,
-  },
-  modalBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  modalBtnCancel: { backgroundColor: '#F0F2F5' },
-  modalBtnCancelText: { color: colors.text, fontWeight: '600', fontSize: 14 },
-  modalBtnConfirm: { backgroundColor: colors.primary },
-  modalBtnConfirmText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-});
+const makeStyles = (C: ScreenColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.screen },
+    content: { padding: 16, width: '100%', maxWidth: 500, alignSelf: 'center', paddingBottom: 40 },
+    menuHeaderCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOpacity: C.isDark ? 0.2 : 0.05,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    menuHeaderText: {
+      flex: 1,
+      marginLeft: 14,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    editNameBtn: {
+      padding: 4,
+      borderRadius: 12,
+      backgroundColor: C.brandSoft,
+    },
+    subRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+    },
+    avatarContainer: { position: 'relative' },
+    avatarPlaceholder: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: C.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.card,
+      elevation: 3,
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+    },
+    avatarImage: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      borderWidth: 2,
+      borderColor: C.card,
+    },
+    avatarInitial: { color: '#fff', fontSize: 32, fontWeight: '700' },
+    cameraBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: C.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.card,
+      elevation: 4,
+    },
+    adminBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#4F46E5',
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: 12,
+      gap: 3,
+    },
+    adminBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    userBadge: {
+      backgroundColor: C.inputBg,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.line,
+    },
+    userBadgeText: {
+      color: C.muted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    name: { fontSize: 20, fontWeight: '700', color: C.ink, flexShrink: 1 },
+    subtext: { fontSize: 13, color: C.muted },
+    sectionHeader: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.muted,
+      marginLeft: 12,
+      marginBottom: 6,
+      marginTop: 18,
+      letterSpacing: 0.5,
+    },
+    card: { backgroundColor: C.card, borderRadius: 16, overflow: 'hidden' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+    iconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    rowContent: { flex: 1 },
+    rowLabel: { fontSize: 15, fontWeight: '600', color: C.ink },
+    rowSub: { fontSize: 13, color: C.muted, marginTop: 2 },
+    logout: { color: C.danger, fontWeight: '600', flex: 1, marginLeft: 2 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      width: '100%',
+      maxWidth: 380,
+      backgroundColor: C.card,
+      borderRadius: 18,
+      padding: 22,
+      elevation: 8,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: C.ink, marginBottom: 6 },
+    modalDesc: { fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 18 },
+    modalInput: {
+      backgroundColor: C.inputBg,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: C.ink,
+    },
+    modalError: { color: C.danger, fontSize: 13, marginTop: 8 },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 12,
+      marginTop: 20,
+    },
+    modalBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: 10,
+      minWidth: 80,
+      alignItems: 'center',
+    },
+    modalBtnCancel: { backgroundColor: C.inputBg },
+    modalBtnCancelText: { color: C.ink, fontWeight: '600', fontSize: 14 },
+    modalBtnConfirm: { backgroundColor: C.brand },
+    modalBtnConfirmText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  });
