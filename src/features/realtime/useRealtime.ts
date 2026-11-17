@@ -6,7 +6,7 @@ import {
   setCallEnded,
 } from '../call/callSlice';
 import { registerCallWebSocketProvider } from '../call/callSignalEmitter';
-import { useRouter } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   registerForPushNotificationsAsync,
@@ -56,7 +56,13 @@ export function useRealtime() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
+  const params = useGlobalSearchParams<{ roomId?: string | string[] }>();
+  const currentRoomId = Array.isArray(params.roomId) ? params.roomId[0] : params.roomId;
   const [registerPushToken] = chatApi.useRegisterPushTokenMutation();
+
+  // Lưu phòng đang mở vào ref để ws.onmessage luôn đọc được giá trị mới nhất mà không làm reconnect WebSocket
+  const activeRoomIdRef = useRef<string | undefined>(currentRoomId);
+  activeRoomIdRef.current = currentRoomId;
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -176,15 +182,16 @@ export function useRealtime() {
                 isForwarded: msg.is_forwarded,
                 replyTo: msg.reply_to
                   ? {
-                      messageId: msg.reply_to.message_id,
-                      senderName: msg.reply_to.sender_name,
-                      content: msg.reply_to.content,
-                    }
+                    messageId: msg.reply_to.message_id,
+                    senderName: msg.reply_to.sender_name,
+                    content: msg.reply_to.content,
+                  }
                   : null,
               };
               const preview =
                 msg.content ||
                 (msg.type === 'IMAGE' ? 'Đã gửi một ảnh' : msg.type === 'VIDEO' ? 'Đã gửi một video' : msg.type === 'FILE' ? `📎 [Tài liệu] ${msg.file_name || 'Tệp tin'}` : '');
+
 
               // 1. Cập nhật cache của getMessages nếu phòng đó đang mở / có trong cache
               dispatch(
@@ -198,11 +205,28 @@ export function useRealtime() {
                 }),
               );
 
+              let senderName =
+                msg.sender_name ||
+                msg.senderName ||
+                (msg.sender_id === 'hq_ai_bot' ? 'HQ AI 🤖' : '');
+              let groupName = '';
+
               // 2. Cập nhật cache danh sách phòng (tin cuối & sắp xếp phòng lên đầu)
               dispatch(
                 chatApi.util.updateQueryData('getRooms', undefined, (draft) => {
                   const room = draft.find((r) => r.id === msg.room_id);
                   if (room) {
+                    const member = room.members?.find((m) => m.userId === msg.sender_id);
+                    if (member?.displayName) {
+                      senderName = member.displayName;
+                    } else if (room.type === 'direct' && room.name) {
+                      senderName = room.name;
+                    }
+
+                    if (room.type === 'group' && room.name) {
+                      groupName = room.name;
+                    }
+
                     room.lastMessage = preview;
                     room.lastMessageSenderId = msg.sender_id;
                     room.lastMessageAt = msg.timestamp;
@@ -218,10 +242,25 @@ export function useRealtime() {
               );
 
               // 3. Thông báo đẩy (Push Notification) khi nhận tin nhắn từ người khác
-              if (msg.sender_id !== userId) {
+              const isViewingThisRoom =
+                AppState.currentState === 'active' &&
+                activeRoomIdRef.current === msg.room_id;
+
+              if (msg.sender_id !== userId && !isViewingThisRoom) {
+                const notifTitle = groupName
+                  ? senderName
+                    ? `${groupName} · ${senderName}`
+                    : groupName
+                  : senderName || 'Tin nhắn mới';
+
+                const cleanContent =
+                  typeof msg.content === 'string'
+                    ? msg.content.replace(/^🤖\s*\[HQ AI\]:\s*/, '')
+                    : '';
+
                 showLocalNotification(
-                  'Tin nhắn mới',
-                  msg.content ||
+                  notifTitle,
+                  cleanContent ||
                     (msg.type === 'IMAGE'
                       ? 'Đã gửi một hình ảnh'
                       : msg.type === 'VIDEO'
