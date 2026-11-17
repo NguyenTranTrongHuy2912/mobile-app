@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Text, View } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { useCreateRoomMutation, useSearchUsersQuery } from '../api/chatApi';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { errorMessage } from '../utils/errorMessage';
 import type { UserSummary } from '../types/chat';
 
@@ -25,6 +19,9 @@ interface Props {
 
 export default function NewChatScreen({ navigate = 'replace', autoFocus = true }: Props) {
   const router = useRouter();
+  const colors = useScreenColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +79,7 @@ export default function NewChatScreen({ navigate = 'replace', autoFocus = true }
       <TextInput
         style={styles.input}
         placeholder="Nhập tên hoặc email"
+        placeholderTextColor={colors.muted}
         value={text}
         onChangeText={setText}
         autoCapitalize="none"
@@ -89,7 +87,7 @@ export default function NewChatScreen({ navigate = 'replace', autoFocus = true }
         autoFocus={autoFocus}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {isFetching ? <ActivityIndicator style={styles.loading} /> : null}
+      {isFetching ? <ActivityIndicator style={styles.loading} color={colors.brand} /> : null}
       <FlatList
         data={users}
         keyExtractor={(u) => u.userId}
@@ -102,32 +100,43 @@ export default function NewChatScreen({ navigate = 'replace', autoFocus = true }
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  input: {
-    margin: 12,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  error: { color: '#FF3B30', marginHorizontal: 12, marginBottom: 8 },
-  loading: { marginVertical: 8 },
-  empty: { textAlign: 'center', color: '#999', marginTop: 32, paddingHorizontal: 24 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#007AFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  avatarText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  rowBody: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '600', color: '#222' },
-  email: { fontSize: 13, color: '#888', marginTop: 2 },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#e0e0e0', marginLeft: 72 },
-});
+const makeStyles = (colors: ScreenColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.page },
+    input: {
+      margin: 12,
+      backgroundColor: colors.inputBg,
+      color: colors.ink,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 16,
+    },
+    error: { color: colors.danger, marginHorizontal: 12, marginBottom: 8 },
+    loading: { marginVertical: 8 },
+    empty: {
+      textAlign: 'center',
+      color: colors.muted,
+      marginTop: 32,
+      paddingHorizontal: 24,
+    },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    avatarText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+    rowBody: { flex: 1 },
+    name: { fontSize: 16, fontWeight: '600', color: colors.ink },
+    email: { fontSize: 13, color: colors.muted, marginTop: 2 },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.line,
+      marginLeft: 72,
+    },
+  });

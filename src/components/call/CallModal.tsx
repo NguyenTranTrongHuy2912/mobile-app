@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Dimensions,
@@ -7,10 +7,9 @@ import {
   Pressable,
   SafeAreaView,
   StyleSheet,
-  Text,
   Vibration,
-  View,
 } from 'react-native';
+import { Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -24,6 +23,7 @@ import {
   toggleVideoOff,
 } from '../../features/call/callSlice';
 import { sendCallSignal } from '../../features/call/callSignalEmitter';
+import { useScreenColors, type ScreenColors } from '../../features/theme/useScreenColors';
 import { thumbUrl } from '../../utils/imageUrl';
 import { webrtcService } from '../../services/webrtcService';
 
@@ -37,6 +37,9 @@ function formatDuration(totalSeconds: number): string {
 
 export default function CallModal() {
   const dispatch = useAppDispatch();
+  const colors = useScreenColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const call = useAppSelector((s) => s.call);
   const currentUserId = useAppSelector((s) => s.session.userId);
 
@@ -213,7 +216,7 @@ export default function CallModal() {
             {/* Khung camera nhỏ của chính mình (Floating PIP) */}
             <View style={styles.localVideoPip}>
               <View style={styles.localPipContent}>
-                <Ionicons name="videocam" size={24} color="#0084FF" />
+                <Ionicons name="videocam" size={24} color={colors.brand} />
                 <Text style={styles.localPipText}>Bạn</Text>
               </View>
             </View>
@@ -224,7 +227,7 @@ export default function CallModal() {
           {/* Header hiển thị loại cuộc gọi và bảo mật mã hóa */}
           <View style={styles.header}>
             <View style={styles.securityBadge}>
-              <Ionicons name="shield-checkmark" size={13} color="#48BB78" />
+              <Ionicons name="shield-checkmark" size={13} color={colors.success} />
               <Text style={styles.securityText}>Mã hóa WebRTC · STUN Google</Text>
             </View>
             <Text style={styles.callTypeLabel}>
@@ -245,7 +248,11 @@ export default function CallModal() {
                 {displayName}
               </Text>
               <Text style={styles.groupStatusText}>
-                {isConnected ? formatDuration(call.durationSeconds) : isCalling ? 'Đang gọi nhóm...' : 'Cuộc gọi nhóm đến...'}
+                {isConnected
+                  ? formatDuration(call.durationSeconds)
+                  : isCalling
+                  ? 'Đang gọi nhóm...'
+                  : 'Cuộc gọi nhóm đến...'}
               </Text>
 
               {/* Lưới thành viên trong nhóm (Participants Grid) */}
@@ -265,7 +272,7 @@ export default function CallModal() {
                         <Ionicons
                           name={p.isMuted ? 'mic-off' : 'mic'}
                           size={12}
-                          color={p.isMuted ? '#E53E3E' : '#48BB78'}
+                          color={p.isMuted ? colors.danger : colors.success}
                         />
                       </View>
                     </View>
@@ -273,7 +280,7 @@ export default function CallModal() {
                 ) : (
                   <View style={styles.groupMemberTile}>
                     <View style={styles.groupAvatarCircle}>
-                      <Ionicons name="people" size={32} color="#0084FF" />
+                      <Ionicons name="people" size={32} color={colors.brand} />
                     </View>
                     <Text style={styles.groupMemberName}>Thành viên nhóm</Text>
                   </View>
@@ -337,9 +344,7 @@ export default function CallModal() {
           {!isGroup && isVideo && isConnected && !call.isVideoOff && (
             <View style={styles.videoTimerWrap}>
               <Text style={styles.videoCallerName}>{displayName}</Text>
-              <Text style={styles.videoTimerText}>
-                {formatDuration(call.durationSeconds)}
-              </Text>
+              <Text style={styles.videoTimerText}>{formatDuration(call.durationSeconds)}</Text>
             </View>
           )}
 
@@ -365,11 +370,7 @@ export default function CallModal() {
                     onPress={handleAccept}
                     hitSlop={8}
                   >
-                    <Ionicons
-                      name={isVideo ? 'videocam' : 'call'}
-                      size={30}
-                      color="#fff"
-                    />
+                    <Ionicons name={isVideo ? 'videocam' : 'call'} size={30} color="#fff" />
                   </Pressable>
                   <Text style={styles.btnLabel}>Trả lời</Text>
                 </View>
@@ -386,7 +387,7 @@ export default function CallModal() {
                     <Ionicons
                       name={call.isSpeakerOn ? 'volume-high' : 'volume-medium-outline'}
                       size={26}
-                      color="#fff"
+                      color={call.isSpeakerOn ? '#000' : '#fff'}
                     />
                   </Pressable>
                   <Text style={styles.btnLabel}>Loa ngoài</Text>
@@ -417,7 +418,7 @@ export default function CallModal() {
                     <Ionicons
                       name={call.isMuted ? 'mic-off' : 'mic-outline'}
                       size={26}
-                      color="#fff"
+                      color={call.isMuted ? '#000' : '#fff'}
                     />
                   </Pressable>
                   <Text style={styles.btnLabel}>Tắt tiếng</Text>
@@ -525,275 +526,276 @@ export default function CallModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F141C',
-  },
-  safeArea: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? 36 : 12,
-  },
-  securityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    gap: 6,
-    marginBottom: 8,
-  },
-  securityText: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  callTypeLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  centerInfo: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  avatarWrapper: {
-    width: 140,
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  pulseCircle: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(0, 132, 255, 0.35)',
-  },
-  pulseGreen: {
-    backgroundColor: 'rgba(46, 204, 113, 0.4)',
-  },
-  avatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    overflow: 'hidden',
-    backgroundColor: '#1E293B',
-    borderWidth: 3,
-    borderColor: '#334155',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarFallback: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0084FF',
-  },
-  avatarInitial: {
-    color: '#fff',
-    fontSize: 44,
-    fontWeight: '700',
-  },
-  callerName: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  statusText: {
-    color: '#94A3B8',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  // Group Call Styles
-  groupCallContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  groupTitleText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  groupStatusText: {
-    color: '#38BDF8',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 20,
-  },
-  groupGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 16,
-    width: '100%',
-  },
-  groupMemberTile: {
-    width: (width - 72) / 2,
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  groupAvatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#38BDF8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  groupAvatarInit: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  groupMemberName: {
-    color: '#E2E8F0',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  groupAudioStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  // Video Background Styles
-  videoBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#1A202C',
-  },
-  remoteVideoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  remoteVideoText: {
-    color: '#718096',
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  localVideoPip: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    width: 90,
-    height: 130,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#2D3748',
-    borderWidth: 2,
-    borderColor: '#4A5568',
-  },
-  localPipContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  localPipText: {
-    color: '#A0AEC0',
-    fontSize: 11,
-    marginTop: 4,
-  },
-  videoTimerWrap: {
-    alignItems: 'center',
-    paddingTop: 12,
-  },
-  videoCallerName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  videoTimerText: {
-    color: '#E2E8F0',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  // Bottom Controls
-  bottomControls: {
-    paddingBottom: Platform.OS === 'android' ? 36 : 20,
-    paddingHorizontal: 24,
-  },
-  incomingButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  inCallButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  inCallButtonsGrid: {
-    width: '100%',
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  actionCol: {
-    alignItems: 'center',
-  },
-  circleBtn: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  btnActive: {
-    backgroundColor: '#fff',
-  },
-  btnAccept: {
-    backgroundColor: '#2ECC71',
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-  },
-  btnDecline: {
-    backgroundColor: '#E74C3C',
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-  },
-  btnHangup: {
-    backgroundColor: '#E74C3C',
-  },
-  btnLabel: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-});
+const makeStyles = (colors: ScreenColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#0F141C',
+    },
+    safeArea: {
+      flex: 1,
+      justifyContent: 'space-between',
+    },
+    header: {
+      alignItems: 'center',
+      paddingTop: Platform.OS === 'android' ? 36 : 12,
+    },
+    securityBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 16,
+      gap: 6,
+      marginBottom: 8,
+    },
+    securityText: {
+      color: '#E2E8F0',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    callTypeLabel: {
+      color: '#94A3B8',
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 1.5,
+    },
+    centerInfo: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    avatarWrapper: {
+      width: 140,
+      height: 140,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+    },
+    pulseCircle: {
+      position: 'absolute',
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      backgroundColor: 'rgba(47, 107, 255, 0.35)',
+    },
+    pulseGreen: {
+      backgroundColor: 'rgba(49, 162, 76, 0.4)',
+    },
+    avatar: {
+      width: 110,
+      height: 110,
+      borderRadius: 55,
+      overflow: 'hidden',
+      backgroundColor: '#1E293B',
+      borderWidth: 3,
+      borderColor: '#334155',
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+    },
+    avatarFallback: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.brand,
+    },
+    avatarInitial: {
+      color: '#fff',
+      fontSize: 44,
+      fontWeight: '700',
+    },
+    callerName: {
+      color: '#fff',
+      fontSize: 24,
+      fontWeight: '700',
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    statusText: {
+      color: '#94A3B8',
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    // Group Call Styles
+    groupCallContainer: {
+      flex: 1,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    groupTitleText: {
+      color: '#FFFFFF',
+      fontSize: 22,
+      fontWeight: '700',
+      marginBottom: 4,
+      textAlign: 'center',
+    },
+    groupStatusText: {
+      color: '#38BDF8',
+      fontSize: 15,
+      fontWeight: '600',
+      marginBottom: 20,
+    },
+    groupGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 16,
+      width: '100%',
+    },
+    groupMemberTile: {
+      width: (width - 72) / 2,
+      backgroundColor: '#1E293B',
+      borderRadius: 16,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#334155',
+    },
+    groupAvatarCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    groupAvatarInit: {
+      color: '#FFFFFF',
+      fontSize: 22,
+      fontWeight: '700',
+    },
+    groupMemberName: {
+      color: '#E2E8F0',
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    groupAudioStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    // Video Background Styles
+    videoBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: '#1A202C',
+    },
+    remoteVideoPlaceholder: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    remoteVideoText: {
+      color: '#718096',
+      marginTop: 12,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    localVideoPip: {
+      position: 'absolute',
+      top: 60,
+      right: 20,
+      width: 90,
+      height: 130,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: '#2D3748',
+      borderWidth: 2,
+      borderColor: '#4A5568',
+    },
+    localPipContent: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    localPipText: {
+      color: '#A0AEC0',
+      fontSize: 11,
+      marginTop: 4,
+    },
+    videoTimerWrap: {
+      alignItems: 'center',
+      paddingTop: 12,
+    },
+    videoCallerName: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    videoTimerText: {
+      color: '#E2E8F0',
+      fontSize: 14,
+      marginTop: 4,
+    },
+    // Bottom Controls
+    bottomControls: {
+      paddingBottom: Platform.OS === 'android' ? 36 : 20,
+      paddingHorizontal: 24,
+    },
+    incomingButtonsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    inCallButtonsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+    },
+    inCallButtonsGrid: {
+      width: '100%',
+    },
+    controlsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+    },
+    actionCol: {
+      alignItems: 'center',
+    },
+    circleBtn: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    btnActive: {
+      backgroundColor: '#fff',
+    },
+    btnAccept: {
+      backgroundColor: colors.success,
+      width: 66,
+      height: 66,
+      borderRadius: 33,
+    },
+    btnDecline: {
+      backgroundColor: colors.danger,
+      width: 66,
+      height: 66,
+      borderRadius: 33,
+    },
+    btnHangup: {
+      backgroundColor: colors.danger,
+    },
+    btnLabel: {
+      color: '#CBD5E1',
+      fontSize: 12,
+      fontWeight: '500',
+    },
+  });

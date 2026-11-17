@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Text, View } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { useCreateRoomMutation, useSearchUsersQuery } from '../api/chatApi';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { errorMessage } from '../utils/errorMessage';
 import type { UserSummary } from '../types/chat';
 
@@ -22,6 +16,9 @@ const DEBOUNCE_MS = 400;
 
 export default function NewGroupScreen() {
   const router = useRouter();
+  const colors = useScreenColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [name, setName] = useState('');
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
@@ -95,6 +92,7 @@ export default function NewGroupScreen() {
       <TextInput
         style={styles.input}
         placeholder="Tên nhóm"
+        placeholderTextColor={colors.muted}
         value={name}
         onChangeText={setName}
         maxLength={MAX_NAME}
@@ -116,12 +114,13 @@ export default function NewGroupScreen() {
       <TextInput
         style={styles.input}
         placeholder="Tìm bằng tên hoặc email"
+        placeholderTextColor={colors.muted}
         value={text}
         onChangeText={setText}
         autoCapitalize="none"
         autoCorrect={false}
       />
-      {isFetching ? <ActivityIndicator style={styles.loading} /> : null}
+      {isFetching ? <ActivityIndicator style={styles.loading} color={colors.brand} /> : null}
 
       <FlatList
         style={styles.list}
@@ -149,65 +148,76 @@ export default function NewGroupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  input: {
-    marginHorizontal: 12,
-    marginTop: 12,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 10 },
-  chip: {
-    backgroundColor: '#E5F1FF',
-    borderRadius: 14,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  chipText: { color: '#007AFF', fontSize: 13, fontWeight: '600' },
-  hint: { marginHorizontal: 12, marginTop: 8, color: '#888', fontSize: 13 },
-  loading: { marginVertical: 8 },
-  list: { flex: 1, marginTop: 4 },
-  empty: { textAlign: 'center', color: '#999', marginTop: 24, paddingHorizontal: 24 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#34C759',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  avatarText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  rowBody: { flex: 1 },
-  userName: { fontSize: 16, fontWeight: '600', color: '#222' },
-  email: { fontSize: 13, color: '#888', marginTop: 2 },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#ccc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkOn: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  checkMark: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#e0e0e0', marginLeft: 72 },
-  error: { color: '#FF3B30', marginHorizontal: 12, marginTop: 8 },
-  createButton: {
-    margin: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  createDisabled: { backgroundColor: '#9fc7ff' },
-  createText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+const makeStyles = (colors: ScreenColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.page },
+    input: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      backgroundColor: colors.inputBg,
+      color: colors.ink,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 16,
+    },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 10 },
+    chip: {
+      backgroundColor: colors.brandSoft,
+      borderRadius: 14,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      marginRight: 6,
+      marginBottom: 6,
+    },
+    chipText: { color: colors.brandSoftText, fontSize: 13, fontWeight: '600' },
+    hint: { marginHorizontal: 12, marginTop: 8, color: colors.muted, fontSize: 13 },
+    loading: { marginVertical: 8 },
+    list: { flex: 1, marginTop: 4 },
+    empty: {
+      textAlign: 'center',
+      color: colors.muted,
+      marginTop: 24,
+      paddingHorizontal: 24,
+    },
+    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.success,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    avatarText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+    rowBody: { flex: 1 },
+    userName: { fontSize: 16, fontWeight: '600', color: colors.ink },
+    email: { fontSize: 13, color: colors.muted, marginTop: 2 },
+    check: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+    checkMark: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.line,
+      marginLeft: 72,
+    },
+    error: { color: colors.danger, marginHorizontal: 12, marginTop: 8 },
+    createButton: {
+      margin: 12,
+      backgroundColor: colors.brand,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    createDisabled: { opacity: 0.45 },
+    createText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  });

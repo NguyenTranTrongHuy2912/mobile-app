@@ -507,33 +507,41 @@ const makeStyles = (C: ScreenColors) =>
 
   // Active Friends Bar Styles
   activeBarScroll: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingTop: 24, // Tạo sẵn khoảng trống phía trên cho bong bóng ghi chú không bị cắt
     paddingBottom: 12,
-    gap: 16,
+    alignItems: 'flex-end', // Khóa đáy tất cả các cột thẳng hàng tuyệt đối
+    gap: 10,
   },
   activeItem: {
     alignItems: 'center',
-    width: 60,
+    width: 72,
   },
   myAvatarWrap: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 54,
+    height: 54,
     marginBottom: 4,
   },
   thoughtBadge: {
+    position: 'absolute',
+    bottom: 58, // Nằm ngay phía trên avatar 54px, không làm lệch chiều cao khối
+    zIndex: 2,
+    minWidth: 58,
+    maxWidth: 74,
     backgroundColor: C.card,
     borderWidth: 1.2,
     borderColor: C.line,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginBottom: 2,
-    maxWidth: 72,
-    alignSelf: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
-    elevation: 2,
+    elevation: 3,
   },
   thoughtBadgeText: {
     fontSize: 10,
@@ -542,12 +550,16 @@ const makeStyles = (C: ScreenColors) =>
     textAlign: 'center',
   },
   thoughtTailDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.muted,
-    alignSelf: 'center',
-    marginBottom: 2,
+    position: 'absolute',
+    bottom: 52,
+    left: 14,
+    zIndex: 3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.line,
   },
   storyAvatarMe: {
     width: 54,
@@ -566,6 +578,10 @@ const makeStyles = (C: ScreenColors) =>
   },
   friendAvatarWrap: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 54,
+    height: 54,
     marginBottom: 4,
   },
   storyAvatarFriend: {
@@ -589,9 +605,9 @@ const makeStyles = (C: ScreenColors) =>
     fontSize: 12,
     color: C.ink,
     textAlign: 'center',
-    width: 60,
+    width: 72,
   },
-
+  
   // Filter Pills Styles (Ảnh 1)
   pillsRow: {
     flexDirection: 'row',

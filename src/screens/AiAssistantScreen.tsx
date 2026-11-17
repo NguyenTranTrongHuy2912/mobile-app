@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,14 +7,14 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
-  View,
 } from 'react-native';
+import { Text, View } from 'tamagui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAskAiMutation } from '../api/chatApi';
 import { useAppSelector } from '../store/hooks';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import AiMessageBubble from '../components/AiMessageBubble';
 import AiQuickPromptList from '../components/AiQuickPromptList';
 import ScalePressable from '../components/ScalePressable';
@@ -47,6 +47,9 @@ const INITIAL_MESSAGES: ChatMessageItem[] = [
  * Hỗ trợ Multi-turn Conversation & Lưu lịch sử AsyncStorage
  */
 export default function AiAssistantScreen() {
+  const colors = useScreenColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const myId = useAppSelector((s) => s.session.userId) || 'guest';
   const STORAGE_KEY = `@hq_ai_chat_history_${myId}`;
 
@@ -164,7 +167,12 @@ export default function AiAssistantScreen() {
           <Text style={styles.topSubText}>HQ AI luôn sẵn sàng hỗ trợ</Text>
         </View>
         <Pressable onPress={handleClearHistory} hitSlop={8} style={styles.clearBtn}>
-          <Ionicons name="refresh-outline" size={16} color="#65676B" style={{ marginRight: 4 }} />
+          <Ionicons
+            name="refresh-outline"
+            size={16}
+            color={colors.muted}
+            style={{ marginRight: 4 }}
+          />
           <Text style={styles.clearBtnText}>Hội thoại mới</Text>
         </Pressable>
       </View>
@@ -188,7 +196,7 @@ export default function AiAssistantScreen() {
                 <Ionicons name="sparkles" size={14} color="#fff" />
               </View>
               <View style={styles.thinkingBubble}>
-                <ActivityIndicator size="small" color="#0084FF" />
+                <ActivityIndicator size="small" color={colors.brand} />
                 <Text style={styles.thinkingText}>HQ AI đang suy nghĩ câu trả lời...</Text>
               </View>
             </View>
@@ -204,7 +212,7 @@ export default function AiAssistantScreen() {
         <TextInput
           style={styles.input}
           placeholder="Hỏi HQ AI bất cứ điều gì..."
-          placeholderTextColor="#8A8D91"
+          placeholderTextColor={colors.muted}
           value={inputText}
           onChangeText={setInputText}
           multiline
@@ -222,112 +230,113 @@ export default function AiAssistantScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E6EB',
-    backgroundColor: '#F8F9FA',
-  },
-  topInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#31A24C',
-    marginRight: 6,
-  },
-  topSubText: {
-    fontSize: 12,
-    color: '#65676B',
-    fontWeight: '500',
-  },
-  clearBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    backgroundColor: '#E4E6EB',
-  },
-  clearBtnText: {
-    fontSize: 12,
-    color: '#050505',
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingVertical: 12,
-  },
-  thinkingWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    marginVertical: 6,
-  },
-  aiAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#0084FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  thinkingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F2F5',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  thinkingText: {
-    fontSize: 13,
-    color: '#65676B',
-    marginLeft: 8,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E4E6EB',
-    backgroundColor: '#fff',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#F0F2F5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    fontSize: 15,
-    color: '#050505',
-    maxHeight: 120,
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#0084FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    marginBottom: 2,
-  },
-  sendBtnDisabled: {
-    backgroundColor: '#BCC0C4',
-  },
-});
+const makeStyles = (colors: ScreenColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.page,
+    },
+    topBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.line,
+      backgroundColor: colors.card,
+    },
+    topInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    onlineDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success,
+      marginRight: 6,
+    },
+    topSubText: {
+      fontSize: 12,
+      color: colors.muted,
+      fontWeight: '500',
+    },
+    clearBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 12,
+      backgroundColor: colors.chip,
+    },
+    clearBtnText: {
+      fontSize: 12,
+      color: colors.ink,
+      fontWeight: '600',
+    },
+    listContent: {
+      paddingVertical: 12,
+    },
+    thinkingWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      marginVertical: 6,
+    },
+    aiAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.brand,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
+    },
+    thinkingBubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.inputBg,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+    },
+    thinkingText: {
+      fontSize: 13,
+      color: colors.muted,
+      marginLeft: 8,
+    },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.line,
+      backgroundColor: colors.card,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.inputBg,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 10,
+      fontSize: 15,
+      color: colors.ink,
+      maxHeight: 120,
+    },
+    sendBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.brand,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+      marginBottom: 2,
+    },
+    sendBtnDisabled: {
+      opacity: 0.45,
+    },
+  });
