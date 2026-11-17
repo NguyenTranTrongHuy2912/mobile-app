@@ -32,6 +32,7 @@ import ForwardMessageModal from '../components/ForwardMessageModal';
 import SavedMessagesModal from '../components/SavedMessagesModal';
 import CreatePollModal from '../components/CreatePollModal';
 import PollCard from '../components/PollCard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useGetMessagesQuery,
   useGetRoomsQuery,
@@ -66,6 +67,7 @@ const MAX_IMAGES_PER_PICK = 5;
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
 
 const EMOJI_REGEX = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\uFE0F|\u200D){1,8}$/u;
+
 
 function isOnlyEmoji(text: string): boolean {
   if (!text) return false;
@@ -119,6 +121,7 @@ export default function ChatRoomScreen() {
   const dispatch = useAppDispatch();
   const userId = useAppSelector((s) => s.session.userId);
   const draft = useAppSelector((s) => s.chat.drafts[roomId] ?? '');
+  const insets = useSafeAreaInsets();
 
   const C = useScreenColors();
   const isDark = C.isDark;
@@ -869,6 +872,7 @@ export default function ChatRoomScreen() {
     const isSelected = selectedMsgId === item.id;
     const displayContent = isHqAi ? item.content.replace(/^🤖\s*\[HQ AI\]:\s*/, '') : item.content;
 
+
     // Tính toán Date Divider giữa các đoạn hội thoại (chuẩn Messenger Ảnh 4)
     const prevMsg = index > 0 ? messages[index - 1] : null;
     const showDateDivider =
@@ -897,7 +901,7 @@ export default function ChatRoomScreen() {
               ...(isBigEmoji ? styles.bubbleBigEmoji : null),
             }}
           >
-            {!mine && (
+            {!mine && !isDirect && (
               <View style={styles.senderRow}>
                 {isHqAi && (
                   <View style={styles.aiBadgeAvatar}>
@@ -1139,8 +1143,8 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={insets.top + 52}
     >
       {/* Thanh thông báo tin nhắn đã ghim (Pinned Message Banner) */}
       {currentRoom?.pinnedMessage && (
@@ -1295,7 +1299,7 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
         {isCollapsed ? (
           <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
