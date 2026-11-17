@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { TamaguiProvider, Theme } from 'tamagui'; // Thêm import Theme
 import { store } from '../src/store';
 import { tamaguiConfig } from '../tamagui.config';
@@ -46,13 +47,15 @@ function InnerRoot() {
   return (
     <TamaguiProvider config={tamaguiConfig} defaultTheme={themeName}>
       <Theme name={themeName}>
-        <SafeAreaProvider>
-          <SessionBootstrap>
-            <Routes />
-            <CallModal />
-            <StatusBar style={isDark ? 'light' : 'dark'} />
-          </SessionBootstrap>
-        </SafeAreaProvider>
+        <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+          <SafeAreaProvider>
+            <SessionBootstrap>
+              <Routes />
+              <CallModal />
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+            </SessionBootstrap>
+          </SafeAreaProvider>
+        </ThemeProvider>
       </Theme>
     </TamaguiProvider>
   );

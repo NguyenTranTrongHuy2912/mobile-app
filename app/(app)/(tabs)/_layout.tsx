@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View} from 'react-native';
+import { Pressable } from 'react-native';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { XStack } from 'tamagui';
@@ -22,17 +22,12 @@ const tabIcon =
 export default function TabsLayout() {
   const router = useRouter();
   const role = useAppSelector((s) => s.session.role);
-
-  // Admin chỉ đảm nhiệm quản lý, không vào giao diện chat
-  if (role === 'ADMIN') {
-    return <Redirect href="/admin" />;
-  }
+  const isAdmin = role === 'ADMIN';
   const C = useScreenColors();
-  const icon = (active: IconName, inactive: IconName) =>
-    tabIcon(active, inactive, C.brand, C.muted);
 
-  // Tổng số tin chưa đọc của mọi phòng, dùng chung cache với danh sách phòng
+  // Gọi toàn bộ Hook trước khi return có điều kiện
   const { friendRequestCount } = useGetFriendRequestsQuery(undefined, {
+    skip: isAdmin,
     pollingInterval: 10000,
     selectFromResult: ({ data }) => ({
       friendRequestCount: data?.length ?? 0,
@@ -40,11 +35,20 @@ export default function TabsLayout() {
   });
 
   const { unread } = useGetRoomsQuery(undefined, {
+    skip: isAdmin,
     pollingInterval: 5000,
     selectFromResult: ({ data }) => ({
       unread: data?.reduce((sum, r) => sum + r.unreadCount, 0) ?? 0,
     }),
   });
+
+  // Admin chỉ đảm nhiệm quản lý, không vào giao diện chat
+  if (isAdmin) {
+    return <Redirect href="/admin" />;
+  }
+
+  const icon = (active: IconName, inactive: IconName) =>
+    tabIcon(active, inactive, C.brand, C.muted);
 
   return (
     <Tabs
