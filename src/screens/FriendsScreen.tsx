@@ -6,10 +6,9 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   TextInput,
-  View,
 } from 'react-native';
+import { Text, View } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -18,10 +17,10 @@ import {
   useSearchUsersQuery,
   useSendFriendRequestMutation,
 } from '../api/chatApi';
+import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { useAppSelector } from '../store/hooks';
 import { ActiveBadge } from '../components/ActiveBadge';
 import FloatingAiButton from '../components/FloatingAiButton';
-import { colors } from '../theme';
 import { errorMessage } from '../utils/errorMessage';
 import type { Friend, UserSummary } from '../types/chat';
 
@@ -29,6 +28,9 @@ type SubTab = 'friends' | 'find';
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const C = useScreenColors();
+  const styles = useMemo(() => makeStyles(C), [C]);
+
   const currentUserId = useAppSelector((s) => s.session.userId);
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
 
@@ -68,8 +70,8 @@ export default function FriendsScreen() {
     if (!q) return list;
     return list.filter(
       (f) =>
-        f.displayName.toLowerCase().includes(q) ||
-        (f.email && f.email.toLowerCase().includes(q)),
+        (f.displayName ?? '').toLowerCase().includes(q) ||
+        (f.email && f.email.toLowerCase().includes(q))
     );
   }, [friends, friendFilter, onlineUserIds, friendSearch]);
 
@@ -109,8 +111,13 @@ export default function FriendsScreen() {
       });
       setTimeout(() => setFeedbackMsg(null), 4500);
     } catch (e) {
-      const m = errorMessage(e, "Không thể gửi lời mời kết bạn");
-      if (m.includes("trước đó") || m.includes("đã là bạn") || m.toLowerCase().includes("already") || m.toLowerCase().includes("conflict")) {
+      const m = errorMessage(e, 'Không thể gửi lời mời kết bạn');
+      if (
+        m.includes('trước đó') ||
+        m.includes('đã là bạn') ||
+        m.toLowerCase().includes('already') ||
+        m.toLowerCase().includes('conflict')
+      ) {
         setSentUserIds((p) => ({ ...p, [user.userId]: true }));
         setFeedbackMsg({
           text: `Bạn đã gửi lời mời tới ${user.displayName} trước đó rồi. Đang chờ người này mở tab Thông báo để Chấp nhận.`,
@@ -129,6 +136,8 @@ export default function FriendsScreen() {
   // Render từng bạn bè
   const renderFriendItem = ({ item }: { item: Friend }) => {
     const isOnline = !!onlineUserIds[item.userId];
+    const friendName = (item.displayName ?? '').trim() || 'Người dùng';
+
     return (
       <View style={styles.userCard}>
         <View style={styles.avatarWrap}>
@@ -137,7 +146,7 @@ export default function FriendsScreen() {
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarInitial}>
-                {item.displayName.charAt(0).toUpperCase()}
+                {friendName.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
@@ -146,7 +155,7 @@ export default function FriendsScreen() {
 
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>
-            {item.displayName}
+            {friendName}
           </Text>
           {isOnline ? (
             <Text style={[styles.userSub, { color: '#31A24C', fontWeight: '600' }]} numberOfLines={1}>
@@ -159,31 +168,32 @@ export default function FriendsScreen() {
           ) : null}
         </View>
 
-      <Pressable
-        style={styles.messageButton}
-        onPress={() => handleOpenChat(item.userId, item.displayName)}
-        disabled={creatingRoom}
-      >
-        <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-        <Text style={styles.messageButtonText}>Nhắn tin</Text>
-      </Pressable>
+        <Pressable
+          style={styles.messageButton}
+          onPress={() => handleOpenChat(item.userId, friendName)}
+          disabled={creatingRoom}
+        >
+          <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
+          <Text style={styles.messageButtonText}>Nhắn tin</Text>
+        </Pressable>
       </View>
     );
   };
 
   // Render người dùng tìm thấy
   const renderSearchResultItem = ({ item }: { item: UserSummary }) => {
-    if (item.userId === currentUserId) return null; // Không hiện chính mình
+    if (item.userId === currentUserId) return null;
     const isFriend = friendIdSet.has(item.userId);
     const hasSent = !!sentUserIds[item.userId];
     const isOnline = !!onlineUserIds[item.userId];
+    const userName = (item.displayName ?? '').trim() || 'Người dùng';
 
     return (
       <View style={styles.userCard}>
         <View style={styles.avatarWrap}>
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitial}>
-              {item.displayName.charAt(0).toUpperCase()}
+              {userName.charAt(0).toUpperCase()}
             </Text>
           </View>
           {isOnline ? <ActiveBadge size={13} /> : null}
@@ -191,7 +201,7 @@ export default function FriendsScreen() {
 
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>
-            {item.displayName}
+            {userName}
           </Text>
           <Text style={styles.userSub} numberOfLines={1}>
             {item.email}
@@ -201,7 +211,7 @@ export default function FriendsScreen() {
         {isFriend ? (
           <Pressable
             style={styles.messageButton}
-            onPress={() => handleOpenChat(item.userId, item.displayName)}
+            onPress={() => handleOpenChat(item.userId, userName)}
             disabled={creatingRoom}
           >
             <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
@@ -209,7 +219,7 @@ export default function FriendsScreen() {
           </Pressable>
         ) : hasSent ? (
           <View style={styles.sentBadge}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+            <Ionicons name="checkmark-circle" size={16} color={C.brand} />
             <Text style={styles.sentBadgeText}>Đã gửi</Text>
           </View>
         ) : (
@@ -218,7 +228,7 @@ export default function FriendsScreen() {
             onPress={() => handleSendRequest(item)}
             disabled={sendingRequest}
           >
-            <Ionicons name="person-add" size={16} color={colors.primary} />
+            <Ionicons name="person-add" size={16} color={C.brand} />
             <Text style={styles.addFriendText}>Kết bạn</Text>
           </Pressable>
         )}
@@ -228,7 +238,7 @@ export default function FriendsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Subtab Header Messenger style */}
+      {/* Subtab Header */}
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tabButton, activeTab === 'friends' && styles.tabButtonActive]}
@@ -237,11 +247,9 @@ export default function FriendsScreen() {
           <Ionicons
             name="people"
             size={18}
-            color={activeTab === 'friends' ? colors.primary : colors.subtext}
+            color={activeTab === 'friends' ? C.brand : C.muted}
           />
-          <Text
-            style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}
-          >
+          <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
             Bạn bè ({friends.length})
           </Text>
         </Pressable>
@@ -253,11 +261,9 @@ export default function FriendsScreen() {
           <Ionicons
             name="person-add"
             size={18}
-            color={activeTab === 'find' ? colors.primary : colors.subtext}
+            color={activeTab === 'find' ? C.brand : C.muted}
           />
-          <Text
-            style={[styles.tabText, activeTab === 'find' && styles.tabTextActive]}
-          >
+          <Text style={[styles.tabText, activeTab === 'find' && styles.tabTextActive]}>
             Tìm người mới
           </Text>
         </Pressable>
@@ -274,7 +280,7 @@ export default function FriendsScreen() {
           <Ionicons
             name={feedbackMsg.isError ? 'alert-circle' : 'checkmark-circle'}
             size={18}
-            color={feedbackMsg.isError ? colors.error : '#2e7d32'}
+            color={feedbackMsg.isError ? C.danger : C.isDark ? '#81C784' : '#2e7d32'}
           />
           <Text
             style={[
@@ -290,7 +296,7 @@ export default function FriendsScreen() {
       {/* Nội dung Tab 1: Bạn bè */}
       {activeTab === 'friends' && (
         <View style={styles.contentWrap}>
-          {/* Filter Pills chuẩn Messenger (Ảnh 2) */}
+          {/* Filter Pills */}
           <View style={styles.messengerPillsRow}>
             <Pressable
               style={[
@@ -334,27 +340,28 @@ export default function FriendsScreen() {
               </Text>
             </Pressable>
           </View>
+
           {friends.length > 0 && (
             <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={18} color={colors.subtext} style={styles.searchIcon} />
+              <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Tìm kiếm trong danh sách bạn bè..."
-                placeholderTextColor={colors.subtext}
+                placeholderTextColor={C.muted}
                 value={friendSearch}
                 onChangeText={setFriendSearch}
                 autoCorrect={false}
               />
               {friendSearch.length > 0 && (
                 <Pressable onPress={() => setFriendSearch('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={18} color={colors.subtext} />
+                  <Ionicons name="close-circle" size={18} color={C.muted} />
                 </Pressable>
               )}
             </View>
           )}
 
           {loadingFriends ? (
-            <ActivityIndicator style={styles.centerLoader} size="large" color={colors.primary} />
+            <ActivityIndicator style={styles.centerLoader} size="large" color={C.brand} />
           ) : (
             <FlatList
               data={filteredFriends}
@@ -363,8 +370,11 @@ export default function FriendsScreen() {
               refreshControl={
                 <RefreshControl
                   refreshing={fetchingFriends}
-                  onRefresh={() => { refetchFriends(); }}
-                  tintColor={colors.primary}
+                  onRefresh={() => {
+                    refetchFriends();
+                  }}
+                  tintColor={C.brand}
+                  colors={[C.brand]}
                 />
               }
               contentContainerStyle={
@@ -374,7 +384,7 @@ export default function FriendsScreen() {
               ListEmptyComponent={
                 <View style={styles.emptyWrap}>
                   <View style={styles.emptyIconCircle}>
-                    <Ionicons name="people-outline" size={48} color={colors.subtext} />
+                    <Ionicons name="people-outline" size={48} color={C.muted} />
                   </View>
                   <Text style={styles.emptyTitle}>
                     {friends.length === 0
@@ -387,10 +397,7 @@ export default function FriendsScreen() {
                       : 'Thử kiểm tra lại tên hoặc email bạn vừa nhập.'}
                   </Text>
                   {friends.length === 0 && (
-                    <Pressable
-                      style={styles.ctaButton}
-                      onPress={() => setActiveTab('find')}
-                    >
+                    <Pressable style={styles.ctaButton} onPress={() => setActiveTab('find')}>
                       <Ionicons name="person-add" size={18} color="#fff" />
                       <Text style={styles.ctaButtonText}>Tìm người mới ngay</Text>
                     </Pressable>
@@ -406,11 +413,11 @@ export default function FriendsScreen() {
       {activeTab === 'find' && (
         <View style={styles.contentWrap}>
           <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={18} color={colors.subtext} style={styles.searchIcon} />
+            <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Nhập tên hoặc email (tối thiểu 2 ký tự)..."
-              placeholderTextColor={colors.subtext}
+              placeholderTextColor={C.muted}
               value={findSearch}
               onChangeText={setFindSearch}
               autoCapitalize="none"
@@ -419,13 +426,13 @@ export default function FriendsScreen() {
             />
             {findSearch.length > 0 && (
               <Pressable onPress={() => setFindSearch('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={colors.subtext} />
+                <Ionicons name="close-circle" size={18} color={C.muted} />
               </Pressable>
             )}
           </View>
 
           {searchingUsers && (
-            <ActivityIndicator style={styles.searchLoader} size="small" color={colors.primary} />
+            <ActivityIndicator style={styles.searchLoader} size="small" color={C.brand} />
           )}
 
           <FlatList
@@ -438,7 +445,7 @@ export default function FriendsScreen() {
             ListEmptyComponent={
               <View style={styles.emptyWrap}>
                 <View style={styles.emptyIconCircle}>
-                  <Ionicons name="search-outline" size={44} color={colors.subtext} />
+                  <Ionicons name="search-outline" size={44} color={C.muted} />
                 </View>
                 <Text style={styles.emptyTitle}>
                   {!canSearchNew
@@ -468,233 +475,241 @@ export default function FriendsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  // Messenger Pills Styles (Ảnh 2)
-  messengerPillsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    gap: 8,
-    backgroundColor: '#fff',
-  },
-  messengerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 18,
-    backgroundColor: '#F0F2F5',
-  },
-  messengerPillActive: {
-    backgroundColor: '#E7F3FF',
-  },
-  greenDotSmall: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#31A24C',
-    marginRight: 6,
-  },
-  messengerPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#050505',
-  },
-  messengerPillTextActive: {
-    color: '#0064D1',
-    fontWeight: '700',
-  },
+const makeStyles = (C: ScreenColors) =>
+  StyleSheet.create({
+    messengerPillsRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 8,
+      gap: 8,
+      backgroundColor: C.screen,
+    },
+    messengerPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 18,
+      backgroundColor: C.inputBg,
+    },
+    messengerPillActive: {
+      backgroundColor: C.brandSoft,
+    },
+    greenDotSmall: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#31A24C',
+      marginRight: 6,
+    },
+    messengerPillText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    messengerPillTextActive: {
+      color: C.brand,
+      fontWeight: '700',
+    },
 
-  container: { flex: 1, backgroundColor: colors.background },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    gap: 12,
-  },
-  tabButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 2.5,
-    borderBottomColor: 'transparent',
-    gap: 6,
-  },
-  tabButtonActive: {
-    borderBottomColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.subtext,
-  },
-  tabTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  contentWrap: { flex: 1 },
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F2F5',
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    height: 40,
-  },
-  searchIcon: { marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    paddingVertical: 0,
-  },
-  searchLoader: { marginVertical: 8 },
-  centerLoader: { marginTop: 48 },
-  listContent: { paddingVertical: 8 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  avatarWrap: { marginRight: 14 },
-  avatarImage: { width: 50, height: 50, borderRadius: 25 },
-  avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E7F3FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    color: colors.primary,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  userInfo: { flex: 1, marginRight: 10 },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  userSub: {
-    fontSize: 13,
-    color: colors.subtext,
-    marginTop: 2,
-  },
-  messageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    gap: 6,
-  },
-  messageButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  addFriendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E7F3FF',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    gap: 6,
-  },
-  addFriendText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F2F5',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    gap: 4,
-  },
-  sentBadgeText: {
-    color: colors.subtext,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginLeft: 80,
-  },
-  emptyWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingTop: 64,
-  },
-  emptyIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F0F2F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySub: {
-    fontSize: 14,
-    color: colors.subtext,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 22,
-    gap: 8,
-  },
-  ctaButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  feedbackBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  feedbackSuccess: { backgroundColor: '#E8F5E9' },
-  feedbackError: { backgroundColor: '#FFEBEE' },
-  feedbackText: { flex: 1, fontSize: 13, fontWeight: '500' },
-  feedbackTextSuccess: { color: '#2e7d32' },
-  feedbackTextError: { color: colors.error },
-});
+    container: { flex: 1, backgroundColor: C.screen },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: C.page,
+      borderBottomWidth: 1,
+      borderBottomColor: C.line,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      gap: 12,
+    },
+    tabButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderBottomWidth: 2.5,
+      borderBottomColor: 'transparent',
+      gap: 6,
+    },
+    tabButtonActive: {
+      borderBottomColor: C.brand,
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: C.muted,
+    },
+    tabTextActive: {
+      color: C.brand,
+      fontWeight: '700',
+    },
+    contentWrap: { flex: 1 },
+    searchBarContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      height: 40,
+    },
+    searchIcon: { marginRight: 8 },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: C.ink,
+      paddingVertical: 0,
+    },
+    searchLoader: { marginVertical: 8 },
+    centerLoader: { marginTop: 48 },
+    listContent: { paddingVertical: 8 },
+    emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+    userCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    avatarWrap: { marginRight: 14 },
+    avatarImage: { width: 50, height: 50, borderRadius: 25 },
+    avatarPlaceholder: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: C.brandSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      color: C.brand,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    userInfo: { flex: 1, marginRight: 10 },
+    userName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    userSub: {
+      fontSize: 13,
+      color: C.muted,
+      marginTop: 2,
+    },
+    messageButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.brand,
+      paddingVertical: 7,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      gap: 6,
+    },
+    messageButtonText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    addFriendButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.brandSoft,
+      paddingVertical: 7,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      gap: 6,
+    },
+    addFriendText: {
+      color: C.brand,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    sentBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      gap: 4,
+    },
+    sentBadgeText: {
+      color: C.muted,
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.line,
+      marginLeft: 80,
+    },
+    emptyWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      paddingTop: 64,
+    },
+    emptyIconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: C.inputBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.ink,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    emptySub: {
+      fontSize: 14,
+      color: C.muted,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 20,
+    },
+    ctaButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.brand,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 22,
+      gap: 8,
+    },
+    ctaButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    feedbackBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 16,
+      marginTop: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      gap: 8,
+    },
+    feedbackSuccess: {
+      backgroundColor: C.isDark ? 'rgba(46, 125, 50, 0.22)' : '#E8F5E9',
+    },
+    feedbackError: {
+      backgroundColor: C.dangerSoft,
+    },
+    feedbackText: { flex: 1, fontSize: 13, fontWeight: '500' },
+    feedbackTextSuccess: {
+      color: C.isDark ? '#81C784' : '#2e7d32',
+    },
+    feedbackTextError: {
+      color: C.danger,
+    },
+  });

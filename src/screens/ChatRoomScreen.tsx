@@ -208,7 +208,7 @@ export default function ChatRoomScreen() {
   const [reactionTargetMsg, setReactionTargetMsg] = useState<Message | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
-    // Quản lý trạng thái thu gọn / mở rộng các nút hành động (Camera, Ảnh, Mic, Thêm)
+  // Quản lý trạng thái thu gọn / mở rộng các nút hành động (Camera, Ảnh, Mic, Thêm)
   const [isActionsExpanded, setIsActionsExpanded] = useState(false);
 
   useEffect(() => {
@@ -443,12 +443,13 @@ export default function ChatRoomScreen() {
     }
   };
 
+  // 1. Trong useEffect cấu hình Header:
   useEffect(() => {
     navigation.setOptions({
       headerStyle: { backgroundColor: C.card },
       headerTintColor: C.ink,
       headerTitle: () => (
-        <View
+        <Pressable
           style={styles.headerContainer}
           onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
         >
@@ -468,38 +469,42 @@ export default function ChatRoomScreen() {
             </Text>
             {isDirect ? (
               isFriend ? (
-                <Text style={{ ...styles.headerSubtitleText, ...(isOtherOnline ? styles.headerActiveText : null) }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    ...styles.headerSubtitleText,
+                    ...(isOtherOnline ? styles.headerActiveText : null),
+                  }}
+                >
                   {isOtherOnline ? 'Đang hoạt động' : 'Hoạt động gần đây'}
                 </Text>
               ) : null
             ) : currentRoom?.members.length ? (
-              <Text style={styles.headerSubtitleText}>
+              <Text style={styles.headerSubtitleText} numberOfLines={1}>
                 {currentRoom.members.length} thành viên · Chi tiết
               </Text>
             ) : null}
           </View>
-        </View>
+        </Pressable>
       ),
       headerRight: () => (
         <View style={styles.headerRightActions}>
           {otherMember?.userId !== 'hq_ai_bot' && (
             <>
-              {/* Nút Gọi Thoại (Audio Call 2 chiều / Nhóm) */}
               <Pressable
                 onPress={() => handleStartCall('audio')}
                 hitSlop={8}
-                style={{ padding: 4 }}
+                style={{ padding: 5 }}
               >
-                <Ionicons name="call" size={21} color="#0084FF" />
+                <Ionicons name="call" size={20} color={C.brand} />
               </Pressable>
 
-              {/* Nút Gọi Video (Video Call 2 chiều / Nhóm) */}
               <Pressable
                 onPress={() => handleStartCall('video')}
                 hitSlop={8}
-                style={{ padding: 4 }}
+                style={{ padding: 5 }}
               >
-                <Ionicons name="videocam" size={23} color="#0084FF" />
+                <Ionicons name="videocam" size={22} color={C.brand} />
               </Pressable>
             </>
           )}
@@ -509,35 +514,22 @@ export default function ChatRoomScreen() {
               style={styles.summarizeHeaderBtn}
               onPress={handleOpenAiSummarize}
             >
-              <Ionicons name="sparkles" size={15} color={C.brand} />
+              <Ionicons name="sparkles" size={14} color={C.brand} />
               <Text style={styles.summarizeHeaderBtnText}>Tóm tắt</Text>
             </ScalePressable>
           )}
-                    <Pressable
-            onPress={() => setShowSearchModal(true)}
-            hitSlop={8}
-            style={{ padding: 4 }}
-          >
-            <Ionicons name="search-outline" size={22} color={C.brand} />
-          </Pressable>
-          <Pressable
-            onPress={() => setShowSavedModal(true)}
-            hitSlop={8}
-            style={{ padding: 4 }}
-          >
-            <Ionicons name="star-outline" size={22} color={C.brand} />
-          </Pressable>
+
           <Pressable
             onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
             hitSlop={8}
-            style={{ padding: 4 }}
+            style={{ padding: 5 }}
           >
-            <Ionicons name="information-circle-outline" size={24} color={C.brand} />
+            <Ionicons name="information-circle-outline" size={23} color={C.brand} />
           </Pressable>
         </View>
       ),
     });
-  }, [navigation, headerTitle, isDirect, isOtherOnline, currentRoom?.members.length, C, styles]);
+  }, [navigation, headerTitle, isDirect, isFriend, isOtherOnline, currentRoom?.members.length, C, styles]);
 
   // Cuộn thông minh: chỉ tự cuộn xuống cuối khi vào phòng lần đầu hoặc có tin mới ở cuối
   useEffect(() => {
@@ -703,21 +695,21 @@ export default function ChatRoomScreen() {
       if (!text) return;
       const replyData = replyingToMessage
         ? {
-            messageId: replyingToMessage.id,
-            senderName:
-              replyingToMessage.senderId === userId
-                ? 'Bạn'
-                : (names.get(replyingToMessage.senderId) ?? 'Thành viên'),
-            content:
-              replyingToMessage.content ||
-              (replyingToMessage.type === 'image'
-                ? '[Hình ảnh]'
-                : replyingToMessage.type === 'video'
-                  ? '[Video]'
-                  : replyingToMessage.type === 'file'
-                    ? `[Tài liệu] ${replyingToMessage.fileName || ''}`
-                    : ''),
-          }
+          messageId: replyingToMessage.id,
+          senderName:
+            replyingToMessage.senderId === userId
+              ? 'Bạn'
+              : (names.get(replyingToMessage.senderId) ?? 'Thành viên'),
+          content:
+            replyingToMessage.content ||
+            (replyingToMessage.type === 'image'
+              ? '[Hình ảnh]'
+              : replyingToMessage.type === 'video'
+                ? '[Video]'
+                : replyingToMessage.type === 'file'
+                  ? `[Tài liệu] ${replyingToMessage.fileName || ''}`
+                  : ''),
+        }
         : undefined;
       sendMessage({
         roomId,
@@ -1181,7 +1173,7 @@ export default function ChatRoomScreen() {
             onPress={async () => {
               try {
                 await unpinMessage({ roomId }).unwrap();
-              } catch {}
+              } catch { }
             }}
           >
             <Ionicons name="close" size={18} color={C.muted} />
@@ -1311,37 +1303,27 @@ export default function ChatRoomScreen() {
           </View>
         ) : (
           <View style={styles.actionButtonsRow}>
-            <View
+            <Pressable
               onPress={() => setShowMediaModal(true)}
               hitSlop={6}
               style={styles.iconButton}
             >
               <Ionicons name="add-circle" size={26} color={C.brand} />
-            </View>
-            <View onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
+            </Pressable>
+            <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
               <Ionicons name="camera" size={24} color={C.brand} />
-            </View>
-            <View onPress={pickFromLibrary} hitSlop={6} style={styles.iconButton}>
-              <Ionicons name="image" size={24} color={C.brand} />
-            </View>
-            <View
-              onPress={() => Alert.alert('Ghi âm', 'Tính năng tin nhắn thoại đang sẵn sàng!')}
-              hitSlop={6}
-              style={styles.iconButton}
-            >
-              <Ionicons name="mic" size={24} color={C.brand} />
-            </View>
-            <View
+            </Pressable>
+            <Pressable
               onPress={() => setShowAiToolModal(true)}
               hitSlop={6}
               style={styles.iconButton}
             >
-              <Ionicons name="sparkles" size={24} color={C.brand} />
-            </View>
+              <Ionicons name="sparkles" size={23} color={C.brand} />
+            </Pressable>
             {draft.trim().length > 0 && (
-              <View onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
+              <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
                 <Ionicons name="chevron-back" size={22} color={C.muted} />
-              </View>
+              </Pressable>
             )}
           </View>
         )}
@@ -1695,808 +1677,810 @@ export default function ChatRoomScreen() {
 
 const makeStyles = (C: ScreenColors) =>
   StyleSheet.create({
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: 6,
-  },
-  callBubbleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    minWidth: 200,
-  },
-  callIconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#38A169',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  callIconMissed: {
-    backgroundColor: '#E53E3E',
-  },
-  callTitleText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#050505',
-  },
-  callSubText: {
-    fontSize: 12,
-    color: '#65676B',
-    marginTop: 2,
-  },
-  callBackBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#E7F3FF',
-    marginLeft: 8,
-  },
-  callBackBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0084FF',
-  },
-  summarizeHeaderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.brandSoft,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  summarizeHeaderBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.brandSoftText,
-    marginLeft: 4,
-  },
+    headerRightActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginRight: 4,
+    },
+    callBubbleContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      minWidth: 200,
+    },
+    callIconBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: '#38A169',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    callIconMissed: {
+      backgroundColor: '#E53E3E',
+    },
+    callTitleText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.ink,
+    },
+    callSubText: {
+      fontSize: 12,
+      color: '#65676B',
+      marginTop: 2,
+    },
+    callBackBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      backgroundColor: C.brandSoft,
+      marginLeft: 8,
+    },
+    callBackBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.brand,
+    },
+    summarizeHeaderBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.brandSoft,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 14,
+    },
+    summarizeHeaderBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.brandSoftText,
+      marginLeft: 4,
+    },
 
-  container: { flex: 1, backgroundColor: C.screen },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.screen },
-  list: { padding: 12, flexGrow: 1 },
-  empty: { textAlign: 'center', color: C.muted, marginTop: 40 },
-  bubbleRow: { marginBottom: 8, maxWidth: '80%' },
-  rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  rowOther: { alignSelf: 'flex-start' },
-  bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18 },
-  bubbleMine: { backgroundColor: C.brand, borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: C.card, borderBottomLeftRadius: 4 },
-  bubbleImage: { padding: 4 },
-  bubbleBigEmoji: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingVertical: 2,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  textBigEmoji: {
-    fontSize: 42,
-    textAlign: 'center',
-  },
-  metaBigEmoji: {
-    color: C.muted,
-    textAlign: 'center',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  imagePad: { paddingHorizontal: 8 },
-  sender: { fontSize: 12, fontWeight: '600', color: C.brand, marginBottom: 2 },
-  textMine: { color: '#fff', fontSize: 16 },
-  textOther: { color: C.ink, fontSize: 16 },
-  meta: { fontSize: 11, marginTop: 2 },
-  metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-  metaOther: { color: C.muted },
-  loadEarlierContainer: {
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  loadEarlierLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  loadEarlierText: {
-    fontSize: 13,
-    color: C.muted,
-    marginLeft: 6,
-  },
-  loadEarlierBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.chip,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-  },
-  loadEarlierBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.brand,
-  },
-  failed: { color: C.danger, fontSize: 12, marginTop: 2 },
-  notice: {
-    textAlign: 'center',
-    color: C.danger,
-    fontSize: 13,
-    paddingVertical: 6,
-    backgroundColor: C.card,
-  },
-  emojiPickerBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-  },
-  emojiItem: {
-    padding: 6,
-    borderRadius: 20,
-  },
-  emojiText: {
-    fontSize: 26,
-  },
-  iconButton: { paddingHorizontal: 4, paddingBottom: 6 },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 6,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 8,
-    backgroundColor: C.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 1,
-    paddingBottom: 2,
-  },
-  chevronButton: {
-    paddingHorizontal: 6,
-    paddingBottom: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.inputBg,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    marginHorizontal: 4,
-    minHeight: 38,
-    maxHeight: 120,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: C.ink,
-    paddingRight: 6,
-  },
-  innerEmojiButton: {
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButton: {
-    backgroundColor: C.brand,
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-    marginLeft: 4,
-  },
-  likeButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-    marginLeft: 4,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    maxWidth: 240,
-  },
-  headerAvatarWrap: {
-    position: 'relative',
-  },
-  headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerAvatarInitial: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  headerTextWrap: {
-    justifyContent: 'center',
-  },
-  headerTitleText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: C.ink,
-  },
-  headerSubtitleText: {
-    fontSize: 11,
-    color: C.muted,
-    marginTop: 1,
-  },
-  headerActiveText: {
-    color: C.success,
-    fontWeight: '600',
-  },
-  dateDividerWrap: {
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  dateDividerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: C.muted,
-    letterSpacing: 0.3,
-  },
-  sendingMeta: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  // --- HQ AI In-Chat Styles ---
-  bubbleAi: {
-    backgroundColor: C.brandSoft,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderBottomLeftRadius: 4,
-  },
-  textAi: {
-    color: C.ink,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  senderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  aiBadgeAvatar: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  aiSenderText: {
-    color: C.brandSoftText,
-    fontWeight: '700',
-  },
-  mentionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.brandSoft,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-  },
-  mentionAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  mentionText: {
-    flex: 1,
-    fontSize: 13,
-    color: C.ink,
-  },
-  mentionBold: {
-    fontWeight: '700',
-    color: C.brandSoftText,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  aiToolCard: {
-    width: '90%',
-    maxWidth: 420,
-    backgroundColor: C.card,
-    borderRadius: 20,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  aiToolHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  aiToolTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  aiToolTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: C.ink,
-  },
-  aiToolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  aiToolIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  aiToolRowText: {
-    flex: 1,
-  },
-  aiToolRowTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: C.ink,
-  },
-  aiToolRowDesc: {
-    fontSize: 12,
-    color: C.muted,
-    marginTop: 2,
-  },
-  aiToolDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: C.line,
-    marginVertical: 10,
-  },
-  aiRewriteSection: {
-    paddingVertical: 4,
-  },
-  aiSectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.muted,
-    marginBottom: 8,
-  },
-  tonePillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tonePill: {
-    backgroundColor: C.inputBg,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  tonePillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.ink,
-  },
-  aiHintText: {
-    fontSize: 12,
-    color: C.muted,
-    fontStyle: 'italic',
-  },
-  rewritingLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  rewritingText: {
-    fontSize: 13,
-    color: C.brand,
-    marginLeft: 6,
-  },
-  reactionBadge: {
-    position: 'absolute',
-    bottom: -8,
-    backgroundColor: C.card,
-    borderRadius: 12,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: C.line,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  reactionBadgeMine: {
-    right: 6,
-  },
-  reactionBadgeOther: {
-    left: 6,
-  },
-  reactionBadgeText: {
-    fontSize: 12,
-  },
-  reactionModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  reactionCard: {
-    backgroundColor: C.card,
-    borderRadius: 16,
-    padding: 14,
-    width: '100%',
-    maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  reactionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-  },
-  reactionEmojiBtn: {
-    padding: 6,
-  },
-  reactionEmojiText: {
-    fontSize: 28,
-  },
-  actionMenuDivider: {
-    height: 1,
-    backgroundColor: C.line,
-    marginVertical: 10,
-  },
-  actionMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 10,
-  },
-  actionMenuItemText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: C.ink,
-  },
-  pinnedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.line,
-  },
-  pinnedIconWrap: {
-    marginRight: 8,
-  },
-  pinnedContentWrap: {
-    flex: 1,
-  },
-  pinnedTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.brand,
-  },
-  pinnedText: {
-    fontSize: 13,
-    color: C.ink,
-    marginTop: 1,
-  },
-  pinnedCloseBtn: {
-    padding: 4,
-    marginLeft: 6,
-  },
-  revokedBubbleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  revokedText: {
-    fontStyle: 'italic',
-    fontSize: 14,
-    color: C.muted,
-  },
-  reactionBadgeList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 4,
-  },
-  reactionMiniPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  reactionMiniPillActive: {
-    borderColor: C.brand,
-    backgroundColor: C.brandSoft,
-  },
-  reactionMiniText: {
-    fontSize: 11,
-    color: C.ink,
-  },
-  replyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-  },
-  replyBannerBar: {
-    width: 3,
-    height: '100%',
-    backgroundColor: C.brand,
-    borderRadius: 2,
-    marginRight: 8,
-  },
-  replyBannerContent: {
-    flex: 1,
-  },
-  replyBannerAuthor: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.brand,
-  },
-  replyBannerText: {
-    fontSize: 13,
-    color: C.muted,
-    marginTop: 2,
-  },
-  replyBannerCloseBtn: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  quoteContainer: {
-    flexDirection: 'row',
-    marginBottom: 6,
-    padding: 6,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  quoteMine: {
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  quoteOther: {
-    backgroundColor: 'rgba(0,0,0,0.06)',
-  },
-  quoteBar: {
-    width: 3,
-    borderRadius: 2,
-    marginRight: 6,
-  },
-  quoteBarMine: {
-    backgroundColor: '#fff',
-  },
-  quoteBarOther: {
-    backgroundColor: C.brand,
-  },
-  quoteBody: {
-    flex: 1,
-  },
-  quoteAuthor: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.brand,
-  },
-  quoteAuthorMine: {
-    color: '#fff',
-  },
-  quoteText: {
-    fontSize: 12,
-    color: C.ink,
-    marginTop: 1,
-  },
-  quoteTextMine: {
-    color: 'rgba(255,255,255,0.9)',
-  },
-  fileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 10,
-    minWidth: 200,
-    maxWidth: 280,
-  },
-  fileIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  fileInfoWrap: {
-    flex: 1,
-    marginRight: 8,
-  },
-  fileNameText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.ink,
-  },
-  fileSizeText: {
-    fontSize: 11,
-    color: C.muted,
-    marginTop: 2,
-  },
-  forwardedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  forwardedText: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    color: C.muted,
-    fontWeight: '500',
-  },
-  starBadge: {
-    position: 'absolute',
-    bottom: -6,
-    backgroundColor: C.card,
-    borderRadius: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-  },
-  starBadgeMine: {
-    right: 4,
-  },
-  starBadgeOther: {
-    left: 4,
-  },
-  mentionPopupWrap: {
-    backgroundColor: C.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  mentionListContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  mentionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.inputBg,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  mentionChipAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: C.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  mentionChipAi: {
-    backgroundColor: '#7C3AED',
-  },
-  mentionChipAvatarText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  mentionChipName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.ink,
-  },
-  editBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.card,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  editBannerBar: {
-    width: 3,
-    height: 28,
-    borderRadius: 2,
-    backgroundColor: C.brand,
-    marginRight: 10,
-  },
-  editBannerContent: {
-    flex: 1,
-  },
-  editBannerTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.brand,
-  },
-  editBannerText: {
-    fontSize: 13,
-    color: C.ink,
-    marginTop: 2,
-  },
-  translationCard: {
-    marginTop: 8,
-    paddingTop: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  translationCardMine: {
-    borderTopColor: 'rgba(255,255,255,0.25)',
-  },
-  translationCardOther: {
-    borderTopColor: C.line,
-  },
-  translationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  translationLabel: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.brand,
-    marginLeft: 4,
-  },
-  translationBody: {
-    fontSize: 13,
-    color: C.ink,
-    lineHeight: 18,
-  },
-});
+    container: { flex: 1, backgroundColor: C.screen },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.screen },
+    list: { padding: 12, flexGrow: 1 },
+    empty: { textAlign: 'center', color: C.muted, marginTop: 40 },
+    bubbleRow: { marginBottom: 8, maxWidth: '80%' },
+    rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+    rowOther: { alignSelf: 'flex-start' },
+    bubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18 },
+    bubbleMine: { backgroundColor: C.brand, borderBottomRightRadius: 4 },
+    bubbleOther: { backgroundColor: C.card, borderBottomLeftRadius: 4 },
+    bubbleImage: { padding: 4 },
+    bubbleBigEmoji: {
+      backgroundColor: 'transparent',
+      paddingHorizontal: 0,
+      paddingVertical: 2,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+    textBigEmoji: {
+      fontSize: 42,
+      textAlign: 'center',
+    },
+    metaBigEmoji: {
+      color: C.muted,
+      textAlign: 'center',
+      fontSize: 10,
+      marginTop: 2,
+    },
+    imagePad: { paddingHorizontal: 8 },
+    sender: { fontSize: 12, fontWeight: '600', color: C.brand, marginBottom: 2 },
+    textMine: { color: '#fff', fontSize: 16 },
+    textOther: { color: C.ink, fontSize: 16 },
+    meta: { fontSize: 11, marginTop: 2 },
+    metaMine: { color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
+    metaOther: { color: C.muted },
+    loadEarlierContainer: {
+      alignItems: 'center',
+      marginVertical: 10,
+    },
+    loadEarlierLoading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+    },
+    loadEarlierText: {
+      fontSize: 13,
+      color: C.muted,
+      marginLeft: 6,
+    },
+    loadEarlierBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.chip,
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+      borderRadius: 16,
+    },
+    loadEarlierBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.brand,
+    },
+    failed: { color: C.danger, fontSize: 12, marginTop: 2 },
+    notice: {
+      textAlign: 'center',
+      color: C.danger,
+      fontSize: 13,
+      paddingVertical: 6,
+      backgroundColor: C.card,
+    },
+    emojiPickerBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      paddingVertical: 8,
+      paddingHorizontal: 6,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+    },
+    emojiItem: {
+      padding: 6,
+      borderRadius: 20,
+    },
+    emojiText: {
+      fontSize: 26,
+    },
+    iconButton: { paddingHorizontal: 4, paddingBottom: 6 },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      paddingHorizontal: 6,
+      paddingTop: 8,
+      paddingBottom: Platform.OS === 'ios' ? 12 : 8,
+      backgroundColor: C.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+    },
+    actionButtonsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 1,
+      paddingBottom: 2,
+    },
+    chevronButton: {
+      paddingHorizontal: 6,
+      paddingBottom: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    inputWrapper: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      marginHorizontal: 4,
+      minHeight: 38,
+      maxHeight: 120,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 8,
+      fontSize: 15,
+      color: C.ink,
+      paddingRight: 6,
+    },
+    innerEmojiButton: {
+      padding: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sendButton: {
+      backgroundColor: C.brand,
+      borderRadius: 20,
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
+      marginLeft: 4,
+    },
+    likeButton: {
+      width: 36,
+      height: 36,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 2,
+      marginLeft: 4,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 1,
+      paddingRight: 8,
+    },
+    headerAvatarWrap: {
+      position: 'relative',
+    },
+    headerAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: C.brand,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerAvatarInitial: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    headerTextWrap: {
+      justifyContent: 'center',
+      flexShrink: 1,
+    },
+    headerTitleText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: C.ink,
+    },
+    headerSubtitleText: {
+      fontSize: 11,
+      color: C.muted,
+      marginTop: 1,
+    },
+    headerActiveText: {
+      color: C.success,
+      fontWeight: '600',
+    },
+    dateDividerWrap: {
+      alignItems: 'center',
+      marginVertical: 14,
+    },
+    dateDividerText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.muted,
+      letterSpacing: 0.3,
+    },
+    sendingMeta: {
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.7)',
+      textAlign: 'right',
+      marginTop: 2,
+    },
+    // --- HQ AI In-Chat Styles ---
+    bubbleAi: {
+      backgroundColor: C.brandSoft,
+      borderWidth: 1,
+      borderColor: C.line,
+      borderBottomLeftRadius: 4,
+    },
+    textAi: {
+      color: C.ink,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    senderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    aiBadgeAvatar: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: C.brand,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 4,
+    },
+    aiSenderText: {
+      color: C.brandSoftText,
+      fontWeight: '700',
+    },
+    mentionBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.brandSoft,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+    },
+    mentionAvatar: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: C.brand,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
+    },
+    mentionText: {
+      flex: 1,
+      fontSize: 13,
+      color: C.ink,
+    },
+    mentionBold: {
+      fontWeight: '700',
+      color: C.brandSoftText,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    aiToolCard: {
+      width: '90%',
+      maxWidth: 420,
+      backgroundColor: C.card,
+      borderRadius: 20,
+      padding: 18,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    aiToolHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    aiToolTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    aiToolTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.ink,
+    },
+    aiToolRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+    },
+    aiToolIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    aiToolRowText: {
+      flex: 1,
+    },
+    aiToolRowTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    aiToolRowDesc: {
+      fontSize: 12,
+      color: C.muted,
+      marginTop: 2,
+    },
+    aiToolDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.line,
+      marginVertical: 10,
+    },
+    aiRewriteSection: {
+      paddingVertical: 4,
+    },
+    aiSectionLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.muted,
+      marginBottom: 8,
+    },
+    tonePillsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    tonePill: {
+      backgroundColor: C.inputBg,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.line,
+    },
+    tonePillText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    aiHintText: {
+      fontSize: 12,
+      color: C.muted,
+      fontStyle: 'italic',
+    },
+    rewritingLoading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    rewritingText: {
+      fontSize: 13,
+      color: C.brand,
+      marginLeft: 6,
+    },
+    reactionBadge: {
+      position: 'absolute',
+      bottom: -8,
+      backgroundColor: C.card,
+      borderRadius: 12,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      borderWidth: 1,
+      borderColor: C.line,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    reactionBadgeMine: {
+      right: 6,
+    },
+    reactionBadgeOther: {
+      left: 6,
+    },
+    reactionBadgeText: {
+      fontSize: 12,
+    },
+    reactionModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    reactionCard: {
+      backgroundColor: C.card,
+      borderRadius: 16,
+      padding: 14,
+      width: '100%',
+      maxWidth: 320,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    reactionBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: 8,
+    },
+    reactionEmojiBtn: {
+      padding: 6,
+    },
+    reactionEmojiText: {
+      fontSize: 28,
+    },
+    actionMenuDivider: {
+      height: 1,
+      backgroundColor: C.line,
+      marginVertical: 10,
+    },
+    actionMenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      gap: 10,
+    },
+    actionMenuItemText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    pinnedBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.line,
+    },
+    pinnedIconWrap: {
+      marginRight: 8,
+    },
+    pinnedContentWrap: {
+      flex: 1,
+    },
+    pinnedTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.brand,
+    },
+    pinnedText: {
+      fontSize: 13,
+      color: C.ink,
+      marginTop: 1,
+    },
+    pinnedCloseBtn: {
+      padding: 4,
+      marginLeft: 6,
+    },
+    revokedBubbleContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 2,
+    },
+    revokedText: {
+      fontStyle: 'italic',
+      fontSize: 14,
+      color: C.muted,
+    },
+    reactionBadgeList: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+      marginTop: 4,
+    },
+    reactionMiniPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderWidth: 1,
+      borderColor: C.line,
+    },
+    reactionMiniPillActive: {
+      borderColor: C.brand,
+      backgroundColor: C.brandSoft,
+    },
+    reactionMiniText: {
+      fontSize: 11,
+      color: C.ink,
+    },
+    replyBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+    },
+    replyBannerBar: {
+      width: 3,
+      height: '100%',
+      backgroundColor: C.brand,
+      borderRadius: 2,
+      marginRight: 8,
+    },
+    replyBannerContent: {
+      flex: 1,
+    },
+    replyBannerAuthor: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.brand,
+    },
+    replyBannerText: {
+      fontSize: 13,
+      color: C.muted,
+      marginTop: 2,
+    },
+    replyBannerCloseBtn: {
+      padding: 4,
+      marginLeft: 8,
+    },
+    quoteContainer: {
+      flexDirection: 'row',
+      marginBottom: 6,
+      padding: 6,
+      borderRadius: 6,
+      overflow: 'hidden',
+    },
+    quoteMine: {
+      backgroundColor: 'rgba(0,0,0,0.18)',
+    },
+    quoteOther: {
+      backgroundColor: 'rgba(0,0,0,0.06)',
+    },
+    quoteBar: {
+      width: 3,
+      borderRadius: 2,
+      marginRight: 6,
+    },
+    quoteBarMine: {
+      backgroundColor: '#fff',
+    },
+    quoteBarOther: {
+      backgroundColor: C.brand,
+    },
+    quoteBody: {
+      flex: 1,
+    },
+    quoteAuthor: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.brand,
+    },
+    quoteAuthorMine: {
+      color: '#fff',
+    },
+    quoteText: {
+      fontSize: 12,
+      color: C.ink,
+      marginTop: 1,
+    },
+    quoteTextMine: {
+      color: 'rgba(255,255,255,0.9)',
+    },
+    fileCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+      borderRadius: 10,
+      minWidth: 200,
+      maxWidth: 280,
+    },
+    fileIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    fileInfoWrap: {
+      flex: 1,
+      marginRight: 8,
+    },
+    fileNameText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    fileSizeText: {
+      fontSize: 11,
+      color: C.muted,
+      marginTop: 2,
+    },
+    forwardedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    forwardedText: {
+      fontSize: 11,
+      fontStyle: 'italic',
+      color: C.muted,
+      fontWeight: '500',
+    },
+    starBadge: {
+      position: 'absolute',
+      bottom: -6,
+      backgroundColor: C.card,
+      borderRadius: 10,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 2,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    starBadgeMine: {
+      right: 4,
+    },
+    starBadgeOther: {
+      left: 4,
+    },
+    mentionPopupWrap: {
+      backgroundColor: C.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+    },
+    mentionListContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    mentionChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: C.line,
+    },
+    mentionChipAvatar: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: C.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 6,
+    },
+    mentionChipAi: {
+      backgroundColor: '#7C3AED',
+    },
+    mentionChipAvatarText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    mentionChipName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.ink,
+    },
+    editBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.line,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    editBannerBar: {
+      width: 3,
+      height: 28,
+      borderRadius: 2,
+      backgroundColor: C.brand,
+      marginRight: 10,
+    },
+    editBannerContent: {
+      flex: 1,
+    },
+    editBannerTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.brand,
+    },
+    editBannerText: {
+      fontSize: 13,
+      color: C.ink,
+      marginTop: 2,
+    },
+    translationCard: {
+      marginTop: 8,
+      paddingTop: 6,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    translationCardMine: {
+      borderTopColor: 'rgba(255,255,255,0.25)',
+    },
+    translationCardOther: {
+      borderTopColor: C.line,
+    },
+    translationHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 3,
+    },
+    translationLabel: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: '700',
+      color: C.brand,
+      marginLeft: 4,
+    },
+    translationBody: {
+      fontSize: 13,
+      color: C.ink,
+      lineHeight: 18,
+    },
+  });
