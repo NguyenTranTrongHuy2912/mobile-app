@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Dimensions,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -142,6 +143,14 @@ export default function CallModal() {
     : call.callerName || 'Người gọi';
   const displayAvatar = isCaller ? call.receiverAvatar : call.callerAvatar;
 
+  // Máy chủ Jitsi WebRTC SFU miễn phí 100% vĩnh viễn, truyền âm thanh & video 2 chiều thật
+  const cleanRoom = (call.roomId || 'room').replace(/[^a-zA-Z0-9]/g, '_');
+  const jitsiRoomId = `HQChatApp_${cleanRoom}`;
+  const myParticipantName = (isCaller ? call.callerName : call.receiverName) || 'Thành viên';
+  const jitsiUrl = `https://meet.jit.si/${jitsiRoomId}#userInfo.displayName="${encodeURIComponent(
+    myParticipantName
+  )}"&config.startWithAudioMuted=false&config.startWithVideoMuted=${!isVideo}&config.prejoinPageEnabled=false`;
+
   // Thao tác chấp nhận cuộc gọi
   const handleAccept = () => {
     Vibration.cancel();
@@ -151,6 +160,10 @@ export default function CallModal() {
         accepted: true,
       });
     }
+    // Mở ngay đàm thoại âm thanh/hình ảnh thật
+    setTimeout(() => {
+      Linking.openURL(jitsiUrl).catch((e) => console.warn('Cannot open Jitsi Meet:', e));
+    }, 400);
   };
 
   // Thao tác từ chối cuộc gọi đến
@@ -328,14 +341,36 @@ export default function CallModal() {
                     ? 'Đang đổ chuông...'
                     : isIncoming
                     ? isVideo
-                      ? 'Đang gọi video cho bạn...'
-                      : 'Cuộc gọi thoại đến...'
+                    ? 'Đang gọi video cho bạn...'
+                    : 'Cuộc gọi thoại đến...'
                     : isConnected
                     ? formatDuration(call.durationSeconds)
                     : isEnded
                     ? call.endReason || 'Cuộc gọi đã kết thúc'
                     : ''}
                 </Text>
+
+                {isConnected && (
+                  <View style={styles.liveMediaBanner}>
+                    <Pressable
+                      style={styles.openLiveMediaBtn}
+                      onPress={() => Linking.openURL(jitsiUrl).catch((e) => console.warn(e))}
+                    >
+                      <Ionicons
+                        name={isVideo ? 'videocam' : 'mic'}
+                        size={20}
+                        color="#fff"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.openLiveMediaBtnText}>
+                        {isVideo ? 'Mở truyền hình & âm thanh trực tiếp' : 'Bật đàm thoại giọng nói HD'}
+                      </Text>
+                    </Pressable>
+                    <Text style={styles.liveMediaHint}>
+                      Máy chủ Jitsi WebRTC SFU miễn phí · Âm thanh & Video 2 chiều thời gian thực
+                    </Text>
+                  </View>
+                )}
               </View>
             )
           )}
@@ -797,5 +832,35 @@ const makeStyles = (colors: ScreenColors) =>
       color: '#CBD5E1',
       fontSize: 12,
       fontWeight: '500',
+    },
+    liveMediaBanner: {
+      alignItems: 'center',
+      marginTop: 20,
+      paddingHorizontal: 16,
+    },
+    openLiveMediaBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.brand,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 5,
+    },
+    openLiveMediaBtnText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    liveMediaHint: {
+      color: 'rgba(255, 255, 255, 0.65)',
+      fontSize: 11,
+      marginTop: 6,
+      textAlign: 'center',
     },
   });

@@ -225,5 +225,73 @@ export function useSendImage(roomId: string) {
     [dispatch, getSignature, patch, roomId, sendMessage, userId],
   );
 
-  return { sendImages, sendMedia: sendImages, sendDocument, retryImage: retryMedia, retryMedia };
+  const sendVoiceNote = useCallback(
+    async (audioUri: string, durationSec: number) => {
+      const localId = newId();
+      dispatch(
+        chatApi.util.updateQueryData('getMessages', roomId, (draft) => {
+          draft.messages.push({
+            id: localId,
+            roomId,
+            senderId: userId,
+            type: 'file',
+            content: '🎤 [Tin nhắn thoại]',
+            timestamp: Date.now(),
+            status: 'sending',
+            localUri: audioUri,
+            fileName: 'voice_note.m4a',
+            videoDurationMs: durationSec * 1000,
+            uploadProgress: 0,
+          });
+        }),
+      );
+
+      patch(localId, (m) => {
+        m.status = 'sending';
+      });
+
+      try {
+        const sig = await getSignature({ resourceType: 'video' }).unwrap();
+        const up = await uploadMedia(
+          sig,
+          { uri: audioUri, name: 'voice_note.m4a', mimeType: 'audio/m4a' },
+          (p) =>
+            patch(localId, (m) => {
+              m.uploadProgress = p;
+            }),
+        );
+
+        patch(localId, (m) => {
+          m.fileUrl = up.url;
+          m.uploadProgress = 100;
+        });
+
+        await sendMessage({
+          roomId,
+          senderId: userId,
+          type: 'file',
+          content: '🎤 [Tin nhắn thoại]',
+          localId,
+          fileUrl: up.url,
+          fileName: 'voice_note.m4a',
+          durationMs: durationSec * 1000,
+        }).unwrap();
+      } catch (e) {
+        console.warn('[SendVoiceNote] Gửi tin nhắn thoại thất bại:', e);
+        patch(localId, (m) => {
+          m.status = 'failed';
+        });
+      }
+    },
+    [dispatch, getSignature, patch, roomId, sendMessage, userId],
+  );
+
+  return {
+    sendImages,
+    sendMedia: sendImages,
+    sendDocument,
+    sendVoiceNote,
+    retryImage: retryMedia,
+    retryMedia,
+  };
 }

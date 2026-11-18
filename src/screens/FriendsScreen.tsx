@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,8 +35,41 @@ export default function FriendsScreen() {
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
 
   const [activeTab, setActiveTab] = useState<SubTab>('friends');
-  const [friendSearch, setFriendSearch] = useState('');
-  const [findSearch, setFindSearch] = useState('');
+  const [friendSearchInput, setFriendSearchInput] = useState('');
+  const [debouncedFriendQuery, setDebouncedFriendQuery] = useState('');
+  const [findSearchInput, setFindSearchInput] = useState('');
+  const [debouncedFindQuery, setDebouncedFindQuery] = useState('');
+  const friendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const findTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFriendSearchChange = (text: string) => {
+    setFriendSearchInput(text);
+    if (friendTimerRef.current) clearTimeout(friendTimerRef.current);
+    friendTimerRef.current = setTimeout(() => {
+      setDebouncedFriendQuery(text);
+    }, 2500);
+  };
+
+  const handleClearFriendSearch = () => {
+    if (friendTimerRef.current) clearTimeout(friendTimerRef.current);
+    setFriendSearchInput('');
+    setDebouncedFriendQuery('');
+  };
+
+  const handleFindSearchChange = (text: string) => {
+    setFindSearchInput(text);
+    if (findTimerRef.current) clearTimeout(findTimerRef.current);
+    findTimerRef.current = setTimeout(() => {
+      setDebouncedFindQuery(text);
+    }, 2500);
+  };
+
+  const handleClearFindSearch = () => {
+    if (findTimerRef.current) clearTimeout(findTimerRef.current);
+    setFindSearchInput('');
+    setDebouncedFindQuery('');
+  };
+
   const [friendFilter, setFriendFilter] = useState<'all' | 'active'>('all');
   const [sentUserIds, setSentUserIds] = useState<Record<string, boolean>>({});
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; isError?: boolean } | null>(null);
@@ -49,13 +82,13 @@ export default function FriendsScreen() {
     refetch: refetchFriends,
   } = useGetFriendsQuery();
 
-  // 2. Tìm kiếm người dùng mới
-  const canSearchNew = findSearch.trim().length >= 2;
+  // 2. Tìm kiếm người dùng mới (đã debounce tránh spam query)
+  const canSearchNew = debouncedFindQuery.trim().length >= 2;
   const {
     data: searchResults = [],
     isFetching: searchingUsers,
     isError: searchError,
-  } = useSearchUsersQuery(findSearch.trim(), { skip: !canSearchNew });
+  } = useSearchUsersQuery(debouncedFindQuery.trim(), { skip: !canSearchNew });
 
   const [createRoom, { isLoading: creatingRoom }] = useCreateRoomMutation();
   const [sendFriendRequest, { isLoading: sendingRequest }] = useSendFriendRequestMutation();
@@ -66,14 +99,14 @@ export default function FriendsScreen() {
     if (friendFilter === 'active') {
       list = list.filter((f) => !!onlineUserIds[f.userId]);
     }
-    const q = friendSearch.trim().toLowerCase();
+    const q = debouncedFriendQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
       (f) =>
         (f.displayName ?? '').toLowerCase().includes(q) ||
         (f.email && f.email.toLowerCase().includes(q))
     );
-  }, [friends, friendFilter, onlineUserIds, friendSearch]);
+  }, [friends, friendFilter, onlineUserIds, debouncedFriendQuery]);
 
   const onlineFriendsCount = useMemo(() => {
     return friends.filter((f) => !!onlineUserIds[f.userId]).length;
@@ -348,12 +381,12 @@ export default function FriendsScreen() {
                 style={styles.searchInput}
                 placeholder="Tìm kiếm trong danh sách bạn bè..."
                 placeholderTextColor={C.muted}
-                value={friendSearch}
-                onChangeText={setFriendSearch}
+                value={friendSearchInput}
+                onChangeText={handleFriendSearchChange}
                 autoCorrect={false}
               />
-              {friendSearch.length > 0 && (
-                <Pressable onPress={() => setFriendSearch('')} hitSlop={8}>
+              {friendSearchInput.length > 0 && (
+                <Pressable onPress={handleClearFriendSearch} hitSlop={8}>
                   <Ionicons name="close-circle" size={18} color={C.muted} />
                 </Pressable>
               )}
@@ -418,14 +451,14 @@ export default function FriendsScreen() {
               style={styles.searchInput}
               placeholder="Nhập tên hoặc email (tối thiểu 2 ký tự)..."
               placeholderTextColor={C.muted}
-              value={findSearch}
-              onChangeText={setFindSearch}
+              value={findSearchInput}
+              onChangeText={handleFindSearchChange}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus={true}
             />
-            {findSearch.length > 0 && (
-              <Pressable onPress={() => setFindSearch('')} hitSlop={8}>
+            {findSearchInput.length > 0 && (
+              <Pressable onPress={handleClearFindSearch} hitSlop={8}>
                 <Ionicons name="close-circle" size={18} color={C.muted} />
               </Pressable>
             )}

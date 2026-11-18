@@ -26,6 +26,8 @@ import { formatChatDivider } from '../utils/dateFormatter';
 import AnimatedMessageItem from '../components/AnimatedMessageItem';
 import ScalePressable from '../components/ScalePressable';
 import * as Clipboard from 'expo-clipboard';
+import { Audio } from 'expo-av';
+import AudioMessagePlayer from '../components/AudioMessagePlayer';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
 import ForwardMessageModal from '../components/ForwardMessageModal';
@@ -561,10 +563,75 @@ export default function ChatRoomScreen() {
     await loadEarlier({ roomId, beforeTimestamp: oldestTimestamp });
   }, [isLoadingEarlier, hasMore, messages, loadEarlier, roomId]);
 
-  const { sendImages, sendDocument, retryImage } = useSendImage(roomId);
+  const { sendImages, sendDocument, sendVoiceNote, retryImage } = useSendImage(roomId);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+
+  // Quản lý ghi âm giọng nói (Voice Message)
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Cần cấp quyền', 'Vui lòng cấp quyền Microphone để ghi âm tin nhắn thoại.');
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const newRecording = new Audio.Recording();
+      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await newRecording.startAsync();
+      setRecording(newRecording);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.warn('Lỗi bắt đầu ghi âm:', err);
+      Alert.alert('Lỗi', 'Không thể khởi động microphone ghi âm.');
+    }
+  };
+
+  const cancelRecording = async () => {
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    try {
+      if (recording) {
+        await recording.stopAndUnloadAsync();
+      }
+    } catch {
+      // ignore
+    }
+    setRecording(null);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
+  const stopAndSendRecording = async () => {
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    if (!recording) return;
+
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      const sec = recordingSeconds;
+      setRecording(null);
+      setIsRecording(false);
+      setRecordingSeconds(0);
+
+      if (!uri) return;
+      await sendVoiceNote(uri, sec);
+    } catch (err) {
+      console.warn('Stop recording error:', err);
+    }
+  };
 
   // Thông báo ngắn (ví dụ chưa cấp quyền camera) tự ẩn sau vài giây
   useEffect(() => {
@@ -961,6 +1028,12 @@ export default function ChatRoomScreen() {
               />
             ) : isVideo ? (
               <ChatVideo message={item} />
+            ) : (item.content.includes('[Tin nhắn thoại]') || (item.fileUrl && (item.fileUrl.endsWith('.m4a') || item.fileUrl.endsWith('.mp3') || item.fileUrl.endsWith('.wav'))) || (item.imageUrl && (item.imageUrl.endsWith('.m4a') || item.imageUrl.endsWith('.mp3')))) ? (
+              <AudioMessagePlayer
+                uri={item.fileUrl || item.imageUrl || item.localUri || ''}
+                durationMs={item.videoDurationMs}
+                isMine={mine}
+              />
             ) : isFile ? (
               <Pressable
                 style={styles.fileCard}
@@ -1299,77 +1372,100 @@ export default function ChatRoomScreen() {
         </View>
       )}
 
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
-        {isCollapsed ? (
-          <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
-            <Ionicons name="chevron-forward" size={24} color={C.brand} />
-          </View>
-        ) : (
-          <View style={styles.actionButtonsRow}>
-            <Pressable
-              onPress={() => setShowMediaModal(true)}
-              hitSlop={6}
-              style={styles.iconButton}
-            >
-              <Ionicons name="add-circle" size={26} color={C.brand} />
-            </Pressable>
-            <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
-              <Ionicons name="camera" size={24} color={C.brand} />
-            </Pressable>
-            <Pressable
-              onPress={() => setShowAiToolModal(true)}
-              hitSlop={6}
-              style={styles.iconButton}
-            >
-              <Ionicons name="sparkles" size={23} color={C.brand} />
-            </Pressable>
-            {draft.trim().length > 0 && (
-              <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
-                <Ionicons name="chevron-back" size={22} color={C.muted} />
-              </Pressable>
-            )}
-          </View>
-        )}
+      {isRecording ? (
+        <View style={[styles.inputBar, styles.recordingBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <Pressable onPress={cancelRecording} hitSlop={8} style={styles.recordCancelBtn}>
+            <Ionicons name="trash" size={20} color={C.danger} />
+            <Text style={{ color: C.danger, marginLeft: 6, fontWeight: '600', fontSize: 13 }}>Hủy</Text>
+          </Pressable>
 
-        {/* Khung chứa ô nhập văn bản và nút emoji */}
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập tin nhắn..."
-            placeholderTextColor={C.muted}
-            keyboardAppearance={isDark ? 'dark' : 'light'}
-            value={draft}
-            onChangeText={handleTextChange}
-            multiline
-          />
-          <View
-            onPress={() => setShowEmojiPicker((prev) => !prev)}
-            hitSlop={6}
-            style={styles.innerEmojiButton}
-          >
-            <Ionicons
-              name={showEmojiPicker ? 'happy' : 'happy-outline'}
-              size={22}
-              color={C.brand}
-            />
+          <View style={styles.recordTimerWrap}>
+            <View style={styles.recordRedDot} />
+            <Text style={styles.recordTimerText}>
+              Đang ghi âm {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60) < 10 ? '0' : ''}{recordingSeconds % 60}
+            </Text>
           </View>
+
+          <Pressable onPress={stopAndSendRecording} hitSlop={8} style={styles.recordSendBtn}>
+            <Ionicons name="send" size={17} color="#fff" />
+          </Pressable>
         </View>
+      ) : (
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
+          {isCollapsed ? (
+            <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
+              <Ionicons name="chevron-forward" size={24} color={C.brand} />
+            </View>
+          ) : (
+            <View style={styles.actionButtonsRow}>
+              <Pressable
+                onPress={() => setShowMediaModal(true)}
+                hitSlop={6}
+                style={styles.iconButton}
+              >
+                <Ionicons name="add-circle" size={26} color={C.brand} />
+              </Pressable>
+              <Pressable onPress={takePhoto} hitSlop={6} style={styles.iconButton}>
+                <Ionicons name="camera" size={24} color={C.brand} />
+              </Pressable>
+              <Pressable onPress={startRecording} hitSlop={6} style={styles.iconButton}>
+                <Ionicons name="mic" size={24} color={C.brand} />
+              </Pressable>
+              <Pressable
+                onPress={() => setShowAiToolModal(true)}
+                hitSlop={6}
+                style={styles.iconButton}
+              >
+                <Ionicons name="sparkles" size={23} color={C.brand} />
+              </Pressable>
+              {draft.trim().length > 0 && (
+                <Pressable onPress={toggleActions} hitSlop={8} style={styles.iconButton}>
+                  <Ionicons name="chevron-back" size={22} color={C.muted} />
+                </Pressable>
+              )}
+            </View>
+          )}
 
-        {draft.trim() ? (
-          <ScalePressable style={styles.sendButton} onPress={onPressSend}>
-            <Ionicons name="send" size={18} color="#fff" />
-          </ScalePressable>
-        ) : (
-          <ScalePressable
-            style={styles.likeButton}
-            onPress={() => send('👍')}
-            hitSlop={6}
-          >
-            <Ionicons name="thumbs-up" size={24} color={C.brand} />
-          </ScalePressable>
-        )}
-      </View>
+          {/* Khung chứa ô nhập văn bản và nút emoji */}
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập tin nhắn..."
+              placeholderTextColor={C.muted}
+              keyboardAppearance={isDark ? 'dark' : 'light'}
+              value={draft}
+              onChangeText={handleTextChange}
+              multiline
+            />
+            <View
+              onPress={() => setShowEmojiPicker((prev) => !prev)}
+              hitSlop={6}
+              style={styles.innerEmojiButton}
+            >
+              <Ionicons
+                name={showEmojiPicker ? 'happy' : 'happy-outline'}
+                size={22}
+                color={C.brand}
+              />
+            </View>
+          </View>
+
+          {draft.trim() ? (
+            <ScalePressable style={styles.sendButton} onPress={onPressSend}>
+              <Ionicons name="send" size={18} color="#fff" />
+            </ScalePressable>
+          ) : (
+            <ScalePressable
+              style={styles.likeButton}
+              onPress={() => send('👍')}
+              hitSlop={6}
+            >
+              <Ionicons name="thumbs-up" size={24} color={C.brand} />
+            </ScalePressable>
+          )}
+        </View>
+      )}
       <ImageViewer uri={viewerUri} onClose={() => setViewerUri(null)} />
       <AiSummarizeModal
         visible={showAiModal}
@@ -1838,6 +1934,42 @@ const makeStyles = (C: ScreenColors) =>
       backgroundColor: C.card,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: C.line,
+    },
+    recordingBar: {
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    recordCancelBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    recordTimerWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    recordRedDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: C.danger,
+      marginRight: 8,
+    },
+    recordTimerText: {
+      color: C.ink,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    recordSendBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: C.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     actionButtonsRow: {
       flexDirection: 'row',

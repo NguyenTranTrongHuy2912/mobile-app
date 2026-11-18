@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Spinner, Text, View } from 'tamagui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,7 +51,35 @@ export default function RoomListScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
 
   const [filter, setFilter] = useState<FilterType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInputText, setSearchInputText] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (text: string) => {
+    setSearchInputText(text);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    // Chờ 3 giây người dùng ngưng gõ mới tìm kiếm (hoặc ấn tìm kiếm trên bàn phím)
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedQuery(text);
+    }, 3000);
+  };
+
+  const handleClearSearch = () => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    setSearchInputText('');
+    setDebouncedQuery('');
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    setDebouncedQuery(searchInputText);
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [userNote, setUserNote] = useState('');
@@ -168,8 +196,8 @@ export default function RoomListScreen() {
       list = list.filter((r) => r.type === 'group');
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase().trim();
       list = list.filter(
         (r) =>
           r.name.toLowerCase().includes(q) ||
@@ -178,7 +206,7 @@ export default function RoomListScreen() {
     }
 
     return list;
-  }, [rooms, filter, searchQuery]);
+  }, [rooms, filter, debouncedQuery]);
 
   const unreadTotal = useMemo(() => {
     return rooms?.reduce((sum, r) => sum + (r.unreadCount > 0 ? 1 : 0), 0) ?? 0;
@@ -203,35 +231,10 @@ export default function RoomListScreen() {
     );
   }
 
-  // Header list: Search Bar + Active Friends Bar + Filter Pills (chuẩn Messenger Ảnh 1)
+  // Header list: Active Friends Bar + Filter Pills (chuẩn Messenger)
   const renderListHeader = () => (
     <View style={styles.listHeaderContainer}>
-      {/* 1. Search Bar */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Hỏi Meta AI hoặc tìm kiếm..."
-          placeholderTextColor={C.muted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery ? (
-          <View onPress={() => setSearchQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={C.muted} />
-          </View>
-        ) : (
-          <View
-            onPress={() => router.push('/(app)/ai-assistant')}
-            hitSlop={8}
-            style={{ padding: 4 }}
-          >
-            <Ionicons name="sparkles" size={18} color={C.brand} />
-          </View>
-        )}
-      </View>
-
-      {/* 2. Active Friends Bar (Hàng ngang bạn bè đang hoạt động) */}
+      {/* 1. Active Friends Bar (Hàng ngang bạn bè đang hoạt động) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -383,11 +386,40 @@ export default function RoomListScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 1. Search Bar cố định ở đỉnh màn hình: Không bao giờ bị unmount, không mất focus hay đóng bàn phím */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Hỏi Meta AI hoặc tìm kiếm..."
+          placeholderTextColor={C.muted}
+          value={searchInputText}
+          onChangeText={handleSearchChange}
+          onSubmitEditing={handleSearchSubmit}
+          returnKeyType="search"
+          blurOnSubmit={false}
+        />
+        {searchInputText ? (
+          <Pressable onPress={handleClearSearch} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={C.muted} />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => router.push('/(app)/ai-assistant')}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="sparkles" size={18} color={C.brand} />
+          </Pressable>
+        )}
+      </View>
+
       <FlatList
         data={filteredRooms}
         keyExtractor={(r) => r.id}
         renderItem={renderItem}
         ListHeaderComponent={renderListHeader}
+        keyboardShouldPersistTaps="handled"
         refreshing={refreshing}
         onRefresh={onRefresh}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -495,7 +527,8 @@ const makeStyles = (C: ScreenColors) =>
     borderRadius: 20,
     paddingHorizontal: 12,
     height: 40,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 4,
   },
   searchIcon: { marginRight: 8 },
   searchInput: {
