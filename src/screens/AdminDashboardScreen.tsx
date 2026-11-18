@@ -141,25 +141,16 @@ export default function AdminDashboardScreen() {
     fetchData();
   };
 
-  // Thao tác: Đổi quyền Admin / User
-  const handleChangeRole = async (targetUser: AdminUserItem) => {
-    if (targetUser.user_id === myAccount) {
-      Alert.alert(
-        'Không thể thực hiện',
-        'Bạn không thể tự hạ quyền Admin của chính mình để đảm bảo luôn có người quản trị hệ thống.'
-      );
+  // Thao tác: Thăng cấp Thành viên thành Quản trị viên (ADMIN)
+  // Lưu ý: Đã bỏ hoàn toàn tính năng hạ cấp Admin xuống User vì lý do bảo mật và toàn vẹn dữ liệu
+  const handlePromoteToAdmin = async (targetUser: AdminUserItem) => {
+    if (targetUser.role === 'ADMIN') {
       return;
     }
 
-    const updatedRole = targetUser.role === 'ADMIN' ? 'USER' : 'ADMIN';
-    const actionText =
-      updatedRole === 'ADMIN'
-        ? 'thăng cấp làm Quản trị viên (ADMIN)'
-        : 'hạ cấp xuống Thành viên (USER)';
-
     Alert.alert(
-      'Xác nhận phân quyền',
-      `Bạn có chắc chắn muốn ${actionText} cho "${targetUser.display_name}"?`,
+      'Xác nhận thăng cấp Quản trị viên',
+      `Bạn có chắc chắn muốn thăng cấp Quản trị viên (ADMIN) cho "${targetUser.display_name}"?\n\nLưu ý: Vì lý do an toàn bảo mật, tài khoản Quản trị viên không thể bị hạ cấp xuống Thành viên.`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -173,14 +164,14 @@ export default function AdminDashboardScreen() {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ role: updatedRole }),
+                body: JSON.stringify({ role: 'ADMIN' }),
               });
               if (res.ok) {
-                Alert.alert('Thành công', `Đã cập nhật quyền thành ${updatedRole}!`);
+                Alert.alert('Thành công', `Đã thăng cấp "${targetUser.display_name}" thành Quản trị viên (ADMIN)!`);
                 fetchData();
               } else {
                 const errData = await res.json().catch(() => ({}));
-                Alert.alert('Lỗi', errData.detail || 'Không thể cập nhật quyền.');
+                Alert.alert('Lỗi', errData.detail || 'Không thể thăng cấp quyền.');
               }
             } catch {
               Alert.alert('Lỗi', 'Lỗi kết nối máy chủ.');
@@ -896,24 +887,22 @@ export default function AdminDashboardScreen() {
                             </View>
                           ) : (
                             <>
-                              {/* Nút Đổi quyền */}
-                              <Pressable
-                                style={styles.actionChipBtn}
-                                onPress={() => handleChangeRole(item)}
-                              >
-                                <Ionicons
-                                  name={
-                                    item.role === 'ADMIN'
-                                      ? 'arrow-down-circle-outline'
-                                      : 'arrow-up-circle-outline'
-                                  }
-                                  size={14}
-                                  color="#3B82F6"
-                                />
-                                <Text style={[styles.actionChipText, { color: '#2563EB' }]}>
-                                  {item.role === 'ADMIN' ? 'Hạ xuống USER' : 'Thăng làm ADMIN'}
-                                </Text>
-                              </Pressable>
+                              {/* Nút Thăng làm ADMIN (chỉ hiển thị cho Thành viên, không cho phép hạ cấp Admin) */}
+                              {item.role !== 'ADMIN' && (
+                                <Pressable
+                                  style={styles.actionChipBtn}
+                                  onPress={() => handlePromoteToAdmin(item)}
+                                >
+                                  <Ionicons
+                                    name="arrow-up-circle-outline"
+                                    size={14}
+                                    color="#3B82F6"
+                                  />
+                                  <Text style={[styles.actionChipText, { color: '#2563EB' }]}>
+                                    Thăng làm ADMIN
+                                  </Text>
+                                </Pressable>
+                              )}
 
                               {/* Nút Khóa / Mở */}
                               <Pressable
