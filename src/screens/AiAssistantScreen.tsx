@@ -30,13 +30,13 @@ const INITIAL_MESSAGES: ChatMessageItem[] = [
   {
     id: 'ai-welcome',
     content:
-      'Xin chào! Tôi là **HQ AI** (Huy & Quốc AI) 🤖✨ — Trợ lý thông minh trong ứng dụng ChatApp.\n\n' +
+      'Xin chào! Tôi là **HQ AI** 🤖✨ — Trợ lý thông minh trong ứng dụng ChatApp.\n\n' +
       'Tôi có thể hỗ trợ bạn:\n' +
-      '• 🎓 **Học tập & Lập trình:** Code React Native, Python, Java, giải thuật.\n' +
-      '• 🧮 **Tính toán & Khoa học:** Tính phần trăm, chia tiền, giải thích hiện tượng tự nhiên.\n' +
-      '• ✍️ **Soạn thảo văn bản:** Viết email xin nghỉ học, lời chúc sinh nhật, dịch Anh - Việt.\n' +
-      '• 🏛️ **Kiến trúc ChatApp:** Nắm rõ Microservices 3 tầng Clean Architecture.\n\n' +
-      'Hãy nhập câu hỏi bất kỳ hoặc chọn gợi ý bên dưới nhé!',
+      '• 💡 **Đời sống & Ý tưởng:** Lên thực đơn món ngon, lịch trình du lịch, lời chúc ý nghĩa.\n' +
+      '• 🎓 **Học tập & Kiến thức:** Giải đáp khoa học, lịch sử, ngoại ngữ và kỹ năng hữu ích.\n' +
+      '• 🧮 **Tính toán & Tiện ích:** Tính phần trăm, chia tiền nhóm, đổi đơn vị nhanh chóng.\n' +
+      '• ✍️ **Soạn thảo & Dịch thuật:** Soạn thảo văn bản lịch sự, dịch câu từ tự nhiên.\n\n' +
+      'Hãy nhắn câu hỏi bất kỳ hoặc chạm vào gợi ý bên dưới để bắt đầu nhé!',
     isAi: true,
     modelName: 'HQ AI',
   },
