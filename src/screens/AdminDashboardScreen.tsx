@@ -143,6 +143,14 @@ export default function AdminDashboardScreen() {
 
   // Thao tác: Đổi quyền Admin / User
   const handleChangeRole = async (targetUser: AdminUserItem) => {
+    if (targetUser.user_id === myAccount) {
+      Alert.alert(
+        'Không thể thực hiện',
+        'Bạn không thể tự hạ quyền Admin của chính mình để đảm bảo luôn có người quản trị hệ thống.'
+      );
+      return;
+    }
+
     const updatedRole = targetUser.role === 'ADMIN' ? 'USER' : 'ADMIN';
     const actionText =
       updatedRole === 'ADMIN'
@@ -171,7 +179,8 @@ export default function AdminDashboardScreen() {
                 Alert.alert('Thành công', `Đã cập nhật quyền thành ${updatedRole}!`);
                 fetchData();
               } else {
-                Alert.alert('Lỗi', 'Không thể cập nhật quyền.');
+                const errData = await res.json().catch(() => ({}));
+                Alert.alert('Lỗi', errData.detail || 'Không thể cập nhật quyền.');
               }
             } catch {
               Alert.alert('Lỗi', 'Lỗi kết nối máy chủ.');
@@ -186,6 +195,11 @@ export default function AdminDashboardScreen() {
 
   // Thao tác: Khóa / Mở khóa tài khoản
   const handleToggleStatus = async (targetUser: AdminUserItem) => {
+    if (targetUser.user_id === myAccount) {
+      Alert.alert('Không thể thực hiện', 'Bạn không thể tự khóa tài khoản của chính mình.');
+      return;
+    }
+
     const newStatus = !targetUser.is_active;
     const actionText = newStatus ? 'mở khóa tài khoản' : 'tạm khóa tài khoản';
 
@@ -212,7 +226,8 @@ export default function AdminDashboardScreen() {
                 Alert.alert('Thành công', `Đã ${actionText}!`);
                 fetchData();
               } else {
-                Alert.alert('Lỗi', 'Không thể thay đổi trạng thái.');
+                const errData = await res.json().catch(() => ({}));
+                Alert.alert('Lỗi', errData.detail || 'Không thể thay đổi trạng thái.');
               }
             } catch {
               Alert.alert('Lỗi', 'Lỗi kết nối máy chủ.');
@@ -872,6 +887,13 @@ export default function AdminDashboardScreen() {
                         <View style={styles.userBottomActions}>
                           {isProcessing ? (
                             <ActivityIndicator size="small" color="#2563EB" />
+                          ) : isSelf ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                              <Ionicons name="shield-checkmark" size={15} color="#16A34A" />
+                              <Text style={{ fontSize: 12, color: '#15803D', marginLeft: 6, fontWeight: '600' }}>
+                                Tài khoản của bạn (Được bảo vệ - Không thể tự hạ quyền/khóa)
+                              </Text>
+                            </View>
                           ) : (
                             <>
                               {/* Nút Đổi quyền */}
@@ -917,15 +939,13 @@ export default function AdminDashboardScreen() {
                               </Pressable>
 
                               {/* Nút Xóa (trừ tài khoản của chính mình) */}
-                              {!isSelf && (
-                                <Pressable
-                                  style={styles.actionDeleteIconBtn}
-                                  onPress={() => handleDeleteUser(item)}
-                                  hitSlop={8}
-                                >
-                                  <Ionicons name="trash-outline" size={16} color="#94A3B8" />
-                                </Pressable>
-                              )}
+                              <Pressable
+                                style={styles.actionDeleteIconBtn}
+                                onPress={() => handleDeleteUser(item)}
+                                hitSlop={8}
+                              >
+                                <Ionicons name="trash-outline" size={16} color="#94A3B8" />
+                              </Pressable>
                             </>
                           )}
                         </View>
