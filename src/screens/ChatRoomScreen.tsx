@@ -215,15 +215,31 @@ export default function ChatRoomScreen() {
   const [showMediaModal, setShowMediaModal] = useState(false);
   // Quản lý trạng thái thu gọn / mở rộng các nút hành động (Camera, Ảnh, Mic, Thêm)
   const [isActionsExpanded, setIsActionsExpanded] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const sub = Keyboard.addListener('keyboardDidShow', () => {
-      setTimeout(() => {
-        listRef.current?.scrollToEnd({ animated: true });
-      }, 80);
-    });
-    return () => sub.remove();
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+        setTimeout(() => {
+          listRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
+
+  const inputBottomPadding = isKeyboardVisible ? 6 : Math.max(insets.bottom, 6);
 
   const isCollapsed = draft.trim().length > 0 && !isActionsExpanded;
 
@@ -1216,8 +1232,8 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior="padding"
-      keyboardVerticalOffset={insets.top + 52}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 52 : 0}
     >
       {/* Thanh thông báo tin nhắn đã ghim (Pinned Message Banner) */}
       {currentRoom?.pinnedMessage && (
@@ -1373,7 +1389,7 @@ export default function ChatRoomScreen() {
       )}
 
       {isRecording ? (
-        <View style={[styles.inputBar, styles.recordingBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <View style={[styles.inputBar, styles.recordingBar, { paddingBottom: inputBottomPadding }]}>
           <Pressable onPress={cancelRecording} hitSlop={8} style={styles.recordCancelBtn}>
             <Ionicons name="trash" size={20} color={C.danger} />
             <Text style={{ color: C.danger, marginLeft: 6, fontWeight: '600', fontSize: 13 }}>Hủy</Text>
@@ -1391,7 +1407,7 @@ export default function ChatRoomScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <View style={[styles.inputBar, { paddingBottom: inputBottomPadding }]}>
           {/* Nút chuyển đổi '>' hoặc hàng nút tính năng: tự động thu gọn khi có chữ để ô nhập rộng nhất */}
           {isCollapsed ? (
             <View onPress={toggleActions} hitSlop={8} style={styles.chevronButton}>
