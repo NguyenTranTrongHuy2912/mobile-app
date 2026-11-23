@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,6 +20,7 @@ interface UserNoteModalProps {
   onClose: () => void;
   onSave: (note: string) => void;
   userInitial?: string;
+  avatarUrl?: string;
 }
 
 const EMOJI_MOODS = ['😊', '☕', '🔥', '🎧', '💪', '😴', '📚', '🎉', '🌟', '🚀'];
@@ -34,6 +36,7 @@ export default function UserNoteModal({
   onClose,
   onSave,
   userInitial = 'U',
+  avatarUrl,
 }: UserNoteModalProps) {
   const C = useScreenColors();
   const styles = useMemo(() => makeStyles(C), [C]);
@@ -108,7 +111,11 @@ export default function UserNoteModal({
           {/* Avatar người dùng */}
           <View style={styles.avatarWrap}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{userInitial.toUpperCase()}</Text>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>{userInitial.toUpperCase()}</Text>
+              )}
             </View>
           </View>
 
@@ -302,6 +309,12 @@ const makeStyles = (C: ScreenColors) => {
       borderColor: INDIGO,
       justifyContent: 'center',
       alignItems: 'center',
+      overflow: 'hidden',
+    },
+    avatarImg: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
     },
     avatarText: {
       fontSize: 34,

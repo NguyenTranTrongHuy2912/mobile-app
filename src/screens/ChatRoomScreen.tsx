@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -308,6 +309,10 @@ export default function ChatRoomScreen() {
   const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
   const isOtherOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
   const headerTitle = currentRoom?.name || 'Chat';
+  const otherFriend = otherUserId ? friends.find((f) => f.userId === otherUserId) : null;
+  const headerAvatarUrl = isDirect
+    ? otherFriend?.avatarUrl || otherMember?.avatarUrl || currentRoom?.avatarUrl
+    : currentRoom?.avatarUrl;
 
   const handleTogglePinMessage = async () => {
     if (!reactionTargetMsg) return;
@@ -476,9 +481,13 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.headerAvatarWrap}>
             <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarInitial}>
-                {headerTitle.charAt(0).toUpperCase()}
-              </Text>
+              {headerAvatarUrl ? (
+                <Image source={{ uri: headerAvatarUrl }} style={styles.headerAvatarImg} />
+              ) : (
+                <Text style={styles.headerAvatarInitial}>
+                  {headerTitle.charAt(0).toUpperCase()}
+                </Text>
+              )}
             </View>
             {isDirect && isFriend && isOtherOnline ? (
               <ActiveBadge size={12} style={{ bottom: -2, right: -2 }} />
@@ -2049,6 +2058,11 @@ const makeStyles = (C: ScreenColors) =>
       backgroundColor: C.brand,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    headerAvatarImg: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
     },
     headerAvatarInitial: {
       color: '#fff',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Spinner, Text, View } from 'tamagui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +46,7 @@ export default function RoomListScreen() {
   const router = useRouter();
   const myId = useAppSelector((s) => s.session.userId);
   const myName = useAppSelector((s) => s.session.displayName) || 'Tôi';
+  const myAvatar = useAppSelector((s) => s.session.avatarUrl);
   const onlineUserIds = useAppSelector((s) => s.presence.onlineUserIds);
   const C = useScreenColors();
   const styles = useMemo(() => makeStyles(C), [C]);
@@ -158,6 +159,17 @@ export default function RoomListScreen() {
   const { data: friends = [] } = useGetFriendsQuery();
   const [createRoom] = useCreateRoomMutation();
 
+  // Bản đồ avatar bạn bè phục vụ hiển thị avatar trong danh sách phòng chat
+  const friendsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const f of friends) {
+      if (f.avatarUrl) {
+        map.set(f.userId, f.avatarUrl);
+      }
+    }
+    return map;
+  }, [friends]);
+
   // Danh sách bạn bè đang online (Active Friends Bar)
   const onlineFriends = useMemo(() => {
     return friends.filter((f) => !!onlineUserIds[f.userId]);
@@ -252,7 +264,11 @@ export default function RoomListScreen() {
             <View style={styles.thoughtTailDot} />
 
             <View style={styles.storyAvatarMe}>
-              <Text style={styles.storyAvatarTextMe}>{myName.charAt(0).toUpperCase()}</Text>
+              {myAvatar ? (
+                <Image source={{ uri: myAvatar }} style={styles.storyAvatarImg} />
+              ) : (
+                <Text style={styles.storyAvatarTextMe}>{myName.charAt(0).toUpperCase()}</Text>
+              )}
             </View>
           </View>
           <Text style={styles.activeName} numberOfLines={1}>
@@ -288,9 +304,13 @@ export default function RoomListScreen() {
                   </>
                 ) : null}
                 <View style={styles.storyAvatarFriend}>
-                  <Text style={styles.storyAvatarText}>
-                    {f.displayName.charAt(0).toUpperCase()}
-                  </Text>
+                  {f.avatarUrl ? (
+                    <Image source={{ uri: f.avatarUrl }} style={styles.storyAvatarImg} />
+                  ) : (
+                    <Text style={styles.storyAvatarText}>
+                      {f.displayName.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <ActiveBadge size={15} style={styles.activeBadgePos} />
               </View>
@@ -341,6 +361,10 @@ export default function RoomListScreen() {
     // Trạng thái hoạt động: Chỉ hiển thị chính xác cho người dùng ĐÃ KẾT BẠN
     const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
     const isOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
+    const otherMember = isDirect ? item.members.find((m) => m.userId !== myId) : undefined;
+    const roomAvatarUrl = isDirect
+      ? (otherUserId ? friendsMap.get(otherUserId) : undefined) || otherMember?.avatarUrl || item.avatarUrl
+      : item.avatarUrl;
 
     return (
       <View
@@ -353,7 +377,11 @@ export default function RoomListScreen() {
         }
       >
         <View style={{ ...styles.avatar, ...(item.type === 'group' ? styles.avatarGroup : null) }}>
-          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+          {roomAvatarUrl ? (
+            <Image source={{ uri: roomAvatarUrl }} style={styles.avatarImg} />
+          ) : (
+            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+          )}
           {isDirect && isOnline ? <ActiveBadge size={14} /> : null}
         </View>
 
@@ -391,7 +419,7 @@ export default function RoomListScreen() {
         <Ionicons name="search" size={18} color={C.muted} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Hỏi Meta AI hoặc tìm kiếm..."
+          placeholder="Hỏi HQ AI hoặc tìm kiếm..."
           placeholderTextColor={C.muted}
           value={searchInputText}
           onChangeText={handleSearchChange}
@@ -465,7 +493,7 @@ export default function RoomListScreen() {
         }
       />
 
-      {/* Floating Meta AI Button */}
+      {/* Floating HQ AI Button */}
       <FloatingAiButton mode="pill" bottom={24} right={18} />
 
       {/* Modal tạo ghi chú suy nghĩ & cảm xúc */}
@@ -475,6 +503,7 @@ export default function RoomListScreen() {
         onClose={() => setShowNoteModal(false)}
         onSave={handleSaveNote}
         userInitial={myName.charAt(0)}
+        avatarUrl={myAvatar}
       />
     </View>
   );
@@ -678,6 +707,16 @@ const makeStyles = (C: ScreenColors) =>
     justifyContent: 'center',
     marginRight: 12,
     position: 'relative',
+  },
+  avatarImg: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  storyAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   avatarGroup: { backgroundColor: C.success },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: '700' },

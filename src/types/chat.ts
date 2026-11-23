@@ -11,6 +11,7 @@ export interface Room {
   id: string;
   type: RoomType;
   name: string; // direct: tên người còn lại; group: tên nhóm
+  avatarUrl?: string;
   memberIds: string[];
   members: RoomMember[]; // dùng để tra tên người gửi từ senderId
   lastMessage?: string;

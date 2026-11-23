@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet } from 'react-native';
 import { Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import {
   useCreateRoomMutation,
+  useGetFriendsQuery,
   useGetRoomsQuery,
   useSummarizeRoomMutation,
   useLeaveRoomMutation,
@@ -39,6 +40,15 @@ export default function RoomDetailScreen() {
 
   const { data: rooms = [] } = useGetRoomsQuery();
   const room = rooms.find((r) => r.id === roomId);
+  const { data: friends = [] } = useGetFriendsQuery();
+
+  const friendsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const f of friends) {
+      if (f.avatarUrl) map.set(f.userId, f.avatarUrl);
+    }
+    return map;
+  }, [friends]);
 
   const [createRoom] = useCreateRoomMutation();
   const [summarizeRoom, { isLoading: isSummarizing }] = useSummarizeRoomMutation();
@@ -52,6 +62,10 @@ export default function RoomDetailScreen() {
   });
 
   const isGroup = room?.type === 'group';
+  const otherMember = !isGroup ? room?.members.find((m) => m.userId !== currentUserId) : undefined;
+  const bigAvatarUrl = !isGroup
+    ? (otherMember ? friendsMap.get(otherMember.userId) : undefined) || otherMember?.avatarUrl || room?.avatarUrl
+    : room?.avatarUrl;
 
   const handleOpenAiSummarize = async () => {
     if (!roomId) return;
@@ -120,7 +134,11 @@ export default function RoomDetailScreen() {
       {/* 1. Header Avatar & Tên phòng */}
       <View style={styles.headerCard}>
         <View style={{ ...styles.avatarBig, ...(isGroup ? styles.avatarGroup : null) }}>
-          <Text style={styles.avatarBigText}>{room.name.charAt(0).toUpperCase()}</Text>
+          {bigAvatarUrl ? (
+            <Image source={{ uri: bigAvatarUrl }} style={styles.avatarBigImg} />
+          ) : (
+            <Text style={styles.avatarBigText}>{room.name.charAt(0).toUpperCase()}</Text>
+          )}
         </View>
         <Text style={styles.roomTitle} numberOfLines={2}>
           {room.name}
@@ -181,6 +199,7 @@ export default function RoomDetailScreen() {
                 key={m.userId}
                 userId={m.userId}
                 displayName={m.displayName}
+                avatarUrl={friendsMap.get(m.userId) || m.avatarUrl}
                 isCreator={isCreator}
                 isOnline={isOnline}
                 isSelf={isSelf}
@@ -265,6 +284,11 @@ const makeStyles = (C: ScreenColors) =>
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  avatarBigImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarGroup: { backgroundColor: C.success },
   avatarBigText: { fontSize: 32, fontWeight: '700', color: '#fff' },
