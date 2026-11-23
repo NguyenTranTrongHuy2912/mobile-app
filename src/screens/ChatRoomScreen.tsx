@@ -26,7 +26,7 @@ import { formatChatDivider } from '../utils/dateFormatter';
 import AnimatedMessageItem from '../components/AnimatedMessageItem';
 import ScalePressable from '../components/ScalePressable';
 import * as Clipboard from 'expo-clipboard';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import AudioMessagePlayer from '../components/AudioMessagePlayer';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
@@ -585,26 +585,24 @@ export default function ChatRoomScreen() {
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
 
   // Quản lý ghi âm giọng nói (Voice Message)
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startRecording = async () => {
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('Cần cấp quyền', 'Vui lòng cấp quyền Microphone để ghi âm tin nhắn thoại.');
         return;
       }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
-      const newRecording = new Audio.Recording();
-      await newRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await newRecording.startAsync();
-      setRecording(newRecording);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
       setRecordingSeconds(0);
       recordingTimerRef.current = setInterval(() => {
@@ -619,26 +617,20 @@ export default function ChatRoomScreen() {
   const cancelRecording = async () => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     try {
-      if (recording) {
-        await recording.stopAndUnloadAsync();
-      }
+      await recorder.stop();
     } catch {
       // ignore
     }
-    setRecording(null);
     setIsRecording(false);
     setRecordingSeconds(0);
   };
 
   const stopAndSendRecording = async () => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    if (!recording) return;
-
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await recorder.stop();
+      const uri = recorder.uri;
       const sec = recordingSeconds;
-      setRecording(null);
       setIsRecording(false);
       setRecordingSeconds(0);
 

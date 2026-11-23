@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useAppDispatch } from '../../store/hooks';
 import type { AuthUser } from '../../api/authApi';
 import { SESSION_KEY, setUser, logout } from './sessionSlice';
+import { API_URL } from '../../config';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,7 +57,27 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
               await AsyncStorage.removeItem(SESSION_KEY);
               dispatch(logout());
             } else {
+              // Khôi phục phiên ngay lập tức
               dispatch(setUser(user));
+
+              // Tự động đồng bộ quyền Role và trạng thái tài khoản thực tế từ máy chủ
+              fetch(`${API_URL}/api/v1/users/me`, {
+                headers: { Authorization: `Bearer ${user.token}` },
+              })
+                .then(async (res) => {
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.role && data.role !== user.role) {
+                      const updatedUser: AuthUser = { ...user, role: data.role };
+                      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+                      dispatch(setUser(updatedUser));
+                    }
+                  } else if (res.status === 401) {
+                    await AsyncStorage.removeItem(SESSION_KEY);
+                    dispatch(logout());
+                  }
+                })
+                .catch(() => {});
             }
           }
         }

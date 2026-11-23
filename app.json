@@ -57,7 +57,9 @@
             "extraProguardRules": "-dontwarn expo.modules.av.**\n-dontwarn expo.modules.core.**\n-dontwarn expo.modules.kotlin.**"
           }
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "router": {

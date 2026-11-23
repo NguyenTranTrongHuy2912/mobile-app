@@ -17,9 +17,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootState } from '../store';
 import { API_URL } from '../config';
-import { logout } from '../features/session/sessionSlice';
+import { logout, setUser, SESSION_KEY } from '../features/session/sessionSlice';
 import { useRouter } from 'expo-router';
 
 interface AdminStats {
@@ -107,6 +108,22 @@ export default function AdminDashboardScreen() {
       const statsRes = await fetch(`${API_URL}/api/v1/admin/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (statsRes.status === 403) {
+        Alert.alert(
+          'Thông báo phân quyền',
+          'Tài khoản của bạn hiện là Thành viên (USER). Đang chuyển hướng về giao diện chat.',
+          [{ text: 'Đồng ý', onPress: () => router.replace('/(app)/(tabs)/rooms') }]
+        );
+        const raw = await AsyncStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const u = JSON.parse(raw);
+          u.role = 'USER';
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(u));
+          dispatch(setUser(u));
+        }
+        router.replace('/(app)/(tabs)/rooms');
+        return;
+      }
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
@@ -142,47 +159,7 @@ export default function AdminDashboardScreen() {
   };
 
   // Thao tác: Thăng cấp Thành viên thành Quản trị viên (ADMIN)
-  // Lưu ý: Đã bỏ hoàn toàn tính năng hạ cấp Admin xuống User vì lý do bảo mật và toàn vẹn dữ liệu
-  const handlePromoteToAdmin = async (targetUser: AdminUserItem) => {
-    if (targetUser.role === 'ADMIN') {
-      return;
-    }
 
-    Alert.alert(
-      'Xác nhận thăng cấp Quản trị viên',
-      `Bạn có chắc chắn muốn thăng cấp Quản trị viên (ADMIN) cho "${targetUser.display_name}"?\n\nLưu ý: Vì lý do an toàn bảo mật, tài khoản Quản trị viên không thể bị hạ cấp xuống Thành viên.`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đồng ý',
-          onPress: async () => {
-            setActionLoadingId(targetUser.user_id);
-            try {
-              const res = await fetch(`${API_URL}/api/v1/admin/users/${targetUser.user_id}/role`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ role: 'ADMIN' }),
-              });
-              if (res.ok) {
-                Alert.alert('Thành công', `Đã thăng cấp "${targetUser.display_name}" thành Quản trị viên (ADMIN)!`);
-                fetchData();
-              } else {
-                const errData = await res.json().catch(() => ({}));
-                Alert.alert('Lỗi', errData.detail || 'Không thể thăng cấp quyền.');
-              }
-            } catch {
-              Alert.alert('Lỗi', 'Lỗi kết nối máy chủ.');
-            } finally {
-              setActionLoadingId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   // Thao tác: Khóa / Mở khóa tài khoản
   const handleToggleStatus = async (targetUser: AdminUserItem) => {
@@ -887,23 +864,6 @@ export default function AdminDashboardScreen() {
                             </View>
                           ) : (
                             <>
-                              {/* Nút Thăng làm ADMIN (chỉ hiển thị cho Thành viên, không cho phép hạ cấp Admin) */}
-                              {item.role !== 'ADMIN' && (
-                                <Pressable
-                                  style={styles.actionChipBtn}
-                                  onPress={() => handlePromoteToAdmin(item)}
-                                >
-                                  <Ionicons
-                                    name="arrow-up-circle-outline"
-                                    size={14}
-                                    color="#3B82F6"
-                                  />
-                                  <Text style={[styles.actionChipText, { color: '#2563EB' }]}>
-                                    Thăng làm ADMIN
-                                  </Text>
-                                </Pressable>
-                              )}
-
                               {/* Nút Khóa / Mở */}
                               <Pressable
                                 style={[
@@ -1061,49 +1021,26 @@ export default function AdminDashboardScreen() {
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Vai trò tài khoản (Role)</Text>
                   <View style={styles.rolePickerRow}>
-                    <Pressable
+                    <View
                       style={[
                         styles.roleOptionBtn,
-                        newRole === 'USER' && styles.roleOptionBtnActive,
+                        styles.roleOptionBtnActive,
                       ]}
-                      onPress={() => setNewRole('USER')}
                     >
                       <Ionicons
                         name="person-outline"
                         size={15}
-                        color={newRole === 'USER' ? '#2563EB' : '#64748B'}
+                        color="#2563EB"
                       />
                       <Text
                         style={[
                           styles.roleOptionText,
-                          newRole === 'USER' && styles.roleOptionTextActive,
+                          styles.roleOptionTextActive,
                         ]}
                       >
                         Thành viên (USER)
                       </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.roleOptionBtn,
-                        newRole === 'ADMIN' && styles.roleOptionBtnActiveAdmin,
-                      ]}
-                      onPress={() => setNewRole('ADMIN')}
-                    >
-                      <Ionicons
-                        name="shield-checkmark-outline"
-                        size={15}
-                        color={newRole === 'ADMIN' ? '#4F46E5' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.roleOptionText,
-                          newRole === 'ADMIN' && styles.roleOptionTextActiveAdmin,
-                        ]}
-                      >
-                        Quản trị viên (ADMIN)
-                      </Text>
-                    </Pressable>
+                    </View>
                   </View>
                 </View>
 

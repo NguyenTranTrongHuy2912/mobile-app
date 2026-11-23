@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 interface AudioMessagePlayerProps {
   uri: string;
@@ -14,52 +14,18 @@ export default function AudioMessagePlayer({
   durationMs = 0,
   isMine = false,
 }: AudioMessagePlayerProps) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackPos, setPlaybackPos] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(durationMs);
+  const player = useAudioPlayer(uri ? { uri } : null);
+  const status = useAudioPlayerStatus(player);
 
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync().catch(() => {});
-      }
-    };
-  }, [sound]);
-
-  const togglePlay = async () => {
+  const togglePlay = () => {
     try {
-      if (sound) {
-        if (isPlaying) {
-          await sound.pauseAsync();
-          setIsPlaying(false);
-        } else {
-          await sound.playAsync();
-          setIsPlaying(true);
-        }
+      if (status.playing) {
+        player.pause();
       } else {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-        });
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true },
-          (status) => {
-            if (status.isLoaded) {
-              setPlaybackPos(status.positionMillis);
-              if (status.durationMillis) {
-                setTotalDuration(status.durationMillis);
-              }
-              if (status.didJustFinish) {
-                setIsPlaying(false);
-                setPlaybackPos(0);
-              }
-            }
-          }
-        );
-        setSound(newSound);
-        setIsPlaying(true);
+        if (status.currentTime >= status.duration && status.duration > 0) {
+          player.seekTo(0);
+        }
+        player.play();
       }
     } catch (e) {
       console.warn('Cannot play audio message:', e);
@@ -73,14 +39,15 @@ export default function AudioMessagePlayer({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPercent =
-    totalDuration > 0 ? Math.min(100, (playbackPos / totalDuration) * 100) : 0;
+  const currentMs = (status.currentTime || 0) * 1000;
+  const durMs = (status.duration || 0) * 1000 || durationMs;
+  const progressPercent = durMs > 0 ? Math.min(100, (currentMs / durMs) * 100) : 0;
 
   return (
     <View style={[styles.container, isMine ? styles.containerMine : styles.containerOther]}>
       <Pressable onPress={togglePlay} style={styles.playBtn} hitSlop={6}>
         <Ionicons
-          name={isPlaying ? 'pause' : 'play'}
+          name={status.playing ? 'pause' : 'play'}
           size={20}
           color={isMine ? '#fff' : '#0084FF'}
         />
@@ -100,11 +67,11 @@ export default function AudioMessagePlayer({
         </View>
         <View style={styles.timeRow}>
           <Text style={[styles.timeText, isMine && { color: 'rgba(255,255,255,0.85)' }]}>
-            {isPlaying || playbackPos > 0 ? formatMs(playbackPos) : 'Tin nhắn thoại'}
+            {status.playing || currentMs > 0 ? formatMs(currentMs) : 'Tin nhắn thoại'}
           </Text>
-          {totalDuration > 0 && (
+          {durMs > 0 && (
             <Text style={[styles.timeText, isMine && { color: 'rgba(255,255,255,0.85)' }]}>
-              {formatMs(totalDuration)}
+              {formatMs(durMs)}
             </Text>
           )}
         </View>
