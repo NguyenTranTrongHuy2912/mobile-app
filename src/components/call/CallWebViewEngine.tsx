@@ -48,6 +48,18 @@ export function CallWebViewEngine({
           event.grant(event.resources);
         }}
         injectedJavaScript={INJECTED_CALL_SCRIPT}
+        onShouldStartLoadWithRequest={(request) => {
+          // Ngăn chặn hoàn toàn việc chuyển hướng sang Google Play hoặc app ngoài
+          if (
+            request.url.startsWith('intent://') ||
+            request.url.startsWith('market://') ||
+            request.url.startsWith('itms-apps://') ||
+            (!request.url.startsWith('http://') && !request.url.startsWith('https://'))
+          ) {
+            return false;
+          }
+          return true;
+        }}
         style={styles.fullWebView}
       />
     </View>
@@ -68,10 +80,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: 1,
+    height: 1,
     zIndex: 0,
-    opacity: 0,
+    opacity: 0.01,
   },
   fullWebView: {
     flex: 1,

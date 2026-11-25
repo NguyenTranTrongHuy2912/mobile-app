@@ -69,11 +69,18 @@ export function buildJitsiRoomUrl(params: {
     'interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true',
   ].join('&');
 
-  return `https://meet.jit.si/${jitsiRoomId}#${configParams}`;
+  return `https://meet.element.io/${jitsiRoomId}#${configParams}`;
 }
 
 export const INJECTED_CALL_SCRIPT = `
   (function() {
+    // 1. Chống Android Chromium tiết kiệm pin gây ngắt / tắt tiếng (anti-throttling)
+    try {
+      Object.defineProperty(document, 'hidden', { get: function() { return false; }, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
+    } catch (e) {}
+
+    // 2. Tự động vượt qua màn hình chờ prejoin / join meeting
     function autoJoin() {
       var selectors = [
         '[data-testid="prejoin.joinMeeting"]',
@@ -103,6 +110,30 @@ export const INJECTED_CALL_SCRIPT = `
 
     var joinInterval = setInterval(autoJoin, 300);
     setTimeout(function() { clearInterval(joinInterval); }, 20000);
+
+    // 3. Liên tục đảm bảo tất cả luồng audio/video được phát và không bị mute
+    function ensureMediaPlaying() {
+      var mediaEls = document.querySelectorAll('audio, video');
+      for (var k = 0; k < mediaEls.length; k++) {
+        var m = mediaEls[k];
+        if (m.muted && m.id !== 'localVideo') {
+          m.muted = false;
+        }
+        m.volume = 1.0;
+        if (m.paused) {
+          m.play().catch(function() {});
+        }
+      }
+      if (window.APP && window.APP.conference) {
+        try {
+          if (window.APP.conference.isLocalAudioMuted && window.APP.conference.isLocalAudioMuted()) {
+            window.APP.conference.muteAudio(false);
+          }
+        } catch(e) {}
+      }
+    }
+    var mediaInterval = setInterval(ensureMediaPlaying, 800);
+    setTimeout(function() { clearInterval(mediaInterval); }, 120000);
 
     var style = document.createElement('style');
     style.innerHTML = \`
