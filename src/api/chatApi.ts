@@ -112,14 +112,24 @@ export const chatApi = createApi({
     searchUsers: build.query<UserSummary[], string>({
       query: (q) => ({ url: '/api/v1/users/search', params: { q, limit: 20 } }),
       transformResponse: (res: SearchUsersResponse): UserSummary[] =>
-        res.users.map((u) => ({ userId: u.user_id, displayName: u.display_name, email: u.email })),
+        res.users.map((u) => ({
+          userId: u.user_id,
+          displayName: u.display_name,
+          email: u.email,
+          avatarUrl: (u as any).avatar_url || (u as any).avatarUrl || undefined,
+        })),
       keepUnusedDataFor: 30,
     }),
 
     getSuggestedUsers: build.query<UserSummary[], void>({
       query: () => '/api/v1/users/suggestions',
       transformResponse: (res: SearchUsersResponse): UserSummary[] =>
-        res.users.map((u) => ({ userId: u.user_id, displayName: u.display_name, email: u.email })),
+        res.users.map((u) => ({
+          userId: u.user_id,
+          displayName: u.display_name,
+          email: u.email,
+          avatarUrl: (u as any).avatar_url || (u as any).avatarUrl || undefined,
+        })),
       providesTags: ['Friend'],
     }),
 
