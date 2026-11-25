@@ -9,7 +9,7 @@ class AvatarCacheManager {
   private nameToAvatar = new Map<string, string>();
   private listeners = new Set<() => void>();
   private pendingFetches = new Set<string>();
-  private isLoadedFromStorage = false;
+  private notifyTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.loadFromStorage();
@@ -34,7 +34,6 @@ class AvatarCacheManager {
     } catch {
       // Bỏ qua lỗi đọc cache local
     } finally {
-      this.isLoadedFromStorage = true;
       this.notify();
     }
   }
@@ -65,16 +64,23 @@ class AvatarCacheManager {
     };
   }
 
+  /**
+   * Phát thông báo bất đồng bộ ra ngoài chu kỳ render của React
+   */
   private notify() {
-    this.listeners.forEach((fn) => {
-      try {
-        fn();
-      } catch {}
-    });
+    if (this.notifyTimeout) return;
+    this.notifyTimeout = setTimeout(() => {
+      this.notifyTimeout = null;
+      this.listeners.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
+    }, 0);
   }
 
   /**
-   * Đăng ký avatar vào bộ nhớ đệm và lưu trữ local
+   * Đăng ký avatar vào bộ nhớ đệm
    */
   public register(userId?: string | null, name?: string | null, avatarUrl?: string | null): void {
     if (!avatarUrl || typeof avatarUrl !== 'string' || !avatarUrl.trim()) return;
@@ -104,13 +110,11 @@ class AvatarCacheManager {
   }
 
   /**
-   * Lấy avatar đồng bộ: kiểm tra fallback -> id -> name
+   * Đọc avatar thuần túy (Pure read - tuyệt đối không gây side-effect hay gọi setState trong render)
    */
   public get(userId?: string | null, name?: string | null, fallbackUrl?: string | null): string | undefined {
     if (fallbackUrl && typeof fallbackUrl === 'string' && fallbackUrl.trim()) {
-      const url = fallbackUrl.trim();
-      this.register(userId, name, url);
-      return url;
+      return fallbackUrl.trim();
     }
 
     if (userId && typeof userId === 'string' && userId.trim()) {
@@ -123,13 +127,11 @@ class AvatarCacheManager {
       if (found) return found;
     }
 
-    // Nếu chưa có, kích hoạt tìm kiếm ngầm nếu có query hợp lệ
-    this.triggerBackgroundResolve(userId, name);
     return undefined;
   }
 
   /**
-   * Kích hoạt truy vấn tìm kiếm ngầm thông qua searchUsers để tự động cập nhật avatar mới nhất
+   * Kích hoạt truy vấn tìm kiếm ngầm (chỉ gọi trong useEffect)
    */
   public triggerBackgroundResolve(userId?: string | null, name?: string | null, token?: string): void {
     const query = name?.trim() || userId?.trim();
@@ -171,7 +173,7 @@ class AvatarCacheManager {
 export const avatarCache = new AvatarCacheManager();
 
 /**
- * React hook tự động lắng nghe và cập nhật avatar theo thời gian thực
+ * React hook an toàn, lắng nghe cập nhật avatar mà không gây re-render loop
  */
 export function useAvatar(
   userId?: string | null,
@@ -183,11 +185,17 @@ export function useAvatar(
   );
 
   useEffect(() => {
-    // Cập nhật giá trị ngay khi props thay đổi
+    if (fallbackUrl && typeof fallbackUrl === 'string' && fallbackUrl.trim()) {
+      avatarCache.register(userId, name, fallbackUrl);
+    } else {
+      avatarCache.triggerBackgroundResolve(userId, name);
+    }
+  }, [userId, name, fallbackUrl]);
+
+  useEffect(() => {
     const cur = avatarCache.get(userId, name, fallbackUrl);
     setAvatar(cur);
 
-    // Đăng ký nhận thông báo khi có avatar mới từ server / background search
     const unsubscribe = avatarCache.subscribe(() => {
       const updated = avatarCache.get(userId, name, fallbackUrl);
       setAvatar((prev) => (prev !== updated ? updated : prev));
@@ -196,5 +204,5 @@ export function useAvatar(
     return unsubscribe;
   }, [userId, name, fallbackUrl]);
 
-  return avatar;
+  return avatar || (fallbackUrl && typeof fallbackUrl === 'string' && fallbackUrl.trim() ? fallbackUrl.trim() : undefined);
 }
