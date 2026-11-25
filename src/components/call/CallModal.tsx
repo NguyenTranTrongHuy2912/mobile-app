@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   SafeAreaView,
@@ -12,6 +13,7 @@ import {
 import { Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import { setAudioModeAsync } from 'expo-audio';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   acceptCall,
@@ -67,24 +69,127 @@ export default function CallModal() {
 
   // Cấu hình URL WebRTC nhúng TRỰC TIẾP trong ứng dụng qua WebView (tuyệt đối không mở app ngoài)
   const cleanRoom = (call.roomId || 'room').replace(/[^a-zA-Z0-9]/g, '_');
-  const jitsiRoomId = `HQChatApp_${cleanRoom}`;
+  const jitsiRoomId = `HQChat_${cleanRoom}`;
   const myParticipantName = (isCaller ? call.callerName : call.receiverName) || 'Thành viên';
+
   const jitsiEmbeddedUrl = useMemo(() => {
-    return (
-      `https://meet.jit.si/${jitsiRoomId}` +
-      `#userInfo.displayName="${encodeURIComponent(myParticipantName)}"` +
-      `&config.startWithAudioMuted=${call.isMuted ? 'true' : 'false'}` +
-      `&config.startWithVideoMuted=${!isVideo || call.isVideoOff ? 'true' : 'false'}` +
-      `&config.prejoinPageEnabled=false` +
-      `&config.disableDeepLinking=true` +
-      `&config.toolbarButtons=[]` +
-      `&interfaceConfig.TOOLBAR_BUTTONS=[]` +
-      `&interfaceConfig.SHOW_JITSI_WATERMARK=false` +
-      `&interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false` +
-      `&interfaceConfig.DEFAULT_BACKGROUND="%230F141C"` +
-      `&config.p2p.enabled=true`
-    );
+    const configParams = [
+      `userInfo.displayName="${encodeURIComponent(myParticipantName)}"`,
+      'config.prejoinConfig.enabled=false',
+      'config.prejoinPageEnabled=false',
+      'config.requireDisplayName=false',
+      `config.startAudioOnly=${!isVideo ? 'true' : 'false'}`,
+      `config.startWithAudioMuted=${call.isMuted ? 'true' : 'false'}`,
+      `config.startWithVideoMuted=${!isVideo || call.isVideoOff ? 'true' : 'false'}`,
+      'config.disableDeepLinking=true',
+      'config.disableInviteFunctions=true',
+      'config.enableInsecureRoomNameCompletion=true',
+      'config.enableWelcomePage=false',
+      'config.toolbarButtons=[]',
+      'config.p2p.enabled=true',
+      'config.resolution=720',
+      'interfaceConfig.TOOLBAR_BUTTONS=[]',
+      'interfaceConfig.SETTINGS_SECTIONS=[]',
+      'interfaceConfig.SHOW_JITSI_WATERMARK=false',
+      'interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false',
+      'interfaceConfig.SHOW_BRAND_WATERMARK=false',
+      'interfaceConfig.SHOW_POWERED_BY=false',
+      'interfaceConfig.MOBILE_APP_PROMO=false',
+      'interfaceConfig.DEFAULT_BACKGROUND="%230F141C"',
+      'interfaceConfig.VERTICAL_FILMSTRIP=false',
+      'interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true',
+    ].join('&');
+
+    return `https://meet.jit.si/${jitsiRoomId}#${configParams}`;
   }, [jitsiRoomId, myParticipantName, isVideo, call.isMuted, call.isVideoOff]);
+
+  // Script tự động tham gia cuộc gọi & loại bỏ hoàn toàn giao diện mặc định của Jitsi
+  const INJECTED_CALL_SCRIPT = useMemo(() => {
+    return `
+      (function() {
+        function autoJoin() {
+          var selectors = [
+            '[data-testid="prejoin.joinMeeting"]',
+            'button[aria-label="Join meeting"]',
+            'button[aria-label="Tham gia cuộc họp"]',
+            '.action-btn.primary',
+            'button.join-button',
+            'div[role="button"][aria-label*="Join"]'
+          ];
+          for (var i = 0; i < selectors.length; i++) {
+            var el = document.querySelector(selectors[i]);
+            if (el) {
+              el.click();
+              return true;
+            }
+          }
+          var allBtns = document.querySelectorAll('button, div[role="button"]');
+          for (var j = 0; j < allBtns.length; j++) {
+            var txt = (allBtns[j].textContent || allBtns[j].innerText || '').trim().toLowerCase();
+            if (txt === 'join meeting' || txt === 'join' || txt === 'tham gia') {
+              allBtns[j].click();
+              return true;
+            }
+          }
+          return false;
+        }
+
+        var joinInterval = setInterval(autoJoin, 300);
+        setTimeout(function() { clearInterval(joinInterval); }, 20000);
+
+        var style = document.createElement('style');
+        style.innerHTML = \`
+          .watermark, .jitsi-icon, #header, .header, .leftwatermark, 
+          .chrome-extension-banner, .deep-linking-mobile, .mobile-browser, 
+          .filmstrip__videos, [data-testid="filmstrip.toolbar"],
+          .toolbox-content, .toolbox-row, .context-menu, .notice, .banner,
+          .prejoin-dialog-btn, .prejoin-second-row, [data-testid="prejoin.screen"] header,
+          .invite-more-container, .modal-dialog-form, .reactions-menu,
+          .filmstrip, #filmstripWrapper, .subject, .videocontainer__toolbar {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+          body, html, #react, .videocontainer {
+            background-color: #0F141C !important;
+            overflow: hidden !important;
+          }
+          #largeVideo, #largeVideoContainer, video {
+            object-fit: cover !important;
+            width: 100vw !important;
+            height: 100vh !important;
+          }
+          #localVideo, #localVideoContainer {
+            border-radius: 12px !important;
+            overflow: hidden !important;
+          }
+        \`;
+        document.head.appendChild(style);
+      })();
+      true;
+    `;
+  }, []);
+
+  // Tự động yêu cầu quyền microphone & camera trên Android khi có cuộc gọi
+  useEffect(() => {
+    if (call.status === 'CALLING' || call.status === 'INCOMING') {
+      if (Platform.OS === 'android') {
+        const perms: any[] = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+        if (isVideo) {
+          perms.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+        }
+        PermissionsAndroid.requestMultiple(perms).catch(() => {});
+      }
+    }
+    if (call.status === 'CONNECTED') {
+      try {
+        setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        }).catch(() => {});
+      } catch {}
+    }
+  }, [call.status, isVideo]);
 
   // Thao tác cúp máy / hủy cuộc gọi
   const handleEndCall = (reason = 'ended') => {
@@ -193,7 +298,18 @@ export default function CallModal() {
   if (call.status === 'IDLE') return null;
 
   // Thao tác chấp nhận cuộc gọi
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const perms: any[] = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+        if (isVideo) {
+          perms.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+        }
+        await PermissionsAndroid.requestMultiple(perms);
+      } catch (err) {
+        console.warn('[Call] Lỗi cấp quyền mic/camera:', err);
+      }
+    }
     Vibration.cancel();
     dispatch(acceptCall());
     if (call.callerId && call.callId) {
@@ -248,16 +364,40 @@ export default function CallModal() {
     } catch {}
   };
 
+  const handleToggleCamera = () => {
+    dispatch(toggleCameraFacing());
+    try {
+      webViewRef.current?.injectJavaScript(`
+        try {
+          if (window.APP && window.APP.conference && window.APP.conference.deviceManager) {
+            window.APP.conference.deviceManager.changeCamera();
+          }
+        } catch(e) {}
+        true;
+      `);
+    } catch {}
+  };
+
+  const handleToggleSpeaker = () => {
+    dispatch(toggleSpeaker());
+    try {
+      setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      }).catch(() => {});
+    } catch {}
+  };
+
   return (
     <Modal visible={true} animationType="fade" transparent={false} statusBarTranslucent>
       <View style={styles.container}>
-        {/* WebRTC Audio/Video Engine nhúng trực tiếp trong ứng dụng (tuyệt đối không mở app ngoài) */}
+        {/* WebRTC Audio/Video Engine nhúng trực tiếp trong ứng dụng */}
         {isConnected && Platform.OS !== 'web' && (
           <View
             style={
               isVideo && !call.isVideoOff && !isGroup
                 ? styles.videoWebViewContainer
-                : styles.hiddenAudioWebView
+                : styles.activeAudioWebViewContainer
             }
             pointerEvents={isVideo && !call.isVideoOff && !isGroup ? 'auto' : 'none'}
           >
@@ -269,34 +409,25 @@ export default function CallModal() {
               javaScriptEnabled={true}
               domStorageEnabled={true}
               originWhitelist={['*']}
-              userAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+              userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
               androidHardwareAccelerationDisabled={false}
+              mediaCapturePermissionGrantType="grant"
               onPermissionRequest={(event: any) => {
                 event.grant(event.resources);
               }}
+              injectedJavaScript={INJECTED_CALL_SCRIPT}
               style={styles.fullWebView}
             />
           </View>
         )}
-        {/* Nền mô phỏng video nếu là Video Call và đã CONNECTED */}
-        {isVideo && isConnected && !call.isVideoOff && !isGroup ? (
-          <View style={styles.videoBackground}>
-            <View style={styles.remoteVideoPlaceholder}>
-              <Ionicons name="person" size={80} color="#4A5568" />
-              <Text style={styles.remoteVideoText}>{displayName}</Text>
-            </View>
 
-            {/* Khung camera nhỏ của chính mình (Floating PIP) */}
-            <View style={styles.localVideoPip}>
-              <View style={styles.localPipContent}>
-                <Ionicons name="videocam" size={24} color={colors.brand} />
-                <Text style={styles.localPipText}>Bạn</Text>
-              </View>
-            </View>
-          </View>
-        ) : null}
-
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView
+          style={[
+            styles.safeArea,
+            isVideo && isConnected && !call.isVideoOff && !isGroup && styles.safeAreaOverlay,
+          ]}
+          pointerEvents="box-none"
+        >
           {/* Header hiển thị loại cuộc gọi và bảo mật mã hóa */}
           <View style={styles.header}>
             <View style={styles.securityBadge}>
@@ -474,7 +605,7 @@ export default function CallModal() {
                 <View style={styles.actionCol}>
                   <Pressable
                     style={[styles.circleBtn, call.isSpeakerOn && styles.btnActive]}
-                    onPress={() => dispatch(toggleSpeaker())}
+                    onPress={handleToggleSpeaker}
                     hitSlop={8}
                   >
                     <Ionicons
@@ -541,7 +672,7 @@ export default function CallModal() {
                   <View style={styles.actionCol}>
                     <Pressable
                       style={[styles.circleBtn, call.isSpeakerOn && styles.btnActive]}
-                      onPress={() => dispatch(toggleSpeaker())}
+                      onPress={handleToggleSpeaker}
                       hitSlop={8}
                     >
                       <Ionicons
@@ -578,7 +709,7 @@ export default function CallModal() {
                     <View style={styles.actionCol}>
                       <Pressable
                         style={styles.circleBtn}
-                        onPress={() => dispatch(toggleCameraFacing())}
+                        onPress={handleToggleCamera}
                         hitSlop={8}
                       >
                         <Ionicons name="camera-reverse-outline" size={26} color="#fff" />
@@ -777,47 +908,9 @@ const makeStyles = (colors: ScreenColors) =>
       alignItems: 'center',
       gap: 4,
     },
-    // Video Background Styles
-    videoBackground: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#1A202C',
-    },
-    remoteVideoPlaceholder: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    remoteVideoText: {
-      color: '#718096',
-      marginTop: 12,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    localVideoPip: {
-      position: 'absolute',
-      top: 60,
-      right: 20,
-      width: 90,
-      height: 130,
-      borderRadius: 12,
-      overflow: 'hidden',
-      backgroundColor: '#2D3748',
-      borderWidth: 2,
-      borderColor: '#4A5568',
-    },
-    localPipContent: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    localPipText: {
-      color: '#A0AEC0',
-      fontSize: 11,
-      marginTop: 4,
+    safeAreaOverlay: {
+      backgroundColor: 'transparent',
+      zIndex: 10,
     },
     videoTimerWrap: {
       alignItems: 'center',
@@ -901,14 +994,14 @@ const makeStyles = (colors: ScreenColors) =>
       zIndex: 1,
       backgroundColor: '#0F141C',
     },
-    hiddenAudioWebView: {
+    activeAudioWebViewContainer: {
       position: 'absolute',
-      width: 1,
-      height: 1,
-      opacity: 0.01,
-      top: -200,
-      left: -200,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       zIndex: 0,
+      opacity: 0,
     },
     fullWebView: {
       flex: 1,

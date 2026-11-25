@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   LayoutAnimation,
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   ScrollView,
@@ -667,7 +668,14 @@ export default function ChatRoomScreen() {
 
   const myAvatar = useAppSelector((s) => s.session.avatarUrl);
 
-  const handleStartCall = (type: 'audio' | 'video') => {
+  const handleStartCall = async (type: 'audio' | 'video') => {
+    if (Platform.OS === 'android') {
+      try {
+        const perms: any[] = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+        if (type === 'video') perms.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+        await PermissionsAndroid.requestMultiple(perms);
+      } catch (e) {}
+    }
     if (isDirect) {
       if (!otherMember) {
         Alert.alert('Lỗi', 'Không tìm thấy thông tin người nhận cuộc gọi.');
