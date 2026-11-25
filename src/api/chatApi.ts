@@ -55,10 +55,10 @@ const toMessage = (m: HistoryItem): Message => ({
   pollId: m.poll_id,
   replyTo: m.reply_to
     ? {
-        messageId: m.reply_to.message_id,
-        senderName: m.reply_to.sender_name,
-        content: m.reply_to.content,
-      }
+      messageId: m.reply_to.message_id,
+      senderName: m.reply_to.sender_name,
+      content: m.reply_to.content,
+    }
     : null,
 });
 
@@ -79,12 +79,12 @@ const toRoom = (d: RoomDto): Room => ({
   unreadCount: d.unread_count,
   pinnedMessage: d.pinned_message
     ? {
-        id: d.pinned_message.id,
-        content: d.pinned_message.content,
-        senderId: d.pinned_message.sender_id,
-        senderName: d.pinned_message.sender_name,
-        timestamp: d.pinned_message.timestamp,
-      }
+      id: d.pinned_message.id,
+      content: d.pinned_message.content,
+      senderId: d.pinned_message.sender_id,
+      senderName: d.pinned_message.sender_name,
+      timestamp: d.pinned_message.timestamp,
+    }
     : null,
 });
 
@@ -386,7 +386,7 @@ export const chatApi = createApi({
         method: 'POST',
         body: { receiver_id: receiverId },
       }),
-      invalidatesTags: ['FriendRequest'],
+      invalidatesTags: ['FriendRequest', 'Friend'],
     }),
 
     respondFriendRequest: build.mutation<
@@ -545,7 +545,7 @@ export const chatApi = createApi({
               }
             }),
           );
-        } catch {}
+        } catch { }
       },
     }),
 
@@ -569,7 +569,7 @@ export const chatApi = createApi({
               }
             }),
           );
-        } catch {}
+        } catch { }
       },
     }),
 
@@ -614,7 +614,7 @@ export const chatApi = createApi({
               }),
             );
           }
-        } catch {}
+        } catch { }
       },
     }),
 
@@ -649,7 +649,7 @@ export const chatApi = createApi({
               }
             }),
           );
-        } catch {}
+        } catch { }
       },
     }),
 
@@ -689,7 +689,7 @@ export const chatApi = createApi({
               Object.assign(draft, data.poll);
             }),
           );
-        } catch {}
+        } catch { }
       },
     }),
 
