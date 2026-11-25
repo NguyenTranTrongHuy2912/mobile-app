@@ -32,8 +32,13 @@ export default function NotificationsScreen() {
   const [actionId, setActionId] = useState<string | null>(null);
 
   // Gợi ý kết bạn ("Những người bạn có thể biết")
-  const { data: friends = [] } = useGetFriendsQuery();
-  const { data: suggestedList = [] } = useGetSuggestedUsersQuery();
+  const { data: friends = [], refetch: refetchFriends } = useGetFriendsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: suggestedList = [], refetch: refetchSuggested } = useGetSuggestedUsersQuery(
+    undefined,
+    { refetchOnMountOrArgChange: true }
+  );
   const [sendFriendRequest, { isLoading: isSendingReq }] = useSendFriendRequestMutation();
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
 
@@ -67,8 +72,13 @@ export default function NotificationsScreen() {
     try {
       await sendFriendRequest(user.userId).unwrap();
       setSentMap((prev) => ({ ...prev, [user.userId]: true }));
-    } catch (e) {
-      console.warn('Lỗi gửi lời mời:', e);
+    } catch (e: any) {
+      // 409 = đã gửi lời mời trước đó -> coi như "Đã gửi"
+      if (e?.status === 409) {
+        setSentMap((prev) => ({ ...prev, [user.userId]: true }));
+      } else {
+        console.warn('Lỗi gửi lời mời:', e);
+      }
     }
   };
 
@@ -151,6 +161,8 @@ export default function NotificationsScreen() {
             refreshing={isLoading}
             onRefresh={() => {
               refetch();
+              refetchFriends();
+              refetchSuggested();
             }}
             tintColor={C.brand}
             colors={[C.brand]}
@@ -318,7 +330,6 @@ const makeStyles = (C: ScreenColors) =>
       flex: 1,
       fontSize: 15,
       color: C.ink,
-      lineHeight: 20,
       marginRight: 8,
     },
     senderName: { fontWeight: '700', color: C.ink },
