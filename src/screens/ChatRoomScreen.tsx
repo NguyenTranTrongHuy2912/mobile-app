@@ -66,6 +66,43 @@ import ChatImage from '../components/ChatImage';
 import ChatVideo from '../components/ChatVideo';
 import ImageViewer from '../components/ImageViewer';
 import type { Message } from '../types/chat';
+import { useAvatar } from '../services/avatarCache';
+
+function HeaderAvatar({
+  userId,
+  name,
+  fallbackUrl,
+  styles,
+}: {
+  userId?: string;
+  name: string;
+  fallbackUrl?: string;
+  styles: any;
+}) {
+  const avatarUrl = useAvatar(userId, name, fallbackUrl);
+  return (
+    <View style={styles.headerAvatar}>
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={styles.headerAvatarImg} />
+      ) : (
+        <Text style={styles.headerAvatarInitial}>{name.charAt(0).toUpperCase()}</Text>
+      )}
+    </View>
+  );
+}
+
+function SenderSmallAvatar({ userId, name }: { userId: string; name: string }) {
+  const avatarUrl = useAvatar(userId, name);
+  if (avatarUrl) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        style={{ width: 16, height: 16, borderRadius: 8, marginRight: 5 }}
+      />
+    );
+  }
+  return null;
+}
 
 const MAX_IMAGES_PER_PICK = 5;
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
@@ -310,7 +347,13 @@ export default function ChatRoomScreen() {
   const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
   const isOtherOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
   const headerTitle = currentRoom?.name || 'Chat';
-  const otherFriend = otherUserId ? friends.find((f) => f.userId === otherUserId) : null;
+  const otherFriend = otherUserId
+    ? friends.find(
+        (f) =>
+          f.userId === otherUserId ||
+          (f.displayName && headerTitle && f.displayName.trim().toLowerCase() === headerTitle.trim().toLowerCase())
+      )
+    : null;
   const headerAvatarUrl = isDirect
     ? otherFriend?.avatarUrl || otherMember?.avatarUrl || currentRoom?.avatarUrl
     : currentRoom?.avatarUrl;
@@ -481,15 +524,12 @@ export default function ChatRoomScreen() {
           onPress={() => router.push({ pathname: '/(app)/room-detail/[roomId]', params: { roomId } })}
         >
           <View style={styles.headerAvatarWrap}>
-            <View style={styles.headerAvatar}>
-              {headerAvatarUrl ? (
-                <Image source={{ uri: headerAvatarUrl }} style={styles.headerAvatarImg} />
-              ) : (
-                <Text style={styles.headerAvatarInitial}>
-                  {headerTitle.charAt(0).toUpperCase()}
-                </Text>
-              )}
-            </View>
+            <HeaderAvatar
+              userId={otherUserId}
+              name={headerTitle}
+              fallbackUrl={headerAvatarUrl}
+              styles={styles}
+            />
             {isDirect && isFriend && isOtherOnline ? (
               <ActiveBadge size={12} style={{ bottom: -2, right: -2 }} />
             ) : null}
@@ -995,10 +1035,15 @@ export default function ChatRoomScreen() {
           >
             {!mine && !isDirect && (
               <View style={styles.senderRow}>
-                {isHqAi && (
+                {isHqAi ? (
                   <View style={styles.aiBadgeAvatar}>
                     <Ionicons name="sparkles" size={10} color="#fff" />
                   </View>
+                ) : (
+                  <SenderSmallAvatar
+                    userId={item.senderId}
+                    name={names.get(item.senderId) ?? 'Người dùng'}
+                  />
                 )}
                 <Text style={{ ...styles.sender, ...(isHqAi ? styles.aiSenderText : null), ...(isMedia || isBigEmoji ? styles.imagePad : null) }}>
                   {isHqAi ? 'HQ AI 🤖' : (names.get(item.senderId) ?? 'Người dùng')}

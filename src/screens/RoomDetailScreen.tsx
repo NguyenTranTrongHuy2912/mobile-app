@@ -16,6 +16,7 @@ import ScalePressable from '../components/ScalePressable';
 import AiSummarizeModal from '../components/AiSummarizeModal';
 import SemanticSearchModal from '../components/SemanticSearchModal';
 import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
+import { useAvatar } from '../services/avatarCache';
 
 /**
  * Màn hình Chi tiết phòng chat / Quản lý nhóm
@@ -63,9 +64,21 @@ export default function RoomDetailScreen() {
 
   const isGroup = room?.type === 'group';
   const otherMember = !isGroup ? room?.members.find((m) => m.userId !== currentUserId) : undefined;
-  const bigAvatarUrl = !isGroup
-    ? (otherMember ? friendsMap.get(otherMember.userId) : undefined) || otherMember?.avatarUrl || room?.avatarUrl
+  const directFriend = !isGroup
+    ? friends.find(
+        (f) =>
+          (otherMember?.userId && f.userId === otherMember.userId) ||
+          (f.displayName && room?.name && f.displayName.trim().toLowerCase() === room.name.trim().toLowerCase())
+      )
+    : null;
+  const initialBigAvatar = !isGroup
+    ? directFriend?.avatarUrl ||
+      (otherMember ? friendsMap.get(otherMember.userId) : undefined) ||
+      otherMember?.avatarUrl ||
+      room?.avatarUrl
     : room?.avatarUrl;
+
+  const bigAvatarUrl = useAvatar(otherMember?.userId, room?.name, initialBigAvatar);
 
   const handleOpenAiSummarize = async () => {
     if (!roomId) return;

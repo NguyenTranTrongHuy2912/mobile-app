@@ -17,6 +17,83 @@ import UserNoteModal from '../components/UserNoteModal';
 import { formatRoomListTime } from '../utils/dateFormatter';
 import type { Room } from '../types/chat';
 import { sendCallSignal } from '../features/call/callSignalEmitter';
+import { avatarCache, useAvatar } from '../services/avatarCache';
+
+function RoomAvatar({
+  userId,
+  name,
+  fallbackUrl,
+  isGroup,
+  isDirect,
+  isOnline,
+  styles,
+}: {
+  userId?: string;
+  name: string;
+  fallbackUrl?: string;
+  isGroup: boolean;
+  isDirect: boolean;
+  isOnline: boolean;
+  styles: any;
+}) {
+  const avatarUrl = useAvatar(userId, name, fallbackUrl);
+  return (
+    <View style={{ ...styles.avatar, ...(isGroup ? styles.avatarGroup : null) }}>
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+      ) : (
+        <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+      )}
+      {isDirect && isOnline ? <ActiveBadge size={14} /> : null}
+    </View>
+  );
+}
+
+function MyStoryAvatar({
+  userId,
+  name,
+  avatarUrl,
+  styles,
+}: {
+  userId?: string;
+  name: string;
+  avatarUrl?: string;
+  styles: any;
+}) {
+  const resolved = useAvatar(userId, name, avatarUrl);
+  return (
+    <View style={styles.storyAvatarMe}>
+      {resolved ? (
+        <Image source={{ uri: resolved }} style={styles.storyAvatarImg} />
+      ) : (
+        <Text style={styles.storyAvatarTextMe}>{name.charAt(0).toUpperCase()}</Text>
+      )}
+    </View>
+  );
+}
+
+function FriendStoryAvatar({
+  userId,
+  name,
+  avatarUrl,
+  styles,
+}: {
+  userId?: string;
+  name: string;
+  avatarUrl?: string;
+  styles: any;
+}) {
+  const resolved = useAvatar(userId, name, avatarUrl);
+  return (
+    <View style={styles.storyAvatarFriend}>
+      {resolved ? (
+        <Image source={{ uri: resolved }} style={styles.storyAvatarImg} />
+      ) : (
+        <Text style={styles.storyAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+      )}
+    </View>
+  );
+}
 
 export interface ThoughtNoteData {
   text: string;
@@ -156,8 +233,19 @@ export default function RoomListScreen() {
     pollingInterval: POLL_MS,
   });
 
-  const { data: friends = [] } = useGetFriendsQuery();
+  const { data: friends = [], refetch: refetchFriends } = useGetFriendsQuery(undefined, {
+    pollingInterval: POLL_MS,
+  });
   const [createRoom] = useCreateRoomMutation();
+
+  // Tự động lưu trữ và đồng bộ toàn bộ avatar bạn bè vào cache toàn cục
+  useEffect(() => {
+    for (const f of friends) {
+      if (f.avatarUrl) {
+        avatarCache.register(f.userId, f.displayName, f.avatarUrl);
+      }
+    }
+  }, [friends]);
 
   // Bản đồ avatar bạn bè phục vụ hiển thị avatar trong danh sách phòng chat
   const friendsMap = useMemo(() => {
@@ -178,7 +266,7 @@ export default function RoomListScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refetch();
+      await Promise.all([refetch(), refetchFriends()]);
     } finally {
       setRefreshing(false);
     }
@@ -263,13 +351,12 @@ export default function RoomListScreen() {
             </View>
             <View style={styles.thoughtTailDot} />
 
-            <View style={styles.storyAvatarMe}>
-              {myAvatar ? (
-                <Image source={{ uri: myAvatar }} style={styles.storyAvatarImg} />
-              ) : (
-                <Text style={styles.storyAvatarTextMe}>{myName.charAt(0).toUpperCase()}</Text>
-              )}
-            </View>
+            <MyStoryAvatar
+              userId={myId}
+              name={myName}
+              avatarUrl={myAvatar}
+              styles={styles}
+            />
           </View>
           <Text style={styles.activeName} numberOfLines={1}>
             {shortMyName}
@@ -303,15 +390,12 @@ export default function RoomListScreen() {
                     <View style={styles.thoughtTailDot} />
                   </>
                 ) : null}
-                <View style={styles.storyAvatarFriend}>
-                  {f.avatarUrl ? (
-                    <Image source={{ uri: f.avatarUrl }} style={styles.storyAvatarImg} />
-                  ) : (
-                    <Text style={styles.storyAvatarText}>
-                      {f.displayName.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+                <FriendStoryAvatar
+                  userId={f.userId}
+                  name={f.displayName}
+                  avatarUrl={f.avatarUrl}
+                  styles={styles}
+                />
                 <ActiveBadge size={15} style={styles.activeBadgePos} />
               </View>
               <Text style={styles.activeName} numberOfLines={1}>
@@ -362,8 +446,19 @@ export default function RoomListScreen() {
     const isFriend = otherUserId ? friends.some((f) => f.userId === otherUserId) : false;
     const isOnline = otherUserId && isFriend ? !!onlineUserIds[otherUserId] : false;
     const otherMember = isDirect ? item.members.find((m) => m.userId !== myId) : undefined;
-    const roomAvatarUrl = isDirect
-      ? (otherUserId ? friendsMap.get(otherUserId) : undefined) || otherMember?.avatarUrl || item.avatarUrl
+    const directFriend = isDirect
+      ? friends.find(
+          (f) =>
+            (otherUserId && f.userId === otherUserId) ||
+            (f.displayName && item.name && f.displayName.trim().toLowerCase() === item.name.trim().toLowerCase())
+        )
+      : null;
+
+    const initialAvatar = isDirect
+      ? directFriend?.avatarUrl ||
+        (otherUserId ? friendsMap.get(otherUserId) : undefined) ||
+        otherMember?.avatarUrl ||
+        item.avatarUrl
       : item.avatarUrl;
 
     return (
@@ -376,14 +471,15 @@ export default function RoomListScreen() {
           })
         }
       >
-        <View style={{ ...styles.avatar, ...(item.type === 'group' ? styles.avatarGroup : null) }}>
-          {roomAvatarUrl ? (
-            <Image source={{ uri: roomAvatarUrl }} style={styles.avatarImg} />
-          ) : (
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-          )}
-          {isDirect && isOnline ? <ActiveBadge size={14} /> : null}
-        </View>
+        <RoomAvatar
+          userId={otherUserId}
+          name={item.name}
+          fallbackUrl={initialAvatar}
+          isGroup={item.type === 'group'}
+          isDirect={isDirect}
+          isOnline={isOnline}
+          styles={styles}
+        />
 
         <View style={styles.rowBody}>
           <View style={styles.rowTop}>
