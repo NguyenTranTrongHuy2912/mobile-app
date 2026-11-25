@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Dimensions,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Text, View } from 'tamagui';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   acceptCall,
@@ -44,9 +44,73 @@ export default function CallModal() {
   const call = useAppSelector((s) => s.call);
   const currentUserId = useAppSelector((s) => s.session.userId);
 
-  // Animation hiệu ứng sóng âm / nhịp đập avatar
+  // Animation hiệu ứng sóng âm / nhịp đập avatar & ref WebView WebRTC
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0.6)).current;
+  const webViewRef = useRef<any>(null);
+
+  const isIncoming = call.status === 'INCOMING';
+  const isCalling = call.status === 'CALLING';
+  const isConnected = call.status === 'CONNECTED';
+  const isEnded = call.status === 'ENDED';
+  const isVideo = call.callType === 'video';
+  const isGroup = !!call.isGroup;
+
+  // Xác định thông tin người hiển thị
+  const isCaller = call.callerId === currentUserId;
+  const displayName = isGroup
+    ? call.groupName || 'Cuộc gọi nhóm'
+    : isCaller
+    ? call.receiverName || 'Người nhận'
+    : call.callerName || 'Người gọi';
+  const displayAvatar = isCaller ? call.receiverAvatar : call.callerAvatar;
+
+  // Cấu hình URL WebRTC nhúng TRỰC TIẾP trong ứng dụng qua WebView (tuyệt đối không mở app ngoài)
+  const cleanRoom = (call.roomId || 'room').replace(/[^a-zA-Z0-9]/g, '_');
+  const jitsiRoomId = `HQChatApp_${cleanRoom}`;
+  const myParticipantName = (isCaller ? call.callerName : call.receiverName) || 'Thành viên';
+  const jitsiEmbeddedUrl = useMemo(() => {
+    return (
+      `https://meet.jit.si/${jitsiRoomId}` +
+      `#userInfo.displayName="${encodeURIComponent(myParticipantName)}"` +
+      `&config.startWithAudioMuted=${call.isMuted ? 'true' : 'false'}` +
+      `&config.startWithVideoMuted=${!isVideo || call.isVideoOff ? 'true' : 'false'}` +
+      `&config.prejoinPageEnabled=false` +
+      `&config.disableDeepLinking=true` +
+      `&config.toolbarButtons=[]` +
+      `&interfaceConfig.TOOLBAR_BUTTONS=[]` +
+      `&interfaceConfig.SHOW_JITSI_WATERMARK=false` +
+      `&interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false` +
+      `&interfaceConfig.DEFAULT_BACKGROUND="%230F141C"` +
+      `&config.p2p.enabled=true`
+    );
+  }, [jitsiRoomId, myParticipantName, isVideo, call.isMuted, call.isVideoOff]);
+
+  // Thao tác cúp máy / hủy cuộc gọi
+  const handleEndCall = (reason = 'ended') => {
+    Vibration.cancel();
+    webrtcService.endAll();
+    const otherUserId = isCaller ? call.receiverId : call.callerId;
+    sendCallSignal({
+      type: 'CALL_HANGUP',
+      call_id: call.callId,
+      target_id: otherUserId,
+      room_id: call.roomId,
+      call_type: call.callType,
+      duration_seconds: call.durationSeconds,
+      reason,
+    });
+    dispatch(
+      setCallEnded({
+        reason:
+          reason === 'timeout'
+            ? 'Người nhận không trả lời'
+            : reason === 'declined'
+            ? 'Cuộc gọi bị từ chối'
+            : 'Cuộc gọi đã kết thúc',
+      })
+    );
+  };
 
   // Timer đếm giây cuộc gọi khi CONNECTED
   useEffect(() => {
@@ -125,31 +189,8 @@ export default function CallModal() {
     }
   }, [call.status]);
 
+  // ĐÃ GỌI ĐỦ TẤT CẢ HOOKS Ở TRÊN -> Tuân thủ nghiêm ngặt React Rules of Hooks
   if (call.status === 'IDLE') return null;
-
-  const isIncoming = call.status === 'INCOMING';
-  const isCalling = call.status === 'CALLING';
-  const isConnected = call.status === 'CONNECTED';
-  const isEnded = call.status === 'ENDED';
-  const isVideo = call.callType === 'video';
-  const isGroup = !!call.isGroup;
-
-  // Xác định thông tin người hiển thị
-  const isCaller = call.callerId === currentUserId;
-  const displayName = isGroup
-    ? call.groupName || 'Cuộc gọi nhóm'
-    : isCaller
-    ? call.receiverName || 'Người nhận'
-    : call.callerName || 'Người gọi';
-  const displayAvatar = isCaller ? call.receiverAvatar : call.callerAvatar;
-
-  // Máy chủ Jitsi WebRTC SFU miễn phí 100% vĩnh viễn, truyền âm thanh & video 2 chiều thật
-  const cleanRoom = (call.roomId || 'room').replace(/[^a-zA-Z0-9]/g, '_');
-  const jitsiRoomId = `HQChatApp_${cleanRoom}`;
-  const myParticipantName = (isCaller ? call.callerName : call.receiverName) || 'Thành viên';
-  const jitsiUrl = `https://meet.jit.si/${jitsiRoomId}#userInfo.displayName="${encodeURIComponent(
-    myParticipantName
-  )}"&config.startWithAudioMuted=false&config.startWithVideoMuted=${!isVideo}&config.prejoinPageEnabled=false`;
 
   // Thao tác chấp nhận cuộc gọi
   const handleAccept = () => {
@@ -160,10 +201,6 @@ export default function CallModal() {
         accepted: true,
       });
     }
-    // Mở ngay đàm thoại âm thanh/hình ảnh thật
-    setTimeout(() => {
-      Linking.openURL(jitsiUrl).catch((e) => console.warn('Cannot open Jitsi Meet:', e));
-    }, 400);
   };
 
   // Thao tác từ chối cuộc gọi đến
@@ -179,45 +216,68 @@ export default function CallModal() {
     });
   };
 
-  // Thao tác cúp máy / hủy cuộc gọi
-  const handleEndCall = (reason = 'ended') => {
-    Vibration.cancel();
-    webrtcService.endAll();
-    const otherUserId = isCaller ? call.receiverId : call.callerId;
-    sendCallSignal({
-      type: 'CALL_HANGUP',
-      call_id: call.callId,
-      target_id: otherUserId,
-      room_id: call.roomId,
-      call_type: call.callType,
-      duration_seconds: call.durationSeconds,
-      reason,
-    });
-    dispatch(
-      setCallEnded({
-        reason:
-          reason === 'timeout'
-            ? 'Người nhận không trả lời'
-            : reason === 'declined'
-            ? 'Cuộc gọi bị từ chối'
-            : 'Cuộc gọi đã kết thúc',
-      })
-    );
-  };
-
   const handleToggleMute = () => {
-    webrtcService.toggleMute(!call.isMuted);
+    const nextMuted = !call.isMuted;
+    webrtcService.toggleMute(nextMuted);
     dispatch(toggleMute());
+    try {
+      webViewRef.current?.injectJavaScript(`
+        try {
+          if (window.APP && window.APP.conference) {
+            window.APP.conference.muteAudio(${nextMuted});
+          }
+        } catch(e) {}
+        true;
+      `);
+    } catch {}
   };
 
   const handleToggleVideo = () => {
-    webrtcService.toggleVideo(!call.isVideoOff);
+    const nextVideoOff = !call.isVideoOff;
+    webrtcService.toggleVideo(nextVideoOff);
     dispatch(toggleVideoOff());
+    try {
+      webViewRef.current?.injectJavaScript(`
+        try {
+          if (window.APP && window.APP.conference) {
+            window.APP.conference.muteVideo(${nextVideoOff});
+          }
+        } catch(e) {}
+        true;
+      `);
+    } catch {}
   };
 
   return (
     <Modal visible={true} animationType="fade" transparent={false} statusBarTranslucent>
       <View style={styles.container}>
+        {/* WebRTC Audio/Video Engine nhúng trực tiếp trong ứng dụng (tuyệt đối không mở app ngoài) */}
+        {isConnected && Platform.OS !== 'web' && (
+          <View
+            style={
+              isVideo && !call.isVideoOff && !isGroup
+                ? styles.videoWebViewContainer
+                : styles.hiddenAudioWebView
+            }
+            pointerEvents={isVideo && !call.isVideoOff && !isGroup ? 'auto' : 'none'}
+          >
+            <WebView
+              ref={webViewRef}
+              source={{ uri: jitsiEmbeddedUrl }}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              originWhitelist={['*']}
+              userAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+              androidHardwareAccelerationDisabled={false}
+              onPermissionRequest={(event: any) => {
+                event.grant(event.resources);
+              }}
+              style={styles.fullWebView}
+            />
+          </View>
+        )}
         {/* Nền mô phỏng video nếu là Video Call và đã CONNECTED */}
         {isVideo && isConnected && !call.isVideoOff && !isGroup ? (
           <View style={styles.videoBackground}>
@@ -351,23 +411,21 @@ export default function CallModal() {
                 </Text>
 
                 {isConnected && (
-                  <View style={styles.liveMediaBanner}>
-                    <Pressable
-                      style={styles.openLiveMediaBtn}
-                      onPress={() => Linking.openURL(jitsiUrl).catch((e) => console.warn(e))}
-                    >
+                  <View style={styles.inAppCallBadgeWrap}>
+                    <View style={styles.inAppCallBadge}>
+                      <View style={styles.liveGreenDot} />
                       <Ionicons
-                        name={isVideo ? 'videocam' : 'mic'}
-                        size={20}
-                        color="#fff"
-                        style={{ marginRight: 8 }}
+                        name={isVideo ? 'videocam' : 'volume-high'}
+                        size={16}
+                        color={colors.success}
+                        style={{ marginRight: 6 }}
                       />
-                      <Text style={styles.openLiveMediaBtnText}>
-                        {isVideo ? 'Mở truyền hình & âm thanh trực tiếp' : 'Bật đàm thoại giọng nói HD'}
+                      <Text style={styles.inAppCallBadgeText}>
+                        {isVideo ? 'Đang truyền hình ảnh HD trong ứng dụng' : 'Đang đàm thoại trực tiếp trong ứng dụng'}
                       </Text>
-                    </Pressable>
-                    <Text style={styles.liveMediaHint}>
-                      Máy chủ Jitsi WebRTC SFU miễn phí · Âm thanh & Video 2 chiều thời gian thực
+                    </View>
+                    <Text style={styles.inAppCallHint}>
+                      Âm thanh 2 chiều thời gian thực · STUN/WebRTC
                     </Text>
                   </View>
                 )}
@@ -570,6 +628,7 @@ const makeStyles = (colors: ScreenColors) =>
     safeArea: {
       flex: 1,
       justifyContent: 'space-between',
+      zIndex: 10,
     },
     header: {
       alignItems: 'center',
@@ -833,32 +892,57 @@ const makeStyles = (colors: ScreenColors) =>
       fontSize: 12,
       fontWeight: '500',
     },
-    liveMediaBanner: {
+    videoWebViewContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 1,
+      backgroundColor: '#0F141C',
+    },
+    hiddenAudioWebView: {
+      position: 'absolute',
+      width: 1,
+      height: 1,
+      opacity: 0.01,
+      top: -200,
+      left: -200,
+      zIndex: 0,
+    },
+    fullWebView: {
+      flex: 1,
+      backgroundColor: '#0F141C',
+    },
+    inAppCallBadgeWrap: {
       alignItems: 'center',
       marginTop: 20,
       paddingHorizontal: 16,
     },
-    openLiveMediaBtn: {
+    inAppCallBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.brand,
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 24,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
-      elevation: 5,
+      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      borderColor: 'rgba(34, 197, 94, 0.35)',
+      borderWidth: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 20,
     },
-    openLiveMediaBtnText: {
-      color: '#fff',
-      fontSize: 14,
-      fontWeight: '700',
+    liveGreenDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success,
+      marginRight: 8,
     },
-    liveMediaHint: {
-      color: 'rgba(255, 255, 255, 0.65)',
+    inAppCallBadgeText: {
+      color: colors.success,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    inAppCallHint: {
+      color: 'rgba(255, 255, 255, 0.5)',
       fontSize: 11,
       marginTop: 6,
       textAlign: 'center',

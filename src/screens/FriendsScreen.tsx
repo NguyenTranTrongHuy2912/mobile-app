@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   useCreateRoomMutation,
   useGetFriendsQuery,
+  useGetSuggestedUsersQuery,
   useSearchUsersQuery,
   useSendFriendRequestMutation,
 } from '../api/chatApi';
@@ -26,6 +27,17 @@ import type { Friend, UserSummary } from '../types/chat';
 
 type SubTab = 'friends' | 'find';
 
+function removeVietnameseTones(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
 export default function FriendsScreen() {
   const router = useRouter();
   const C = useScreenColors();
@@ -36,32 +48,30 @@ export default function FriendsScreen() {
 
   const [activeTab, setActiveTab] = useState<SubTab>('friends');
   const [friendSearchInput, setFriendSearchInput] = useState('');
-  const [debouncedFriendQuery, setDebouncedFriendQuery] = useState('');
   const [findSearchInput, setFindSearchInput] = useState('');
   const [debouncedFindQuery, setDebouncedFindQuery] = useState('');
-  const friendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const findTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleFriendSearchChange = (text: string) => {
     setFriendSearchInput(text);
-    if (friendTimerRef.current) clearTimeout(friendTimerRef.current);
-    friendTimerRef.current = setTimeout(() => {
-      setDebouncedFriendQuery(text);
-    }, 2500);
   };
 
   const handleClearFriendSearch = () => {
-    if (friendTimerRef.current) clearTimeout(friendTimerRef.current);
     setFriendSearchInput('');
-    setDebouncedFriendQuery('');
   };
 
   const handleFindSearchChange = (text: string) => {
     setFindSearchInput(text);
     if (findTimerRef.current) clearTimeout(findTimerRef.current);
+    // Debounce 350ms phản hồi mượt mà theo chuẩn Messenger/Zalo
     findTimerRef.current = setTimeout(() => {
-      setDebouncedFindQuery(text);
-    }, 2500);
+      setDebouncedFindQuery(text.trim());
+    }, 350);
+  };
+
+  const handleFindSubmit = () => {
+    if (findTimerRef.current) clearTimeout(findTimerRef.current);
+    setDebouncedFindQuery(findSearchInput.trim());
   };
 
   const handleClearFindSearch = () => {
@@ -90,23 +100,51 @@ export default function FriendsScreen() {
     isError: searchError,
   } = useSearchUsersQuery(debouncedFindQuery.trim(), { skip: !canSearchNew });
 
+  // 3. Gợi ý bạn bè khi chưa nhập từ khóa tìm kiếm
+  const {
+    data: suggestedUsers = [],
+    isFetching: fetchingSuggestions,
+  } = useGetSuggestedUsersQuery(undefined, { skip: activeTab !== 'find' || canSearchNew });
+
   const [createRoom, { isLoading: creatingRoom }] = useCreateRoomMutation();
   const [sendFriendRequest, { isLoading: sendingRequest }] = useSendFriendRequestMutation();
 
-  // Lọc bạn bè theo ô tìm kiếm nhanh
+  // Lọc bạn bè tức thì trong bộ nhớ, chuẩn hóa tiếng Việt có dấu và không dấu
   const filteredFriends = useMemo(() => {
     let list = friends;
     if (friendFilter === 'active') {
       list = list.filter((f) => !!onlineUserIds[f.userId]);
     }
-    const q = debouncedFriendQuery.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (f) =>
-        (f.displayName ?? '').toLowerCase().includes(q) ||
-        (f.email && f.email.toLowerCase().includes(q))
+    const rawQ = friendSearchInput.trim();
+    if (!rawQ) return list;
+
+    const cleanQ = removeVietnameseTones(rawQ);
+    const lowerRawQ = rawQ.toLowerCase();
+
+    return list.filter((f) => {
+      const name = f.displayName ?? '';
+      const email = f.email ?? '';
+      const cleanName = removeVietnameseTones(name);
+      const lowerName = name.toLowerCase();
+      const lowerEmail = email.toLowerCase();
+      const cleanEmail = removeVietnameseTones(email);
+
+      return (
+        lowerName.includes(lowerRawQ) ||
+        cleanName.includes(cleanQ) ||
+        lowerEmail.includes(lowerRawQ) ||
+        cleanEmail.includes(cleanQ)
+      );
+    });
+  }, [friends, friendFilter, onlineUserIds, friendSearchInput]);
+
+  const searchedSelf = useMemo(() => {
+    if (!canSearchNew || !searchResults.length) return false;
+    return (
+      searchResults.some((u) => u.userId === currentUserId) &&
+      !searchResults.some((u) => u.userId !== currentUserId)
     );
-  }, [friends, friendFilter, onlineUserIds, debouncedFriendQuery]);
+  }, [canSearchNew, searchResults, currentUserId]);
 
   const onlineFriendsCount = useMemo(() => {
     return friends.filter((f) => !!onlineUserIds[f.userId]).length;
@@ -224,11 +262,15 @@ export default function FriendsScreen() {
     return (
       <View style={styles.userCard}>
         <View style={styles.avatarWrap}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {userName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitial}>
+                {userName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
           {isOnline ? <ActiveBadge size={13} /> : null}
         </View>
 
@@ -383,6 +425,7 @@ export default function FriendsScreen() {
                 placeholderTextColor={C.muted}
                 value={friendSearchInput}
                 onChangeText={handleFriendSearchChange}
+                returnKeyType="search"
                 autoCorrect={false}
               />
               {friendSearchInput.length > 0 && (
@@ -453,6 +496,8 @@ export default function FriendsScreen() {
               placeholderTextColor={C.muted}
               value={findSearchInput}
               onChangeText={handleFindSearchChange}
+              onSubmitEditing={handleFindSubmit}
+              returnKeyType="search"
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus={true}
@@ -469,34 +514,53 @@ export default function FriendsScreen() {
           )}
 
           <FlatList
-            data={canSearchNew ? searchResults.filter((u) => u.userId !== currentUserId) : []}
+            data={
+              canSearchNew
+                ? searchResults.filter((u) => u.userId !== currentUserId)
+                : suggestedUsers.filter((u) => u.userId !== currentUserId)
+            }
             keyExtractor={(item) => item.userId}
             renderItem={renderSearchResultItem}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
             ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListHeaderComponent={
+              !canSearchNew && suggestedUsers.filter((u) => u.userId !== currentUserId).length > 0 ? (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionHeaderText}>GỢI Ý KẾT BẠN</Text>
+                </View>
+              ) : undefined
+            }
             ListEmptyComponent={
               <View style={styles.emptyWrap}>
                 <View style={styles.emptyIconCircle}>
-                  <Ionicons name="search-outline" size={44} color={C.muted} />
+                  <Ionicons
+                    name={searchedSelf ? 'person-circle-outline' : 'search-outline'}
+                    size={44}
+                    color={searchedSelf ? C.brand : C.muted}
+                  />
                 </View>
                 <Text style={styles.emptyTitle}>
-                  {!canSearchNew
-                    ? 'Tìm kiếm bạn bè mới'
-                    : searchError
-                      ? 'Lỗi khi tìm kiếm'
-                      : !searchingUsers
-                        ? 'Không tìm thấy người dùng'
-                        : 'Đang tìm kiếm...'}
+                  {searchedSelf
+                    ? 'Đây là tài khoản của bạn'
+                    : !canSearchNew
+                      ? 'Tìm kiếm bạn bè mới'
+                      : searchError
+                        ? 'Lỗi khi tìm kiếm'
+                        : !searchingUsers
+                          ? 'Không tìm thấy người dùng'
+                          : 'Đang tìm kiếm...'}
                 </Text>
                 <Text style={styles.emptySub}>
-                  {!canSearchNew
-                    ? 'Nhập tên hoặc địa chỉ email của người bạn muốn kết bạn.'
-                    : searchError
-                      ? 'Không thể kết nối đến máy chủ. Vui lòng thử lại.'
-                      : !searchingUsers
-                        ? 'Hãy thử tìm bằng từ khóa hoặc email chính xác hơn.'
-                        : ''}
+                  {searchedSelf
+                    ? 'Bạn không thể tự kết bạn với chính mình. Hãy thử tìm kiếm bạn bè khác nhé!'
+                    : !canSearchNew
+                      ? 'Nhập tên hoặc địa chỉ email của người bạn muốn kết bạn.'
+                      : searchError
+                        ? 'Không thể kết nối đến máy chủ. Vui lòng thử lại.'
+                        : !searchingUsers
+                          ? 'Hãy thử tìm bằng từ khóa hoặc email chính xác hơn.'
+                          : ''}
                 </Text>
               </View>
             }
@@ -544,6 +608,18 @@ const makeStyles = (C: ScreenColors) =>
     messengerPillTextActive: {
       color: C.brand,
       fontWeight: '700',
+    },
+    sectionHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    sectionHeaderText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.muted,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
     },
 
     container: { flex: 1, backgroundColor: C.screen },
