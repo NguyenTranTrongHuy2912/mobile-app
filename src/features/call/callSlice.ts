@@ -91,7 +91,7 @@ export const callSlice = createSlice({
       state.receiverAvatar = action.payload.receiverAvatar;
       state.participants = action.payload.participants || [];
       state.isMuted = false;
-      state.isSpeakerOn = action.payload.callType === 'video';
+      state.isSpeakerOn = true;
       state.isVideoOff = false;
       state.isFrontCamera = true;
       state.durationSeconds = 0;
@@ -128,7 +128,7 @@ export const callSlice = createSlice({
       state.receiverId = action.payload.receiverId;
       state.participants = action.payload.participants || [];
       state.isMuted = false;
-      state.isSpeakerOn = action.payload.callType === 'video';
+      state.isSpeakerOn = true;
       state.isVideoOff = false;
       state.isFrontCamera = true;
       state.durationSeconds = 0;

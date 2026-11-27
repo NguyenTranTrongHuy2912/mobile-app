@@ -112,10 +112,13 @@ export default function FriendsScreen() {
   // Lọc bạn bè tức thì trong bộ nhớ, chuẩn hóa tiếng Việt có dấu và không dấu
   const filteredFriends = useMemo(() => {
     let list = friends;
-    if (friendFilter === 'active') {
+    const rawQ = friendSearchInput.trim();
+
+    // Khi đang gõ tìm kiếm, tìm kiếm trên TOÀN BỘ bạn bè để không bỏ sót người offline
+    // Khi ô tìm kiếm rỗng thì mới lọc theo tab con 'active'
+    if (!rawQ && friendFilter === 'active') {
       list = list.filter((f) => !!onlineUserIds[f.userId]);
     }
-    const rawQ = friendSearchInput.trim();
     if (!rawQ) return list;
 
     const cleanQ = removeVietnameseTones(rawQ);
@@ -141,8 +144,8 @@ export default function FriendsScreen() {
   const searchedSelf = useMemo(() => {
     if (!canSearchNew || !searchResults.length) return false;
     return (
-      searchResults.some((u) => u.userId === currentUserId) &&
-      !searchResults.some((u) => u.userId !== currentUserId)
+      searchResults.some((u) => u.userId === currentUserId || u.isSelf) &&
+      !searchResults.some((u) => u.userId !== currentUserId && !u.isSelf)
     );
   }, [canSearchNew, searchResults, currentUserId]);
 
@@ -253,7 +256,7 @@ export default function FriendsScreen() {
 
   // Render người dùng tìm thấy
   const renderSearchResultItem = ({ item }: { item: UserSummary }) => {
-    if (item.userId === currentUserId) return null;
+    const isSelf = item.isSelf || item.userId === currentUserId;
     const isFriend = friendIdSet.has(item.userId);
     const hasSent = !!sentUserIds[item.userId];
     const isOnline = !!onlineUserIds[item.userId];
@@ -283,7 +286,12 @@ export default function FriendsScreen() {
           </Text>
         </View>
 
-        {isFriend ? (
+        {isSelf ? (
+          <View style={styles.selfBadge}>
+            <Ionicons name="person-circle" size={16} color={C.brand} />
+            <Text style={styles.selfBadgeText}>Bạn (Chính mình)</Text>
+          </View>
+        ) : isFriend ? (
           <Pressable
             style={styles.messageButton}
             onPress={() => handleOpenChat(item.userId, userName)}
@@ -378,7 +386,7 @@ export default function FriendsScreen() {
                 styles.messengerPill,
                 friendFilter === 'active' && styles.messengerPillActive,
               ]}
-              onPress={() => setFriendFilter('active')}
+              onPress={() => setFriendFilter((prev) => (prev === 'active' ? 'all' : 'active'))}
             >
               <View style={styles.greenDotSmall} />
               <Text
@@ -749,6 +757,20 @@ const makeStyles = (C: ScreenColors) =>
       color: C.muted,
       fontSize: 13,
       fontWeight: '500',
+    },
+    selfBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.isDark ? '#1e293b' : '#f1f5f9',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      gap: 4,
+    },
+    selfBadgeText: {
+      color: C.brand,
+      fontSize: 13,
+      fontWeight: '600',
     },
     separator: {
       height: StyleSheet.hairlineWidth,

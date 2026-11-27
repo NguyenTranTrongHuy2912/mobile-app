@@ -1,950 +1,125 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import {
-  Animated,
-  Dimensions,
-  Modal,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Vibration,
-} from 'react-native';
-import { Text, View } from 'tamagui';
-import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import {
-  acceptCall,
-  incrementDuration,
-  resetCall,
-  setCallEnded,
-  toggleCameraFacing,
-  toggleMute,
-  toggleSpeaker,
-  toggleVideoOff,
-} from '../../features/call/callSlice';
-import { sendCallSignal } from '../../features/call/callSignalEmitter';
-import { useScreenColors, type ScreenColors } from '../../features/theme/useScreenColors';
-import { thumbUrl } from '../../utils/imageUrl';
-import { webrtcService } from '../../services/webrtcService';
-
-const { width } = Dimensions.get('window');
-
-function formatDuration(totalSeconds: number): string {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-}
+/**
+ * CallModal.tsx
+ * Component điều phối chính cho cuộc gọi thoại và video WebRTC trong ứng dụng
+ * Tách biệt hoàn toàn logic (useCallController) và giao diện thành các thành phần chuyên biệt
+ */
+import React from 'react';
+import { Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallController } from '../../features/call/useCallController';
+import { formatCallDuration } from '../../features/call/callEngine';
+import { CallHeader } from './CallHeader';
+import { AudioCallView } from './AudioCallView';
+import { GroupCallView } from './GroupCallView';
+import { CallControls } from './CallControls';
+import { CallWebViewEngine } from './CallWebViewEngine';
 
 export default function CallModal() {
-  const dispatch = useAppDispatch();
-  const colors = useScreenColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const c = useCallController();
 
-  const call = useAppSelector((s) => s.call);
-  const currentUserId = useAppSelector((s) => s.session.userId);
+  if (c.call.status === 'IDLE') return null;
 
-  // Animation hiệu ứng sóng âm / nhịp đập avatar & ref WebView WebRTC
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pulseOpacity = useRef(new Animated.Value(0.6)).current;
-  const webViewRef = useRef<any>(null);
-
-  const isIncoming = call.status === 'INCOMING';
-  const isCalling = call.status === 'CALLING';
-  const isConnected = call.status === 'CONNECTED';
-  const isEnded = call.status === 'ENDED';
-  const isVideo = call.callType === 'video';
-  const isGroup = !!call.isGroup;
-
-  // Xác định thông tin người hiển thị
-  const isCaller = call.callerId === currentUserId;
-  const displayName = isGroup
-    ? call.groupName || 'Cuộc gọi nhóm'
-    : isCaller
-    ? call.receiverName || 'Người nhận'
-    : call.callerName || 'Người gọi';
-  const displayAvatar = isCaller ? call.receiverAvatar : call.callerAvatar;
-
-  // Cấu hình URL WebRTC nhúng TRỰC TIẾP trong ứng dụng qua WebView (tuyệt đối không mở app ngoài)
-  const cleanRoom = (call.roomId || 'room').replace(/[^a-zA-Z0-9]/g, '_');
-  const jitsiRoomId = `HQChatApp_${cleanRoom}`;
-  const myParticipantName = (isCaller ? call.callerName : call.receiverName) || 'Thành viên';
-  const jitsiEmbeddedUrl = useMemo(() => {
-    return (
-      `https://meet.jit.si/${jitsiRoomId}` +
-      `#userInfo.displayName="${encodeURIComponent(myParticipantName)}"` +
-      `&config.startWithAudioMuted=${call.isMuted ? 'true' : 'false'}` +
-      `&config.startWithVideoMuted=${!isVideo || call.isVideoOff ? 'true' : 'false'}` +
-      `&config.prejoinPageEnabled=false` +
-      `&config.disableDeepLinking=true` +
-      `&config.toolbarButtons=[]` +
-      `&interfaceConfig.TOOLBAR_BUTTONS=[]` +
-      `&interfaceConfig.SHOW_JITSI_WATERMARK=false` +
-      `&interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false` +
-      `&interfaceConfig.DEFAULT_BACKGROUND="%230F141C"` +
-      `&config.p2p.enabled=true`
-    );
-  }, [jitsiRoomId, myParticipantName, isVideo, call.isMuted, call.isVideoOff]);
-
-  // Thao tác cúp máy / hủy cuộc gọi
-  const handleEndCall = (reason = 'ended') => {
-    Vibration.cancel();
-    webrtcService.endAll();
-    const otherUserId = isCaller ? call.receiverId : call.callerId;
-    sendCallSignal({
-      type: 'CALL_HANGUP',
-      call_id: call.callId,
-      target_id: otherUserId,
-      room_id: call.roomId,
-      call_type: call.callType,
-      duration_seconds: call.durationSeconds,
-      reason,
-    });
-    dispatch(
-      setCallEnded({
-        reason:
-          reason === 'timeout'
-            ? 'Người nhận không trả lời'
-            : reason === 'declined'
-            ? 'Cuộc gọi bị từ chối'
-            : 'Cuộc gọi đã kết thúc',
-      })
-    );
-  };
-
-  // Timer đếm giây cuộc gọi khi CONNECTED
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (call.status === 'CONNECTED') {
-      timer = setInterval(() => {
-        dispatch(incrementDuration());
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [call.status, dispatch]);
-
-  // Timeout tự ngắt nếu đổ chuông quá 45s không ai trả lời
-  useEffect(() => {
-    let ringTimeout: ReturnType<typeof setTimeout> | null = null;
-    if (call.status === 'CALLING') {
-      ringTimeout = setTimeout(() => {
-        handleEndCall('timeout');
-      }, 45000);
-    }
-    return () => {
-      if (ringTimeout) clearTimeout(ringTimeout);
-    };
-  }, [call.status]);
-
-  // Tự động đóng modal sau 1.5s khi ENDED
-  useEffect(() => {
-    let dismissTimeout: ReturnType<typeof setTimeout> | null = null;
-    if (call.status === 'ENDED') {
-      Vibration.cancel();
-      webrtcService.endAll();
-      dismissTimeout = setTimeout(() => {
-        dispatch(resetCall());
-      }, 1500);
-    }
-    return () => {
-      if (dismissTimeout) clearTimeout(dismissTimeout);
-    };
-  }, [call.status, dispatch]);
-
-  // Vòng lặp animation phát sóng khi đang đổ chuông / gọi
-  useEffect(() => {
-    if (call.status === 'CALLING' || call.status === 'INCOMING' || call.status === 'CONNECTED') {
-      const loop = Animated.loop(
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.25,
-              duration: 1200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 1200,
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.timing(pulseOpacity, {
-              toValue: 0.1,
-              duration: 1200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseOpacity, {
-              toValue: 0.6,
-              duration: 1200,
-              useNativeDriver: true,
-            }),
-          ]),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-  }, [call.status]);
-
-  // ĐÃ GỌI ĐỦ TẤT CẢ HOOKS Ở TRÊN -> Tuân thủ nghiêm ngặt React Rules of Hooks
-  if (call.status === 'IDLE') return null;
-
-  // Thao tác chấp nhận cuộc gọi
-  const handleAccept = () => {
-    Vibration.cancel();
-    dispatch(acceptCall());
-    if (call.callerId && call.callId) {
-      webrtcService.handleOffer(call.callerId, call.callId, call.callType, null, {
-        accepted: true,
-      });
-    }
-  };
-
-  // Thao tác từ chối cuộc gọi đến
-  const handleDecline = () => {
-    Vibration.cancel();
-    dispatch(setCallEnded({ reason: 'Đã từ chối cuộc gọi' }));
-    webrtcService.endAll();
-    sendCallSignal({
-      type: 'CALL_ANSWER',
-      call_id: call.callId,
-      caller_id: call.callerId,
-      accepted: false,
-    });
-  };
-
-  const handleToggleMute = () => {
-    const nextMuted = !call.isMuted;
-    webrtcService.toggleMute(nextMuted);
-    dispatch(toggleMute());
-    try {
-      webViewRef.current?.injectJavaScript(`
-        try {
-          if (window.APP && window.APP.conference) {
-            window.APP.conference.muteAudio(${nextMuted});
-          }
-        } catch(e) {}
-        true;
-      `);
-    } catch {}
-  };
-
-  const handleToggleVideo = () => {
-    const nextVideoOff = !call.isVideoOff;
-    webrtcService.toggleVideo(nextVideoOff);
-    dispatch(toggleVideoOff());
-    try {
-      webViewRef.current?.injectJavaScript(`
-        try {
-          if (window.APP && window.APP.conference) {
-            window.APP.conference.muteVideo(${nextVideoOff});
-          }
-        } catch(e) {}
-        true;
-      `);
-    } catch {}
-  };
+  const isFullVideo = c.isVideo && c.isConnected && !c.call.isVideoOff && !c.isGroup;
 
   return (
     <Modal visible={true} animationType="fade" transparent={false} statusBarTranslucent>
       <View style={styles.container}>
-        {/* WebRTC Audio/Video Engine nhúng trực tiếp trong ứng dụng (tuyệt đối không mở app ngoài) */}
-        {isConnected && Platform.OS !== 'web' && (
-          <View
-            style={
-              isVideo && !call.isVideoOff && !isGroup
-                ? styles.videoWebViewContainer
-                : styles.hiddenAudioWebView
-            }
-            pointerEvents={isVideo && !call.isVideoOff && !isGroup ? 'auto' : 'none'}
-          >
-            <WebView
-              ref={webViewRef}
-              source={{ uri: jitsiEmbeddedUrl }}
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              originWhitelist={['*']}
-              userAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-              androidHardwareAccelerationDisabled={false}
-              onPermissionRequest={(event: any) => {
-                event.grant(event.resources);
-              }}
-              style={styles.fullWebView}
+        {/* Động cơ đàm thoại âm thanh & video WebRTC */}
+        <CallWebViewEngine
+          webViewRef={c.webViewRef}
+          jitsiUrl={c.jitsiEmbeddedUrl}
+          isVideo={c.isVideo}
+          isVideoOff={c.call.isVideoOff}
+          isGroup={c.isGroup}
+          isConnected={c.isConnected}
+        />
+
+        {/* Lớp hiển thị UI phủ lên trên (pointerEvents="box-none" khi đang xem video) */}
+        <SafeAreaView
+          style={[styles.safeArea, isFullVideo && styles.safeAreaOverlay]}
+          pointerEvents="box-none"
+        >
+          <CallHeader isGroup={c.isGroup} isVideo={c.isVideo} />
+
+          {/* Nội dung trung tâm */}
+          {c.isGroup ? (
+            <GroupCallView
+              displayName={c.displayName}
+              isCalling={c.isCalling}
+              isConnected={c.isConnected}
+              durationSeconds={c.call.durationSeconds}
+              participants={c.call.participants}
             />
-          </View>
-        )}
-        {/* Nền mô phỏng video nếu là Video Call và đã CONNECTED */}
-        {isVideo && isConnected && !call.isVideoOff && !isGroup ? (
-          <View style={styles.videoBackground}>
-            <View style={styles.remoteVideoPlaceholder}>
-              <Ionicons name="person" size={80} color="#4A5568" />
-              <Text style={styles.remoteVideoText}>{displayName}</Text>
-            </View>
-
-            {/* Khung camera nhỏ của chính mình (Floating PIP) */}
-            <View style={styles.localVideoPip}>
-              <View style={styles.localPipContent}>
-                <Ionicons name="videocam" size={24} color={colors.brand} />
-                <Text style={styles.localPipText}>Bạn</Text>
-              </View>
-            </View>
-          </View>
-        ) : null}
-
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header hiển thị loại cuộc gọi và bảo mật mã hóa */}
-          <View style={styles.header}>
-            <View style={styles.securityBadge}>
-              <Ionicons name="shield-checkmark" size={13} color={colors.success} />
-              <Text style={styles.securityText}>Mã hóa WebRTC · STUN Google</Text>
-            </View>
-            <Text style={styles.callTypeLabel}>
-              {isGroup
-                ? isVideo
-                  ? 'GỌI VIDEO NHÓM'
-                  : 'GỌI THOẠI NHÓM'
-                : isVideo
-                ? 'CUỘC GỌI VIDEO 2 CHIỀU'
-                : 'CUỘC GỌI THOẠI 2 CHIỀU'}
-            </Text>
-          </View>
-
-          {/* Phần giữa: Giao diện Gọi Nhóm (Group) hoặc Gọi 1-1 */}
-          {isGroup ? (
-            <View style={styles.groupCallContainer}>
-              <Text style={styles.groupTitleText} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <Text style={styles.groupStatusText}>
-                {isConnected
-                  ? formatDuration(call.durationSeconds)
-                  : isCalling
-                  ? 'Đang gọi nhóm...'
-                  : 'Cuộc gọi nhóm đến...'}
-              </Text>
-
-              {/* Lưới thành viên trong nhóm (Participants Grid) */}
-              <View style={styles.groupGrid}>
-                {call.participants && call.participants.length > 0 ? (
-                  call.participants.slice(0, 6).map((p, idx) => (
-                    <View key={p.userId || idx} style={styles.groupMemberTile}>
-                      <View style={styles.groupAvatarCircle}>
-                        <Text style={styles.groupAvatarInit}>
-                          {(p.displayName || 'U').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.groupMemberName} numberOfLines={1}>
-                        {p.displayName}
-                      </Text>
-                      <View style={styles.groupAudioStatus}>
-                        <Ionicons
-                          name={p.isMuted ? 'mic-off' : 'mic'}
-                          size={12}
-                          color={p.isMuted ? colors.danger : colors.success}
-                        />
-                      </View>
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.groupMemberTile}>
-                    <View style={styles.groupAvatarCircle}>
-                      <Ionicons name="people" size={32} color={colors.brand} />
-                    </View>
-                    <Text style={styles.groupMemberName}>Thành viên nhóm</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+          ) : !c.isVideo || !c.isConnected || c.call.isVideoOff ? (
+            <AudioCallView
+              displayName={c.displayName}
+              displayAvatar={c.displayAvatar}
+              isCalling={c.isCalling}
+              isIncoming={c.isIncoming}
+              isConnected={c.isConnected}
+              isEnded={c.isEnded}
+              isVideo={c.isVideo}
+              endReason={c.call.endReason}
+              durationSeconds={c.call.durationSeconds}
+              pulseAnim={c.pulseAnim}
+              pulseOpacity={c.pulseOpacity}
+            />
           ) : (
-            (!isVideo || !isConnected || call.isVideoOff) && (
-              <View style={styles.centerInfo}>
-                <View style={styles.avatarWrapper}>
-                  {(isCalling || isIncoming || isConnected) && (
-                    <Animated.View
-                      style={[
-                        styles.pulseCircle,
-                        isIncoming && styles.pulseGreen,
-                        {
-                          transform: [{ scale: pulseAnim }],
-                          opacity: pulseOpacity,
-                        },
-                      ]}
-                    />
-                  )}
-                  <View style={styles.avatar}>
-                    {displayAvatar ? (
-                      <Animated.Image
-                        source={{ uri: thumbUrl(displayAvatar, 300) }}
-                        style={styles.avatarImage}
-                      />
-                    ) : (
-                      <View style={styles.avatarFallback}>
-                        <Text style={styles.avatarInitial}>
-                          {displayName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                <Text style={styles.callerName} numberOfLines={1}>
-                  {displayName}
-                </Text>
-
-                <Text style={styles.statusText}>
-                  {isCalling
-                    ? 'Đang đổ chuông...'
-                    : isIncoming
-                    ? isVideo
-                    ? 'Đang gọi video cho bạn...'
-                    : 'Cuộc gọi thoại đến...'
-                    : isConnected
-                    ? formatDuration(call.durationSeconds)
-                    : isEnded
-                    ? call.endReason || 'Cuộc gọi đã kết thúc'
-                    : ''}
-                </Text>
-
-                {isConnected && (
-                  <View style={styles.inAppCallBadgeWrap}>
-                    <View style={styles.inAppCallBadge}>
-                      <View style={styles.liveGreenDot} />
-                      <Ionicons
-                        name={isVideo ? 'videocam' : 'volume-high'}
-                        size={16}
-                        color={colors.success}
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text style={styles.inAppCallBadgeText}>
-                        {isVideo ? 'Đang truyền hình ảnh HD trong ứng dụng' : 'Đang đàm thoại trực tiếp trong ứng dụng'}
-                      </Text>
-                    </View>
-                    <Text style={styles.inAppCallHint}>
-                      Âm thanh 2 chiều thời gian thực · STUN/WebRTC
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )
-          )}
-
-          {/* Nếu đang trong Video Call 1-1 đã kết nối: thanh thời lượng phía trên */}
-          {!isGroup && isVideo && isConnected && !call.isVideoOff && (
             <View style={styles.videoTimerWrap}>
-              <Text style={styles.videoCallerName}>{displayName}</Text>
-              <Text style={styles.videoTimerText}>{formatDuration(call.durationSeconds)}</Text>
+              <Text style={styles.videoCallerName}>{c.displayName}</Text>
+              <Text style={styles.videoTimerText}>
+                {formatCallDuration(c.call.durationSeconds)}
+              </Text>
             </View>
           )}
 
-          {/* Thanh phím điều khiển phía dưới */}
-          <View style={styles.bottomControls}>
-            {isIncoming ? (
-              /* Màn hình cuộc gọi đến: 2 nút Từ chối (Đỏ) và Trả lời (Xanh) */
-              <View style={styles.incomingButtonsRow}>
-                <View style={styles.actionCol}>
-                  <Pressable
-                    style={[styles.circleBtn, styles.btnDecline]}
-                    onPress={handleDecline}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="close" size={32} color="#fff" />
-                  </Pressable>
-                  <Text style={styles.btnLabel}>Từ chối</Text>
-                </View>
-
-                <View style={styles.actionCol}>
-                  <Pressable
-                    style={[styles.circleBtn, styles.btnAccept]}
-                    onPress={handleAccept}
-                    hitSlop={8}
-                  >
-                    <Ionicons name={isVideo ? 'videocam' : 'call'} size={30} color="#fff" />
-                  </Pressable>
-                  <Text style={styles.btnLabel}>Trả lời</Text>
-                </View>
-              </View>
-            ) : isCalling ? (
-              /* Màn hình đang gọi đi: Tắt mic, Loa ngoài, Nút Hủy (Đỏ) */
-              <View style={styles.inCallButtonsRow}>
-                <View style={styles.actionCol}>
-                  <Pressable
-                    style={[styles.circleBtn, call.isSpeakerOn && styles.btnActive]}
-                    onPress={() => dispatch(toggleSpeaker())}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={call.isSpeakerOn ? 'volume-high' : 'volume-medium-outline'}
-                      size={26}
-                      color={call.isSpeakerOn ? '#000' : '#fff'}
-                    />
-                  </Pressable>
-                  <Text style={styles.btnLabel}>Loa ngoài</Text>
-                </View>
-
-                <View style={styles.actionCol}>
-                  <Pressable
-                    style={[styles.circleBtn, styles.btnHangup]}
-                    onPress={() => handleEndCall('canceled')}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name="call"
-                      size={28}
-                      color="#fff"
-                      style={{ transform: [{ rotate: '135deg' }] }}
-                    />
-                  </Pressable>
-                  <Text style={styles.btnLabel}>Hủy</Text>
-                </View>
-
-                <View style={styles.actionCol}>
-                  <Pressable
-                    style={[styles.circleBtn, call.isMuted && styles.btnActive]}
-                    onPress={handleToggleMute}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={call.isMuted ? 'mic-off' : 'mic-outline'}
-                      size={26}
-                      color={call.isMuted ? '#000' : '#fff'}
-                    />
-                  </Pressable>
-                  <Text style={styles.btnLabel}>Tắt tiếng</Text>
-                </View>
-              </View>
-            ) : isConnected ? (
-              /* Màn hình đang đàm thoại: Mic, Loa, Video On/Off, Đổi Cam, Nút Cúp máy (Đỏ) */
-              <View style={styles.inCallButtonsGrid}>
-                <View style={styles.controlsRow}>
-                  {/* Bật/Tắt Mic */}
-                  <View style={styles.actionCol}>
-                    <Pressable
-                      style={[styles.circleBtn, call.isMuted && styles.btnActive]}
-                      onPress={handleToggleMute}
-                      hitSlop={8}
-                    >
-                      <Ionicons
-                        name={call.isMuted ? 'mic-off' : 'mic'}
-                        size={26}
-                        color={call.isMuted ? '#000' : '#fff'}
-                      />
-                    </Pressable>
-                    <Text style={styles.btnLabel}>{call.isMuted ? 'Bật mic' : 'Tắt mic'}</Text>
-                  </View>
-
-                  {/* Bật/Tắt Loa Ngoài */}
-                  <View style={styles.actionCol}>
-                    <Pressable
-                      style={[styles.circleBtn, call.isSpeakerOn && styles.btnActive]}
-                      onPress={() => dispatch(toggleSpeaker())}
-                      hitSlop={8}
-                    >
-                      <Ionicons
-                        name={call.isSpeakerOn ? 'volume-high' : 'volume-medium'}
-                        size={26}
-                        color={call.isSpeakerOn ? '#000' : '#fff'}
-                      />
-                    </Pressable>
-                    <Text style={styles.btnLabel}>
-                      {call.isSpeakerOn ? 'Loa ngoài' : 'Tai nghe'}
-                    </Text>
-                  </View>
-
-                  {/* Nếu là Video Call: Nút tắt/bật Camera */}
-                  {isVideo && (
-                    <View style={styles.actionCol}>
-                      <Pressable
-                        style={[styles.circleBtn, call.isVideoOff && styles.btnActive]}
-                        onPress={handleToggleVideo}
-                        hitSlop={8}
-                      >
-                        <Ionicons
-                          name={call.isVideoOff ? 'videocam-off' : 'videocam'}
-                          size={26}
-                          color={call.isVideoOff ? '#000' : '#fff'}
-                        />
-                      </Pressable>
-                      <Text style={styles.btnLabel}>Camera</Text>
-                    </View>
-                  )}
-
-                  {/* Đổi Camera trước/sau (chỉ hiện khi Video Call) */}
-                  {isVideo && (
-                    <View style={styles.actionCol}>
-                      <Pressable
-                        style={styles.circleBtn}
-                        onPress={() => dispatch(toggleCameraFacing())}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="camera-reverse-outline" size={26} color="#fff" />
-                      </Pressable>
-                      <Text style={styles.btnLabel}>Đổi chiều</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Hàng nút cúp máy ở trung tâm */}
-                <View style={[styles.controlsRow, { marginTop: 24, justifyContent: 'center' }]}>
-                  <View style={styles.actionCol}>
-                    <Pressable
-                      style={[
-                        styles.circleBtn,
-                        styles.btnHangup,
-                        { width: 72, height: 72, borderRadius: 36 },
-                      ]}
-                      onPress={() => handleEndCall('ended')}
-                      hitSlop={8}
-                    >
-                      <Ionicons
-                        name="call"
-                        size={32}
-                        color="#fff"
-                        style={{ transform: [{ rotate: '135deg' }] }}
-                      />
-                    </Pressable>
-                    <Text style={styles.btnLabel}>Kết thúc</Text>
-                  </View>
-                </View>
-              </View>
-            ) : null}
-          </View>
+          {/* Bộ nút điều khiển cuộc gọi */}
+          <CallControls
+            isIncoming={c.isIncoming}
+            isCalling={c.isCalling}
+            isConnected={c.isConnected}
+            isVideo={c.isVideo}
+            isMuted={c.call.isMuted}
+            isSpeakerOn={c.call.isSpeakerOn}
+            isVideoOff={c.call.isVideoOff}
+            onAccept={c.handleAccept}
+            onDecline={c.handleDecline}
+            onEndCall={c.handleEndCall}
+            onToggleMute={c.handleToggleMute}
+            onToggleVideo={c.handleToggleVideo}
+            onToggleCamera={c.handleToggleCamera}
+            onToggleSpeaker={c.handleToggleSpeaker}
+          />
         </SafeAreaView>
       </View>
     </Modal>
   );
 }
 
-const makeStyles = (colors: ScreenColors) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#0F141C',
-    },
-    safeArea: {
-      flex: 1,
-      justifyContent: 'space-between',
-      zIndex: 10,
-    },
-    header: {
-      alignItems: 'center',
-      paddingTop: Platform.OS === 'android' ? 36 : 12,
-    },
-    securityBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderRadius: 16,
-      gap: 6,
-      marginBottom: 8,
-    },
-    securityText: {
-      color: '#E2E8F0',
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    callTypeLabel: {
-      color: '#94A3B8',
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 1.5,
-    },
-    centerInfo: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 24,
-    },
-    avatarWrapper: {
-      width: 140,
-      height: 140,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 20,
-    },
-    pulseCircle: {
-      position: 'absolute',
-      width: 140,
-      height: 140,
-      borderRadius: 70,
-      backgroundColor: 'rgba(47, 107, 255, 0.35)',
-    },
-    pulseGreen: {
-      backgroundColor: 'rgba(49, 162, 76, 0.4)',
-    },
-    avatar: {
-      width: 110,
-      height: 110,
-      borderRadius: 55,
-      overflow: 'hidden',
-      backgroundColor: '#1E293B',
-      borderWidth: 3,
-      borderColor: '#334155',
-    },
-    avatarImage: {
-      width: '100%',
-      height: '100%',
-    },
-    avatarFallback: {
-      width: '100%',
-      height: '100%',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.brand,
-    },
-    avatarInitial: {
-      color: '#fff',
-      fontSize: 44,
-      fontWeight: '700',
-    },
-    callerName: {
-      color: '#fff',
-      fontSize: 24,
-      fontWeight: '700',
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    statusText: {
-      color: '#94A3B8',
-      fontSize: 15,
-      fontWeight: '500',
-    },
-    // Group Call Styles
-    groupCallContainer: {
-      flex: 1,
-      paddingHorizontal: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    groupTitleText: {
-      color: '#FFFFFF',
-      fontSize: 22,
-      fontWeight: '700',
-      marginBottom: 4,
-      textAlign: 'center',
-    },
-    groupStatusText: {
-      color: '#38BDF8',
-      fontSize: 15,
-      fontWeight: '600',
-      marginBottom: 20,
-    },
-    groupGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-      gap: 16,
-      width: '100%',
-    },
-    groupMemberTile: {
-      width: (width - 72) / 2,
-      backgroundColor: '#1E293B',
-      borderRadius: 16,
-      padding: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: '#334155',
-    },
-    groupAvatarCircle: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: colors.brand,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 8,
-    },
-    groupAvatarInit: {
-      color: '#FFFFFF',
-      fontSize: 22,
-      fontWeight: '700',
-    },
-    groupMemberName: {
-      color: '#E2E8F0',
-      fontSize: 14,
-      fontWeight: '600',
-      textAlign: 'center',
-      marginBottom: 6,
-    },
-    groupAudioStatus: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    // Video Background Styles
-    videoBackground: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#1A202C',
-    },
-    remoteVideoPlaceholder: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    remoteVideoText: {
-      color: '#718096',
-      marginTop: 12,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    localVideoPip: {
-      position: 'absolute',
-      top: 60,
-      right: 20,
-      width: 90,
-      height: 130,
-      borderRadius: 12,
-      overflow: 'hidden',
-      backgroundColor: '#2D3748',
-      borderWidth: 2,
-      borderColor: '#4A5568',
-    },
-    localPipContent: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    localPipText: {
-      color: '#A0AEC0',
-      fontSize: 11,
-      marginTop: 4,
-    },
-    videoTimerWrap: {
-      alignItems: 'center',
-      paddingTop: 12,
-    },
-    videoCallerName: {
-      color: '#fff',
-      fontSize: 18,
-      fontWeight: '700',
-    },
-    videoTimerText: {
-      color: '#E2E8F0',
-      fontSize: 14,
-      marginTop: 4,
-    },
-    // Bottom Controls
-    bottomControls: {
-      paddingBottom: Platform.OS === 'android' ? 36 : 20,
-      paddingHorizontal: 24,
-    },
-    incomingButtonsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-    },
-    inCallButtonsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      alignItems: 'center',
-    },
-    inCallButtonsGrid: {
-      width: '100%',
-    },
-    controlsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      alignItems: 'center',
-    },
-    actionCol: {
-      alignItems: 'center',
-    },
-    circleBtn: {
-      width: 58,
-      height: 58,
-      borderRadius: 29,
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 8,
-    },
-    btnActive: {
-      backgroundColor: '#fff',
-    },
-    btnAccept: {
-      backgroundColor: colors.success,
-      width: 66,
-      height: 66,
-      borderRadius: 33,
-    },
-    btnDecline: {
-      backgroundColor: colors.danger,
-      width: 66,
-      height: 66,
-      borderRadius: 33,
-    },
-    btnHangup: {
-      backgroundColor: colors.danger,
-    },
-    btnLabel: {
-      color: '#CBD5E1',
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    videoWebViewContainer: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      zIndex: 1,
-      backgroundColor: '#0F141C',
-    },
-    hiddenAudioWebView: {
-      position: 'absolute',
-      width: 1,
-      height: 1,
-      opacity: 0.01,
-      top: -200,
-      left: -200,
-      zIndex: 0,
-    },
-    fullWebView: {
-      flex: 1,
-      backgroundColor: '#0F141C',
-    },
-    inAppCallBadgeWrap: {
-      alignItems: 'center',
-      marginTop: 20,
-      paddingHorizontal: 16,
-    },
-    inAppCallBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-      borderColor: 'rgba(34, 197, 94, 0.35)',
-      borderWidth: 1,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-    },
-    liveGreenDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.success,
-      marginRight: 8,
-    },
-    inAppCallBadgeText: {
-      color: colors.success,
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    inAppCallHint: {
-      color: 'rgba(255, 255, 255, 0.5)',
-      fontSize: 11,
-      marginTop: 6,
-      textAlign: 'center',
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0F141C',
+  },
+  safeArea: {
+    flex: 1,
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  safeAreaOverlay: {
+    backgroundColor: 'transparent',
+  },
+  videoTimerWrap: {
+    alignItems: 'center',
+    paddingTop: 12,
+  },
+  videoCallerName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  videoTimerText: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    marginTop: 4,
+  },
+});

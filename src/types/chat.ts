@@ -33,6 +33,7 @@ export interface UserSummary {
   displayName: string;
   email: string;
   avatarUrl?: string;
+  isSelf?: boolean;
 }
 
 export interface ReplyToInfo {

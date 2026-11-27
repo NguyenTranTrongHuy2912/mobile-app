@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAppDispatch } from '../../store/hooks';
 import type { AuthUser } from '../../api/authApi';
-import { SESSION_KEY, setUser, logout } from './sessionSlice';
+import { SESSION_KEY, setUser, logout, updateUserProfile } from './sessionSlice';
 import { API_URL } from '../../config';
+import { avatarCache } from '../../services/avatarCache';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,6 +60,9 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
             } else {
               // Khôi phục phiên ngay lập tức
               dispatch(setUser(user));
+              if (user.avatarUrl) {
+                avatarCache.register(user.userId, user.displayName, user.avatarUrl);
+              }
 
               // Tự động đồng bộ quyền Role và trạng thái tài khoản thực tế từ máy chủ
               fetch(`${API_URL}/api/v1/users/me`, {
@@ -78,6 +82,41 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
                   }
                 })
                 .catch(() => {});
+
+              // Tự động đồng bộ danh sách bạn bè và avatar mới nhất vào cache
+              fetch(`${API_URL}/api/v1/friends`, {
+                headers: { Authorization: `Bearer ${user.token}` },
+              })
+                .then(async (res) => {
+                  if (res.ok) {
+                    const data = await res.json();
+                    const friends = data?.friends || [];
+                    for (const f of friends) {
+                      const av = f.avatar_url || f.avatarUrl || f.avatar;
+                      if (av) avatarCache.register(f.user_id, f.display_name, av);
+                    }
+                  }
+                })
+                .catch(() => {});
+
+              // Đồng bộ avatar của chính mình nếu chưa có trong session
+              if (!user.avatarUrl && user.displayName) {
+                fetch(`${API_URL}/api/v1/users/search?q=${encodeURIComponent(user.displayName)}&limit=5`, {
+                  headers: { Authorization: `Bearer ${user.token}` },
+                })
+                  .then(async (res) => {
+                    if (res.ok) {
+                      const data = await res.json();
+                      const me = (data?.users || []).find((u: any) => u.user_id === user.userId);
+                      const myAv = me?.avatar_url || me?.avatarUrl;
+                      if (myAv) {
+                        dispatch(updateUserProfile({ avatarUrl: myAv }));
+                        avatarCache.register(user.userId, user.displayName, myAv);
+                      }
+                    }
+                  })
+                  .catch(() => {});
+              }
             }
           }
         }
