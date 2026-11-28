@@ -104,6 +104,7 @@ function SenderSmallAvatar({ userId, name }: { userId: string; name: string }) {
   return null;
 }
 
+const HQ_AI_BOT_ID = 'hq_ai_bot';
 const MAX_IMAGES_PER_PICK = 5;
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '🎉'];
 
@@ -467,7 +468,7 @@ export default function ChatRoomScreen() {
     if (mentionQuery === null) return [];
     const list: { id: string; name: string; isAi?: boolean }[] = [];
     if ('hq ai'.includes(mentionQuery) || 'ai'.includes(mentionQuery) || mentionQuery === '') {
-      list.push({ id: 'hq_ai_bot', name: 'HQ AI', isAi: true });
+      list.push({ id: HQ_AI_BOT_ID, name: 'HQ AI', isAi: true });
     }
     const members = currentRoom?.members ?? [];
     for (const m of members) {
@@ -560,7 +561,7 @@ export default function ChatRoomScreen() {
       ),
       headerRight: () => (
         <View style={styles.headerRightActions}>
-          {otherMember?.userId !== 'hq_ai_bot' && (
+          {otherMember?.userId !== HQ_AI_BOT_ID && (
             <>
               <Pressable
                 onPress={() => handleStartCall('audio')}
@@ -721,7 +722,7 @@ export default function ChatRoomScreen() {
         Alert.alert('Lỗi', 'Không tìm thấy thông tin người nhận cuộc gọi.');
         return;
       }
-      if (otherMember.userId === 'hq_ai_bot') {
+      if (otherMember.userId === HQ_AI_BOT_ID) {
         Alert.alert('Thông báo', 'Không thể gọi điện cho Trợ lý ảo HQ AI.');
         return;
       }
@@ -749,7 +750,7 @@ export default function ChatRoomScreen() {
     } else {
       // Gọi nhóm (Group Calling qua WebRTC Mesh)
       const groupMembers = (currentRoom?.members || []).filter(
-        (m) => m.userId !== userId && m.userId !== 'hq_ai_bot'
+        (m) => m.userId !== userId && m.userId !== HQ_AI_BOT_ID
       );
       if (groupMembers.length === 0) {
         Alert.alert('Thông báo', 'Phòng nhóm chưa có thành viên nào khác để thực hiện cuộc gọi.');
@@ -994,7 +995,8 @@ export default function ChatRoomScreen() {
   };
 
   const renderItem = ({ item, index }: { item: Message; index: number }) => {
-    const isHqAi = item.senderId === 'hq_ai_bot' || item.content.startsWith('🤖 [HQ AI]');
+    // Chỉ tin cậy senderId do server gán. Không suy ra từ nội dung (người dùng có thể gõ tiền tố để giả AI).
+    const isHqAi = item.senderId === HQ_AI_BOT_ID;
     const mine = !isHqAi && item.senderId === userId;
     const isImage = item.type === 'image';
     const isVideo = item.type === 'video';
@@ -1107,7 +1109,7 @@ export default function ChatRoomScreen() {
             ) : isFile ? (
               <Pressable
                 style={styles.fileCard}
-                onPress={() => item.fileUrl && Linking.openURL(item.fileUrl)}
+                onPress={() => item.fileUrl && /^https:\/\//i.test(item.fileUrl) && Linking.openURL(item.fileUrl)}
               >
                 <View style={[styles.fileIconWrap, { backgroundColor: getFileColor(item.fileName) }]}>
                   <Ionicons name={getFileIcon(item.fileName)} size={22} color="#fff" />
