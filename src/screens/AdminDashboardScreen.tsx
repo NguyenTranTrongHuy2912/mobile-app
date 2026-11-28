@@ -17,10 +17,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootState } from '../store';
 import { API_URL } from '../config';
-import { logout, setUser, SESSION_KEY } from '../features/session/sessionSlice';
+import { logout, setUser } from '../features/session/sessionSlice';
+import { loadSession, saveSession } from '../features/session/sessionStorage';
 import { useRouter } from 'expo-router';
 
 interface AdminStats {
@@ -114,11 +114,10 @@ export default function AdminDashboardScreen() {
           'Tài khoản của bạn hiện là Thành viên (USER). Đang chuyển hướng về giao diện chat.',
           [{ text: 'Đồng ý', onPress: () => router.replace('/(app)/(tabs)/rooms') }]
         );
-        const raw = await AsyncStorage.getItem(SESSION_KEY);
-        if (raw) {
-          const u = JSON.parse(raw);
-          u.role = 'USER';
-          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(u));
+        const stored = await loadSession();
+        if (stored) {
+          const u = { ...stored, role: 'USER' as const };
+          await saveSession(u).catch(() => {});
           dispatch(setUser(u));
         }
         router.replace('/(app)/(tabs)/rooms');

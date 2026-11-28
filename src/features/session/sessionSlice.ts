@@ -1,8 +1,17 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, type AuthUser } from '../../api/authApi';
+import { clearSession, patchSessionProfile, saveSession } from './sessionStorage';
 
-export const SESSION_KEY = 'chat_session';
+// Đăng nhập đã thành công ở server: nếu lưu máy thất bại vẫn cho dùng trong phiên này (chỉ mất khi tắt app)
+const persistSession = async (user: AuthUser) => {
+  try {
+    await saveSession(user);
+  } catch (e) {
+    console.warn('[session] Không lưu được phiên đăng nhập:', e);
+  }
+};
+
+export { SESSION_KEY, loadSession } from './sessionStorage';
 
 interface SessionState extends AuthUser {
   isAuthenticated: boolean;
@@ -21,12 +30,6 @@ const initialState: SessionState = {
   error: null,
 };
 
-const saveSession = async (user: AuthUser) => {
-  try {
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  } catch {}
-};
-
 export const login = createAsyncThunk<
   AuthUser,
   { account: string; password: string },
@@ -34,7 +37,7 @@ export const login = createAsyncThunk<
 >('session/login', async ({ account, password }, { rejectWithValue }) => {
   try {
     const user = await authApi.login(account, password);
-    await saveSession(user);
+    await persistSession(user);
     return user;
   } catch (e) {
     return rejectWithValue(e instanceof Error ? e.message : 'Đăng nhập thất bại');
@@ -48,7 +51,7 @@ export const register = createAsyncThunk<
 >('session/register', async ({ name, account, password, otpCode }, { rejectWithValue }) => {
   try {
     const user = await authApi.register(name, account, password, otpCode);
-    await saveSession(user);
+    await persistSession(user);
     return user;
   } catch (e) {
     return rejectWithValue(e instanceof Error ? e.message : 'Đăng ký thất bại');
@@ -56,8 +59,17 @@ export const register = createAsyncThunk<
 });
 
 export const logout = createAsyncThunk('session/logout', async () => {
+  await clearSession();
+});
+
+/** Cập nhật state + lưu bền. Dùng thay cho dispatch(updateUserProfile(...)) ở ProfileScreen. */
+export const persistProfile = createAsyncThunk<
+  void,
+  { displayName?: string; avatarUrl?: string }
+>('session/persistProfile', async (patch, { dispatch }) => {
+  dispatch(sessionSlice.actions.updateUserProfile(patch));
   try {
-    await AsyncStorage.removeItem(SESSION_KEY);
+    await patchSessionProfile(patch);
   } catch {}
 });
 
@@ -77,17 +89,10 @@ const sessionSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    // Reducer thuần: việc ghi xuống bộ nhớ làm ở thunk persistProfile bên dưới
     updateUserProfile(state, action: PayloadAction<{ displayName?: string; avatarUrl?: string }>) {
       if (action.payload.displayName) state.displayName = action.payload.displayName;
-      if (action.payload.avatarUrl) state.avatarUrl = action.payload.avatarUrl;
-      AsyncStorage.getItem(SESSION_KEY).then((data) => {
-        if (data) {
-          const user = JSON.parse(data);
-          if (action.payload.displayName) user.displayName = action.payload.displayName;
-          if (action.payload.avatarUrl) user.avatarUrl = action.payload.avatarUrl;
-          AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
-        }
-      }).catch(() => {});
+      if (action.payload.avatarUrl !== undefined) state.avatarUrl = action.payload.avatarUrl;
     },
   },
   extraReducers: (builder) => {

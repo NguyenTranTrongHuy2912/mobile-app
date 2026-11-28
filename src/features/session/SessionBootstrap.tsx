@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAppDispatch } from '../../store/hooks';
 import type { AuthUser } from '../../api/authApi';
-import { SESSION_KEY, setUser, logout, updateUserProfile } from './sessionSlice';
+import { setUser, logout, persistProfile } from './sessionSlice';
+import { loadSession, saveSession } from './sessionStorage';
 import { API_URL } from '../../config';
 import { avatarCache } from '../../services/avatarCache';
 
@@ -49,14 +49,13 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(SESSION_KEY);
-        if (raw) {
-          const user = JSON.parse(raw) as AuthUser;
-          if (user?.userId && user?.token) {
+        // Token nằm trong SecureStore; loadSession tự chuyển dữ liệu cũ từ AsyncStorage sang
+        const user = await loadSession();
+        if (user) {
+          if (user.userId && user.token) {
             if (isTokenExpired(user.token)) {
               console.warn('[SessionBootstrap] Token đã hết hạn, xóa phiên cũ để đăng nhập lại');
-              await AsyncStorage.removeItem(SESSION_KEY);
-              dispatch(logout());
+              await dispatch(logout());
             } else {
               // Khôi phục phiên ngay lập tức
               dispatch(setUser(user));
@@ -73,11 +72,10 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
                     const data = await res.json();
                     if (data && data.role && data.role !== user.role) {
                       const updatedUser: AuthUser = { ...user, role: data.role };
-                      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+                      await saveSession(updatedUser).catch(() => {});
                       dispatch(setUser(updatedUser));
                     }
                   } else if (res.status === 401) {
-                    await AsyncStorage.removeItem(SESSION_KEY);
                     dispatch(logout());
                   }
                 })
@@ -110,7 +108,7 @@ export default function SessionBootstrap({ children }: { children: React.ReactNo
                       const me = (data?.users || []).find((u: any) => u.user_id === user.userId);
                       const myAv = me?.avatar_url || me?.avatarUrl;
                       if (myAv) {
-                        dispatch(updateUserProfile({ avatarUrl: myAv }));
+                        dispatch(persistProfile({ avatarUrl: myAv }));
                         avatarCache.register(user.userId, user.displayName, myAv);
                       }
                     }

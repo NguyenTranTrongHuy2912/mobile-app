@@ -22,7 +22,7 @@ import {
   useUpdateProfileMutation,
 } from '../api/chatApi';
 import { uploadImage } from '../api/uploadApi';
-import { logout, updateUserProfile } from '../features/session/sessionSlice';
+import { logout, persistProfile } from '../features/session/sessionSlice';
 import { useScreenColors, type ScreenColors } from '../features/theme/useScreenColors';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { errorMessage } from '../utils/errorMessage';
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
       });
 
       await updateProfile({ avatarUrl: uploaded.url }).unwrap();
-      dispatch(updateUserProfile({ avatarUrl: uploaded.url }));
+      dispatch(persistProfile({ avatarUrl: uploaded.url }));
       Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện thành công!');
     } catch (e) {
       Alert.alert('Lỗi', errorMessage(e, 'Không thể cập nhật ảnh đại diện. Vui lòng thử lại.'));
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
     }
     try {
       await updateProfile({ displayName: trimmed }).unwrap();
-      dispatch(updateUserProfile({ displayName: trimmed }));
+      dispatch(persistProfile({ displayName: trimmed }));
       setShowNameModal(false);
       Alert.alert('Thành công', 'Đã cập nhật tên hiển thị!');
     } catch (e) {
