@@ -32,8 +32,10 @@ export interface WebRTCSession {
 
 class WebRTCManager {
   private peerConnections: Map<string, WebRTCSession> = new Map();
-  private localAudioStream: any = null;
-  private localVideoStream: any = null;
+  // Một luồng media cục bộ DÙNG CHUNG cho mọi peer (gọi nhóm mesh): tránh mở mic/cam nhiều lần và rò rỉ stream
+  private localStream: any = null;
+  private localStreamPromise: Promise<any> | null = null;
+  private onRemoteStreamDefault: ((peerId: string, stream: any) => void) | null = null;
   private isNativeWebRTCAvailable: boolean = false;
 
   constructor() {
@@ -57,6 +59,32 @@ class WebRTCManager {
     );
   }
 
+  /** Đăng ký handler mặc định nhận remote stream (dùng khi callee không truyền callback riêng vào handleOffer). */
+  public setRemoteStreamHandler(handler: ((peerId: string, stream: any) => void) | null) {
+    this.onRemoteStreamDefault = handler;
+  }
+
+  /** Lấy (hoặc tạo 1 lần) luồng mic/cam cục bộ. Các peer sau dùng lại cùng luồng. */
+  private async acquireLocalStream(callType: 'audio' | 'video'): Promise<any> {
+    if (this.localStream) return this.localStream;
+    if (!this.localStreamPromise) {
+      this.localStreamPromise = navigator.mediaDevices
+        .getUserMedia({ audio: true, video: callType === 'video' })
+        .then((stream: any) => {
+          this.localStream = stream;
+          return stream;
+        })
+        .catch((err: any) => {
+          console.warn('[WebRTC] Trình duyệt không thể truy cập mic/cam:', err);
+          return null;
+        })
+        .finally(() => {
+          this.localStreamPromise = null;
+        });
+    }
+    return this.localStreamPromise;
+  }
+
   /**
    * Khởi tạo kết nối PeerConnection với 1 đối tác (1-1 hoặc thành viên trong nhóm)
    */
@@ -78,22 +106,18 @@ class WebRTCManager {
         iceServers: DEFAULT_ICE_SERVERS,
       });
 
-      // Lấy media thật trên trình duyệt / webview
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: callType === 'video',
-        });
-        this.localAudioStream = stream;
+      // Lấy media thật trên trình duyệt / webview (dùng chung 1 luồng cho mọi peer)
+      const stream = await this.acquireLocalStream(callType);
+      if (stream) {
         stream.getTracks().forEach((track: any) => pc.addTrack(track, stream));
-      } catch (err) {
-        console.warn('[WebRTC] Trình duyệt không thể truy cập mic/cam:', err);
       }
 
       pc.ontrack = (event: any) => {
-        if (event.streams && event.streams[0] && onRemoteStream) {
-          onRemoteStream(event.streams[0]);
-        }
+        const remote = event.streams && event.streams[0];
+        if (!remote) return;
+        const sess = this.peerConnections.get(peerId);
+        if (sess) sess.remoteStream = remote;
+        (onRemoteStream ?? ((s: any) => this.onRemoteStreamDefault?.(peerId, s)))(remote);
       };
 
       pc.onicecandidate = (event: any) => {
@@ -136,7 +160,7 @@ class WebRTCManager {
     const session: WebRTCSession = {
       peerId,
       pc,
-      localStream: this.localAudioStream,
+      localStream: this.localStream,
       remoteStream: null,
       isOfferPending: isCaller,
     };
@@ -184,11 +208,12 @@ class WebRTCManager {
     callId: string,
     callType: 'audio' | 'video',
     offerSdp: any,
-    extra: Record<string, any> = {}
+    extra: Record<string, any> = {},
+    onRemoteStream?: (stream: any) => void
   ) {
     let session = this.peerConnections.get(peerId);
     if (!session) {
-      await this.createPeerConnection(peerId, false, callType);
+      await this.createPeerConnection(peerId, false, callType, onRemoteStream);
       session = this.peerConnections.get(peerId);
     }
     if (!session || !session.pc) return;
@@ -271,8 +296,8 @@ class WebRTCManager {
    * Bật/Tắt Microphone
    */
   public toggleMute(muted: boolean) {
-    if (this.localAudioStream && this.localAudioStream.getAudioTracks) {
-      this.localAudioStream.getAudioTracks().forEach((track: any) => {
+    if (this.localStream && this.localStream.getAudioTracks) {
+      this.localStream.getAudioTracks().forEach((track: any) => {
         track.enabled = !muted;
       });
     }
@@ -282,8 +307,8 @@ class WebRTCManager {
    * Bật/Tắt Camera
    */
   public toggleVideo(videoOff: boolean) {
-    if (this.localAudioStream && this.localAudioStream.getVideoTracks) {
-      this.localAudioStream.getVideoTracks().forEach((track: any) => {
+    if (this.localStream && this.localStream.getVideoTracks) {
+      this.localStream.getVideoTracks().forEach((track: any) => {
         track.enabled = !videoOff;
       });
     }
@@ -313,14 +338,13 @@ class WebRTCManager {
     });
     this.peerConnections.clear();
 
-    if (this.localAudioStream) {
+    if (this.localStream) {
       try {
-        if (this.localAudioStream.getTracks) {
-          this.localAudioStream.getTracks().forEach((t: any) => t.stop());
-        }
+        this.localStream.getTracks?.().forEach((t: any) => t.stop());
       } catch {}
-      this.localAudioStream = null;
+      this.localStream = null;
     }
+    this.localStreamPromise = null;
   }
 }
 
