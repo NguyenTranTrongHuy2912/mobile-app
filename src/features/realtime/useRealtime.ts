@@ -70,6 +70,10 @@ export function useRealtime() {
         wsRef.current.close();
         wsRef.current = null;
       }
+      // Đăng xuất: dừng rung chuông, đóng cuộc gọi đang dở (giải phóng mic/cam) và xóa thông báo của tài khoản cũ
+      Vibration.cancel();
+      webrtcService.endAll();
+      Notifications.dismissAllNotificationsAsync().catch(() => {});
       return;
     }
 
